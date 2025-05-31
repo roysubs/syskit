@@ -1,0 +1,84 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# YouTube Keyboard Shortcuts and Tech Tricks
+
+## Keyboard Shortcuts
+
+- **Playback Controls**:
+  - Play/Pause: `k`
+  - Stop: `Shift + k`
+  - Rewind 10 seconds: `j`
+  - Fast-forward 10 seconds: `l`
+  - Jump to start: `Home`, Jump to end: `End`
+  - Skip forward/back 5 seconds: `Left Arrow` / `Right Arrow`
+  - Increase speed: `>` (Shift + .), Decrease speed: `<` (Shift + ,)
+  
+- **Volume and Mute**:
+  - Mute/Unmute: `m`
+  - Increase volume: `Up Arrow`
+  - Decrease volume: `Down Arrow`
+
+- **Captions**:
+  - Toggle captions: `c`
+  - Adjust caption size: `+` / `-`
+
+- **Navigation**:
+  - Search: `/`
+  - Go to previous video: `Shift + p`, Go to next video: `Shift + n`
+  - Fullscreen: `f`, Exit Fullscreen: `Esc`
+  - Theater mode: `t`
+  - Miniplayer: `i`
+  - Close Miniplayer: `Esc`
+
+- **Seek**:
+  - Seek to a specific point in the video (percentages): `0-9`
+  - Go to next chapter: `Shift + >`, Previous chapter: `Shift + <`
+
+- **Subtitles**:
+  - Turn subtitles on/off: `c`
+  - Change subtitle settings: Use gear icon in settings.
+
+## Tech Tricks
+
+- **URL Tricks**:
+  - Start video at specific time: Add `?t=30s` (e.g., `youtube.com/watch?v=abc123?t=30s`).
+  - Loop video: Right-click the video and select `Loop` or add `&loop=1` to the URL.
+  - Disable Autoplay: Add `&autoplay=0` to the URL.
+
+- **Download Video (CLI)**:
+  - Install `youtube-dl`: `sudo apt install youtube-dl`
+  - Download video: `youtube-dl <video_url>`
+  - Download audio only: `youtube-dl -x <video_url>`
+
+- **Ad-Free Experience**:
+  - Use browser extensions like `uBlock Origin`.
+  - Open in `Invidious`: Replace `youtube.com` with `invidio.us` in the URL.
+
+- **Picture-in-Picture (PiP)**:
+  - Right-click the video twice, select `Picture-in-Picture` (or use browser PiP features).
+
+- **Playback Speed Beyond Limits**:
+  - Use developer tools (F12): Go to console and set speed: `document.querySelector('video').playbackRate = 3.0`.
+
+- **Download Subtitles**:
+  - Use `youtube-dl` with `--write-sub` flag: `youtube-dl --write-sub <video_url>`.
+
+- **Embed Videos Without Controls**:
+  - Append `?controls=0` to the URL when embedding videos.
+
+- **Force High/Low Quality**:
+  - Add `&vq=hd1080` for HD or `&vq=small` for low quality to the URL.
+
+- **Hidden Stats Overlay**:
+  - Enable stats for nerds: Right-click and select `Stats for nerds`.
+  - Shortcut: `Ctrl + Shift + Alt + D` (Windows/Linux), `Command + Shift + Option + D` (Mac).
+
+- **Keyboard Shortcut Legend**:
+  - While watching a video, press `Shift + ?` to display all available shortcuts.
+
+EOF
+) | less -R

@@ -1,0 +1,209 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Timeshift Quick Reference (CLI Focus)
+
+Timeshift is a system restore utility for Linux. It creates incremental snapshots of the filesystem using rsync or BTRFS snapshots. It's designed to protect system files and settings, not user data.
+
+## Core Concepts
+
+* **System Snapshots:** Timeshift focuses on backing up system files (`/`, `/usr`, `/etc`, `/opt`, etc.) and system settings.
+* **Exclusions:** By default, Timeshift **excludes** user home directories (`/home`), though you can configure inclusions/exclusions. Other common exclusions include `/tmp`, `/var/tmp`, `/var/log`, and the trash bin.
+* **Backup Types:**
+    * **Rsync:** Copies files and directories. Uses hard-links for unchanged files between snapshots, saving space. Can be used on any filesystem.
+    * **BTRFS:** Leverages the snapshot feature of the BTRFS filesystem for very fast snapshots. Requires the root partition to be BTRFS.
+* **Snapshot Levels:** Defines how many snapshots of each type (hourly, daily, weekly, monthly, boot) to retain. Older snapshots are automatically pruned.
+* **Destination:** Snapshots are typically saved to an external drive or a separate internal partition. **It is highly recommended to save snapshots to a different partition or disk than the root filesystem.**
+
+## Installation (if not already installed)
+
+Timeshift is often pre-installed on many distributions (like Linux Mint, Ubuntu variants). If not, install it via your package manager:
+
+```bash
+sudo apt install timeshift
+sudo dnf install timeshift
+sudo pacman -S timeshift   # etc
+```
+
+## Initial Setup (CLI)
+While the GUI is often used for initial setup, you can configure Timeshift via its configuration file or command-line options. The primary configuration file is usually located at /etc/timeshift/timeshift.json.
+
+Note: For a headless system, you'll likely edit /etc/timeshift/timeshift.json directly or use CLI commands to set parameters before the first run.
+
+Brief GUI Mention: The GUI provides an easy setup wizard. To start it (on a system with a desktop environment):
+
+Bash
+
+timeshift-gui
+It's usually found in the system menu under "Timeshift" or "System Restore".
+
+Creating Snapshots (CLI)
+Manual snapshots are useful before major system changes (e.g., kernel updates, software installations).
+
+Create a manual snapshot:
+
+Bash
+
+sudo timeshift --create --comments "Manual snapshot before system update" --tags O
+--create: Initiates snapshot creation.
+--comments: Adds a descriptive comment to the snapshot.
+--tags: Assigns tags (e.g., D for Daily, W for Weekly, M for Monthly, B for Boot, O for On-demand/Manual). Tags are used for retention policies.
+Create a snapshot with a specific type (based on retention policy):
+
+Bash
+
+sudo timeshift --create --tags W
+Automated Snapshots: Scheduled snapshots are configured in /etc/timeshift/timeshift.json or via the GUI. Once configured, a systemd timer or cron job typically runs timeshift --check periodically.
+
+Check and run scheduled tasks:
+
+Bash
+
+sudo timeshift --check
+This command checks if a scheduled snapshot is due according to the configuration and creates one if necessary. It also prunes older snapshots based on retention settings.
+
+Listing Snapshots (CLI)
+View existing snapshots and their details.
+
+List all snapshots:
+
+Bash
+
+sudo timeshift --list
+This shows the snapshot type, date, size, and comments.
+
+Restoring from Snapshots (CLI)
+WARNING: Restoring a snapshot will revert your system files to the state they were in when the snapshot was taken. This is a powerful operation and should be used with caution. It's often best performed from a live environment (like a Linux installation USB) if your system is unbootable.
+
+Restore the latest snapshot:
+
+Bash
+
+sudo timeshift --restore
+This will prompt you to select the target device (usually the root partition /).
+
+Restore a specific snapshot:
+First, list snapshots to get the snapshot ID (the date/time string).
+
+Bash
+
+sudo timeshift --list
+Then, restore using the ID:
+
+Bash
+
+sudo timeshift --restore --snapshot 'YYYY-MM-DD_HH-MM-SS'
+Replace 'YYYY-MM-DD_HH-MM-SS' with the actual snapshot ID.
+
+Restore to a different device (e.g., from a live environment):
+
+Bash
+
+sudo timeshift --restore --snapshot 'YYYY-MM-DD_HH-MM-SS' --target /dev/sdXn --skip-boot --skip-grub
+--target /dev/sdXn: Specify the target root partition (e.g., /dev/sda1).
+--skip-boot: Skip updating the bootloader configuration (useful if restoring from a live USB).
+--skip-grub: Skip reinstalling GRUB (useful if restoring from a live USB and you don't want to mess with the existing bootloader).
+Simulate a restore (dry run):
+
+Bash
+
+sudo timeshift --restore --snapshot 'YYYY-MM-DD_HH-MM-SS' --dry-run
+This shows what files would be restored without actually performing the restore.
+
+Deleting Snapshots (CLI)
+Manually remove unwanted snapshots.
+
+Delete a specific snapshot:
+
+Bash
+
+sudo timeshift --delete --snapshot 'YYYY-MM-DD_HH-MM-SS'
+Replace 'YYYY-MM-DD_HH-MM-SS' with the actual snapshot ID.
+
+Delete snapshots based on tags (e.g., delete all manual snapshots):
+
+Bash
+
+sudo timeshift --delete --tags O
+Common Command-Line Switches
+--create: Create a snapshot.
+--restore: Restore a snapshot.
+--list: List existing snapshots.
+--delete: Delete snapshots.
+--check: Check and run scheduled tasks, prune old snapshots.
+--snapshot 'ID': Specify a snapshot ID for restore/delete.
+--tags TAGS: Assign tags (D, W, M, B, O) or delete by tags.
+--comments "TEXT": Add comments to a snapshot.
+--target DEVICE: Specify the target device for restore (e.g., /dev/sda1).
+--skip-boot: Skip bootloader update during restore.
+--skip-grub: Skip GRUB reinstallation during restore.
+--dry-run: Simulate an operation without making changes.
+--exclude PATTERN: Exclude files/folders matching the pattern.
+--include PATTERN: Include files/folders matching the pattern (overrides default exclusions).
+--exclude-rsync PATTERN: Exclude using rsync patterns.
+--include-rsync PATTERN: Include using rsync patterns.
+--config FILE: Specify an alternative configuration file.
+--yes: Assume yes to all prompts (use with extreme caution).
+--verbose: Show more detailed output.
+--help: Display help message.
+Configuration File (/etc/timeshift/timeshift.json)
+This JSON file controls Timeshift's behavior for scheduled snapshots, retention policies, locations, and inclusions/exclusions.
+
+Key parameters include:
+
+backup_device_uuid: UUID of the snapshot destination partition.
+snapshot_levels: Defines retention counts for each tag (daily, weekly, monthly, boot, on-demand).
+exclude, include: Lists of paths to exclude/include.
+backup_type: rsync or btrfs.
+Example (Snippet):
+
+JSON
+
+{
+    "backup_device_uuid": "YOUR_DEVICE_UUID",
+    "snapshot_levels": {
+        "daily": 5,
+        "weekly": 2,
+        "monthly": 1,
+        "boot": 0,
+        "on_demand": 1
+    },
+    "exclude": [
+        "/home/**",
+        "/root/**",
+        "/var/log/**",
+        "/tmp/**",
+        "/var/tmp/**",
+        "/dev/*",
+        "/proc/*",
+        "/sys/*",
+        "/mnt/*",
+        "/media/*",
+        "/run/*",
+        "/cdrom/*",
+        "/srv/*"
+    ],
+    "include": [],
+    "backup_type": "rsync",
+    "schedule_enabled": true,
+    "schedule_weekly": true,
+    "schedule_monthly": false,
+    "schedule_hourly": false,
+    "schedule_boot": false,
+    "schedule_daily": false,
+    "schedule_at": "12:00"
+}
+Remember to replace "YOUR_DEVICE_UUID" with the actual UUID of your backup partition. You can find the UUID using lsblk -f or blkid.
+
+Important Considerations
+Backup Location: Always use a separate partition or disk for snapshots. Saving snapshots on the same partition as the root filesystem offers no protection against disk failure.
+User Data: Timeshift is NOT a backup solution for your personal files (/home). Use a separate tool (like rsync, BorgBackup, Deja Dup) for user data backups.
+Live Environment: For restoring a broken system, using a live USB of your distribution is the safest method. Install Timeshift on the live environment if needed.
+Testing: Regularly test your restore process to ensure it works correctly BEFORE you have a system failure.
+This cheat sheet provides a command-line focused overview. Refer to the timeshift man page (man timeshift) for complete details and options.
+
+EOF
+) | less -R

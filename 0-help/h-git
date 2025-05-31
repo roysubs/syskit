@@ -1,0 +1,273 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Git Quick Notes
+===============
+
+- **Basic Git Commands**:
+    - Initialize a new Git repository:
+      ```bash
+      git init
+      ```
+      git config --global user.name "username"
+      git config --global user.email "user@email.com"
+
+    - Clone a remote repository:
+      ```bash
+      git clone https://github.com/username/repository.git
+      ```
+
+    - Check repository status (see changes):
+      ```bash
+      git status
+      ```
+
+    - Add changes to staging area:
+      ```bash
+      git add file.txt
+      ```
+      Add all changes:
+      ```bash
+      git add .
+      ```
+
+    - Commit changes:
+      ```bash
+      git commit -m "Commit message"
+      ```
+
+    - View commit history:
+      ```bash
+      git log
+      ```
+
+    - View a short, one-line commit history:
+      ```bash
+      git log --oneline
+      ```
+
+    - Push changes to a remote repository:
+      ```bash
+      git push origin branch_name
+      ```
+
+    - Pull changes from a remote repository:
+      ```bash
+      git pull origin branch_name
+      ```
+
+    - Checkout a branch:
+      ```bash
+      git checkout branch_name
+      ```
+
+    - Create a new branch and switch to it:
+      ```bash
+      git checkout -b new_branch_name
+      ```
+
+- **Branching and Merging**:
+    - List all branches:
+      ```bash
+      git branch
+      ```
+
+    - Create and switch to a new branch:
+      ```bash
+      git checkout -b new-feature
+      ```
+
+    - Merge one branch into another:
+      ```bash
+      git merge branch_name
+      ```
+
+    - Resolve merge conflicts:
+      - After merge, if conflicts arise, manually resolve them in the files.
+      - Mark the conflicts as resolved:
+        ```bash
+        git add resolved_file.txt
+        git commit -m "Resolved merge conflict"
+        ```
+
+    - Delete a local branch:
+      ```bash
+      git branch -d branch_name
+      ```
+
+    - Delete a remote branch:
+      ```bash
+      git push origin --delete branch_name
+      ```
+
+- **Remote Repositories**:
+    - Add a remote repository:
+      ```bash
+      git remote add origin https://github.com/username/repository.git
+      ```
+
+    - View all remote repositories:
+      ```bash
+      git remote -v
+      ```
+
+    - Change the URL of a remote repository:
+      ```bash
+      git remote set-url origin https://github.com/username/new-repository.git
+      ```
+
+    - Fetch updates from a remote repository:
+      ```bash
+      git fetch origin
+      ```
+
+    - Set upstream for a branch (connect a local branch to a remote):
+      ```bash
+      git branch --set-upstream-to=origin/branch_name branch_name
+      ```
+
+- **Git Stashing**:
+    - Save local changes temporarily:
+      ```bash
+      git stash
+      ```
+
+    - Apply the most recent stash:
+      ```bash
+      git stash apply
+      ```
+
+    - List all stashes:
+      ```bash
+      git stash list
+      ```
+
+    - Drop the most recent stash:
+      ```bash
+      git stash drop
+      ```
+
+    - Clear all stashes:
+      ```bash
+      git stash clear
+      ```
+
+- **Git Configuration**:
+    - Set your username:
+      ```bash
+      git config --global user.name "Your Name"
+      ```
+
+    - Set your email:
+      ```bash
+      git config --global user.email "you@example.com"
+      ```
+
+    - View global configuration settings:
+      ```bash
+      git config --list
+      ```
+
+    - Set default editor for Git (e.g., vim or nano):
+      ```bash
+      git config --global core.editor "nano"
+      ```
+
+    - Change the default merge tool:
+      ```bash
+      git config --global merge.tool vimdiff
+      ```
+
+- **Undoing Changes**:
+    - Unstage a file:
+      ```bash
+      git reset file.txt
+      ```
+
+    - Reset to the last commit:
+      ```bash
+      git reset --hard
+      ```
+
+    - Revert a commit (create a new commit that undoes a previous one):
+      ```bash
+      git revert commit_hash
+      ```
+
+    - Amend the last commit:
+      ```bash
+      git commit --amend
+      ```
+
+- **Git Tags**:
+    - Create a new tag:
+      ```bash
+      git tag v1.0
+      ```
+
+    - Push tags to a remote repository:
+      ```bash
+      git push origin v1.0
+      ```
+
+    - List all tags:
+      ```bash
+      git tag
+      ```
+
+    - Delete a local tag:
+      ```bash
+      git tag -d v1.0
+      ```
+
+    - Delete a remote tag:
+      ```bash
+      git push origin --delete tag v1.0
+      ```
+
+- **Git Aliases**:
+    - Create a Git alias to shorten commands:
+      ```bash
+      git config --global alias.co checkout
+      ```
+
+    - Now you can use `git co` instead of `git checkout`.
+
+    - View existing aliases:
+      ```bash
+      git config --global --get-regexp alias
+      ```
+
+- **Git Hooks**:
+    - Git hooks are scripts that run at certain points in the Git lifecycle.
+    - Common hooks include:
+      - `pre-commit`: Run before a commit is made.
+      - `post-commit`: Run after a commit is made.
+    - Example: To enable `pre-commit`:
+      ```bash
+      cp .git/hooks/pre-commit.sample .git/hooks/pre-commit
+      chmod +x .git/hooks/pre-commit
+      ```
+
+- **Git Submodules**:
+    - Add a submodule:
+      ```bash
+      git submodule add https://github.com/username/repository.git path/to/submodule
+      ```
+
+    - Initialize and clone submodules:
+      ```bash
+      git submodule init
+      git submodule update
+      ```
+
+    - Update submodules:
+      ```bash
+      git submodule update --remote
+      ```
+
+EOF
+) | less -R

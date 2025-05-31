@@ -1,0 +1,77 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Azure CLI (az) Commands and Tips
+
+## Installation
+
+- **Linux**: `curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash`
+- **Update CLI**: `az upgrade`
+- **Check Installation**: `az version`
+
+## Authentication
+
+- **Login**: `az login` | Use `--use-device-code` for device login.
+- **Set Subscription**: `az account set --subscription <subscription-id>`
+- **List Subscriptions**: `az account list --output table`
+
+## Resource Management
+
+- **List Resources**: `az resource list --output table`
+- **Create Resource Group**: `az group create --name <name> --location <region>`
+- **Delete Resource Group**: `az group delete --name <name>`
+
+## Virtual Machines (VM)
+
+- **List VMs**: `az vm list --output table`
+- **Create VM**: `az vm create --resource-group <group> --name <vm-name> --image UbuntuLTS`
+- **Start/Stop VM**: `az vm start --name <vm-name>` | `az vm stop --name <vm-name>`
+- **Delete VM**: `az vm delete --name <vm-name>`
+
+## Storage
+
+- **Create Storage Account**: `az storage account create --name <name> --resource-group <group>`
+- **List Storage Accounts**: `az storage account list --output table`
+- **Upload File to Blob**: `az storage blob upload --account-name <name> --container-name <container> --file <path>`
+
+## Networking
+
+- **List Public IPs**: `az network public-ip list --output table`
+- **Create VNet**: `az network vnet create --name <vnet-name> --resource-group <group>`
+- **Create Subnet**: `az network vnet subnet create --name <subnet-name> --vnet-name <vnet-name>`
+
+## Kubernetes (AKS)
+
+- **Create AKS Cluster**: `az aks create --resource-group <group> --name <cluster-name> --node-count 3 --generate-ssh-keys`
+- **Get Credentials**: `az aks get-credentials --resource-group <group> --name <cluster-name>`
+- **Scale Cluster**: `az aks scale --resource-group <group> --name <cluster-name> --node-count <number>`
+
+## Monitoring
+
+- **Enable Monitoring**: `az monitor log-analytics workspace create --resource-group <group> --name <workspace-name>`
+- **View Metrics**: `az monitor metrics list --resource <resource-id> --metric <metric-name>`
+- **Create Alerts**: `az monitor alert create --name <alert-name> --resource-group <group>`
+
+## Key Vault
+
+- **Create Key Vault**: `az keyvault create --name <vault-name> --resource-group <group>`
+- **Store Secret**: `az keyvault secret set --vault-name <vault-name> --name <secret-name> --value <value>`
+- **Retrieve Secret**: `az keyvault secret show --vault-name <vault-name> --name <secret-name>`
+
+## Tips
+
+- **Interactive Mode**: Run `az interactive` for an enhanced CLI experience.
+- **Command Examples**: Use `az find <command>` for usage examples.
+- **Output Formats**: JSON: `--output json` | Table: `--output table` | TSV: `--output tsv`
+- **Debugging**: Add `--debug` to any command for detailed logs.
+
+## Cleanup
+
+- **Remove Resources**: `az group delete --name <group>`
+- **Remove Orphaned Disks**: `az disk list --query "[?managedBy==''].id" -o tsv | xargs -n1 az disk delete --ids`
+
+EOF
+) | less -R

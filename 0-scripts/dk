@@ -1,0 +1,528 @@
+#!/bin/bash
+# Docker Tool Script ("dk")
+# Unified wrapper for commonly used Docker commands, with auto-prune, color output, and compatibility for both bash and zsh.
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[1;34m'
+NC='\033[0m' # No Color
+
+print_line() {
+    echo -e "${BLUE}=====${NC}"
+}
+
+color_echo() {
+    echo -e "# ${GREEN}$1${NC}\n"
+}
+
+help_text() {
+    printf "
+Docker Tool (dk). Usage: dk [option]
+Options:
+  s|status|size  ${BLUE}docker ps --format${NC}  Created time and uptime only
+  info [name]    Look at container info (from outside with docker commands, and from within the container if a shell exists)
+  im             ${BLUE}docker images${NC}   List all images (base images used to create containers)
+  ps             ${BLUE}docker ps${NC} Can also add -a (all), -n N (last N created), -l (latest created), -f (filter)
+  psl|pslist     ${BLUE}docker ps --format${NC} Name, Image, Ports, Mounts, Size, Networks in list format
+  n <N>          ${BLUE}docker ps -n N${NC}  List last <N> created (if N omitted, default to N=1)
+  l|last         ${BLUE}docker ps -l${NC}  List latest created (can add -a to also check stopped)
+  f              ${BLUE}docker ps -f [filtername=string]${NC}  Type 'dk f' to see all filter options
+  p|ports        ${BLUE}docker ps --format${NC}  Name, Image, Ports in table format
+  pl|portslist   ${BLUE}docker ps --format${NC}  Ports, but in list output
+  m|mounts       ${BLUE}docker ps --format${NC}  Name, Image, Mounts in table format
+  ml|mountslist  ${BLUE}docker ps --format${NC}  Mounts, but in list format
+  run [name] [image]  ${BLUE}sudo docker run -it --name [name] [image]${NC}  Create and start container
+  it [name] <process> ${BLUE}docker exec -it [name] [process]${NC}  Interactive TTY
+      Interactively enter container and start a process (could be bash, sh, top, etc)
+  x|ex|exec      ${BLUE}docker exec -it <name> <process>${NC}   Enter container and run bash
+  start <name>   ${BLUE}docker start <name>${NC}   Start a stopped container
+  stop <name>    ${BLUE}docker stop <name>${NC}    Stop a running container
+  restart<name>  ${BLUE}docker stop <name>${NC}    Stop a running container
+  rm <name>      ${BLUE}docker rm <name>${NC}      Remove a container
+  rmi <img>      ${BLUE}docker rmi <img>${NC}      Remove an image
+  logs <name>    ${BLUE}docker logs -f <name>${NC}   Follow logs from a container
+  prune          ${BLUE}docker system prune -f${NC}  Remove unused data
+  volprune       ${BLUE}docker volume prune -f${NC}  Remove unused volumes
+  clean          Run all prune operations
+  up [name]      ${BLUE}docker-compose up -d [name]${NC}   Start container(s) with docker-compose
+  down           ${BLUE}docker-compose down${NC}           Stop and remove docker-compose containers
+  -h, --help     Show this help menu
+
+"
+}
+
+# Main logic
+cmd=$1
+shift
+
+case "$cmd" in
+    ""|-h|--help)
+        help_text
+        ;;
+
+    ps)
+        color_echo "docker ps $@"
+        docker ps $@
+        ;;
+
+    n)
+        color_echo "docker ps -n $@"
+        docker ps -n $@
+        ;;
+
+    l)
+        color_echo "docker ps -l"
+        docker ps -l
+        ;;
+
+    f)
+        if [ "$#" -eq 0 ]; then
+            echo "Available filters for 'dk f name=value' i.e., 'docker ps -f name=value':"
+            echo "  dk f status=   e.g. running (no wildcards)"
+            echo "  dk f name=     e.g. web-*"
+            echo "  dk f id=       e.g. a1b2 (no wildcards)"
+            echo "  dk f label=    e.g. com.example.*"
+            echo "  dk f ancestor= e.g. ubuntu (no wildcards)"
+            echo "  dk f since=    e.g. container_name (no wildcards)"
+            echo "  dk f before=   e.g. container_id (no wildcards)"
+            echo "  dk f network=  e.g. my-net (no wildcards)"
+            echo "  dk f publish=  e.g. 80 (no wildcards)"
+            echo "  dk f health=   e.g. healthy (no wildcards)"
+            echo "  dk f is-task=  e.g. true (no wildcards)"
+            echo "  dk f desired-state= e.g. running (no wildcards)"
+        else
+            color_echo "docker ps -f $@"
+            docker ps -f $@
+        fi
+        ;;
+
+        # docker ps can use the --format flag.
+        # This flag uses Go's template formatting. You can specify which information fields you want to see.
+        # Provide a Template String: The string tells Docker what data points (placeholders) to display.
+        # Common placeholders include:
+        # .ID: Container ID
+        # .Image: Image name
+        # .Command: Command being run
+        # .CreatedAt: Time the container was created
+        # .RunningFor: Elapsed time since the container was started
+        # .Status: Container status (e.g., "Up 28 minutes", "Exited (0)")
+        # .Ports: Published ports
+        # .Names: Container name
+        # .Size: Container disk size (may require extra calculation steps sometimes)
+        # .Labels: All labels assigned to the container
+        # .Mounts: Volume mounts
+        # .Networks: Networks the container is attached to
+        # Format as a Table (Optional but Recommended): To get nicely aligned columns with headers like the default output,
+        # start your format string with table followed by the placeholders separated by \t (tab character).
+        # 
+        # Examples:
+        # Show only Container ID, Image, and Status:
+        # docker ps -a --format "table {{.ID}}\t{{.Image}}\t{{.Status}}"
+
+    psl|pslist)
+        color_echo "docker ps --format \"Names:  {{.Names}}\\\nImage:  {{.Image}}\\\nSize:  {{.Size}}\\\nStatus: {{.Status}}\\\nPorts:  {{.Ports}}\\\nMounts: {{.Mounts}}\\\nNetworks: {{.Networks}}\\\n\" --no-trunc $@"
+        docker ps --format "Names:  {{.Names}}\nImage:  {{.Image}}\nSize:  {{.Size}}\nStatus: {{.Status}}\nPorts:  {{.Ports}}\nMounts: {{.Mounts}}\nNetworks: {{.Networks}}\n" --no-trunc $@
+        ;;
+
+    p|ports)
+        color_echo "docker ps --format \"table {{.Names}}\\\t{{.Image}}\\\t{{.Ports}}\" $@"
+        docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Ports}}" $@
+        ;;
+    
+    pl|portslist)
+        color_echo "docker ps --format \"Names:  {{.Names}}\\\nImage:  {{.Image}}\\\nStatus: {{.Status}}\\\nPorts:  {{.Ports}}\\\n\" --no-trunc $@"
+        docker ps --format "Names:  {{.Names}}\nImage:  {{.Image}}\nStatus: {{.Status}}\nPorts:  {{.Ports}}\n" --no-trunc $@
+        ;;
+
+    m|mounts)
+        color_echo "docker ps --format \"table {{.Names}}\\\t{{.ID}}\\\t{{.Image}}\\\t{{.Mounts}}\" $@"
+        docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Mounts}}" --no-trunc $@
+        ;;
+
+    ml|mountslist)
+        color_echo "docker ps --format \"Names:  {{.Names}}\\\nImage:  {{.Image}}\\\nStatus: {{.Status}}\\\nMounts: {{.Mounts}}\\\n\" --no-trunc$@"
+        docker ps --format "Names:  {{.Names}}\nImage:  {{.Image}}\nStatus: {{.Status}}\nMounts: {{.Mounts}}\n" --no-trunc $@
+        ;;
+    
+    s|size|up|status)
+        color_echo "docker ps --format \"table {{.Names}}\\\t{{truncate .ID 12}}\\\t{{.Image}}\\\t{{.Status}}\\\t{{.Size}}\" $@"
+        docker ps --format "table {{.Names}}\t{{truncate .ID 12}}\t{{.Image}}\t{{.Status}}\t{{.Size}}" --no-trunc $@
+        ;;
+
+    im)
+        color_echo "docker images"
+        docker images
+        ;;
+
+    imps)
+        color_echo "DEBUGGING: Checking docker inspect Output and Parsing"
+        print_line # Separator
+
+        container_ids=$(docker ps -a -q)
+        if [ -z "$container_ids" ]; then echo "No containers found."; fi
+
+        for container_id in $container_ids; do
+            echo "--- Inspecting Container ID: $container_id ---"
+
+            # --- Step 1: Get Raw Inspect Output ---
+            # Execute docker inspect and capture its output
+            # Use cat -A to clearly show delimiters and line endings
+            inspect_output=$(docker inspect --format='{{.Name}}____{{.Config.Image}}____{{.State.Status}}____{{json .NetworkSettings.Ports}}____{{json .Mounts}}' "$container_id" 2>/dev/null | cat -A)
+
+            echo "Raw output from docker inspect --format (shown with cat -A):"
+            echo "$inspect_output"
+            echo "---------------------------------------------------"
+
+            # --- Step 2: Attempt to Parse and Print Variables ---
+            echo "Attempting to parse the raw output with IFS='____' read -r ..."
+            # Pipe the output of the inspect command directly to read, without cat -A
+             docker inspect --format='{{.Name}}____{{.Config.Image}}____{{.State.Status}}____{{json .NetworkSettings.Ports}}____{{json .Mounts}}' "$container_id" 2>/dev/null | \
+             IFS='____' read -r container_name image_name container_status raw_ports raw_mounts
+
+            echo "Values read into variables:"
+            echo "container_name: '$container_name'"
+            echo "image_name:     '$image_name'"
+            echo "container_status: '$container_status'"
+            echo "raw_ports:      '$raw_ports'"
+            echo "raw_mounts:     '$raw_mounts'"
+            echo "---------------------------------------------------"
+
+            # Comment out the rest of the imps logic below this for focused debugging
+
+        done
+        ;;
+
+    x|ex|exec)
+        color_echo "docker exec -it $@"
+        docker exec -it $@
+        ;;
+
+    run)
+        color_echo "sudo docker run -it --name $@"
+        sudo docker run -it --name $@
+        ;;
+
+    up)
+        color_echo "docker-compose up -d $1"
+        docker-compose up -d $1
+        ;;
+
+    down)
+        color_echo "docker-compose down $@"
+        docker-compose down $@
+        ;;
+
+    start)
+        color_echo "docker start $@"
+        docker start $@
+        ;;
+
+    stop)
+        color_echo "docker stop $@"
+        docker stop $@
+        ;;
+
+    restart)
+        color_echo "docker restart $@"
+        docker restart $@
+        ;;
+
+    info)
+        # Check if container name ($1) is provided for the info command
+        if [ $# -eq 0 ]; then
+            echo "Usage: dk info <container_name>"
+            echo ""
+            echo "Description:"
+            echo "  Show quick system information summary for the specified container."
+            exit 1 # Indicate improper usage
+        fi
+    
+        container_name="$1" # Store the container name
+    
+        # Define colors and bold in the main script scope, needed for the first header
+        BLUE=$(tput setaf 4 2>/dev/null)
+        BOLD=$(tput bold 2>/dev/null)
+        RESET=$(tput sgr0 2>/dev/null)
+        # Fallback for environments without tput
+        if [ -z "$BLUE" ]; then BLUE="\e[1;34m"; BOLD="\e[1m"; RESET="\e[0m"; fi;
+    
+        echo
+        echo -e "${YELLOW}Gathering information for container '$container_name' using 'docker' commands:${NC}"
+        echo
+    
+        # --- Docker Container Info (External View) ---
+        echo "${BOLD}${BLUE}--- Docker Container Info ---${RESET}"
+        # Use --filter to target the specific container by name
+        # Use --no-trunc to display full values
+        # Use --format to specify the output fields and list format
+        # Using the user's simplified format string with actual newlines
+        docker ps -a --filter name="$container_name" --no-trunc --format 'ID: {{.ID}}
+Name: {{.Names}}
+Image: {{.Image}}
+Size: {{.Size}}
+Created At: {{.CreatedAt}}
+Status: {{.Status}}
+Running For: {{.RunningFor}}
+Command: {{.Command}}
+Networks: {{.Networks}}
+=====
+Ports: {{.Ports}}
+=====
+Mounts: {{.Mounts}}
+=====
+Labels: {{.Labels}}' \
+        || { echo "Error: Could not find container '$container_name' or connect to Docker daemon." >&2; exit 1; } # Exit if docker ps fails
+
+        echo "" # Add a blank line
+
+        echo -e "${BOLD}${BLUE}--- Docker Externally Accessible Ports ---${RESET}"
+        echo "Ports that are accessible from outside the container via the host's network interfaces."
+        docker port $container_name
+    
+        echo "" # Add a blank line between the external and internal info sections
+    
+        # --- Container Info (as seen from inside container) ---
+        # Execute the chain of info commands inside the container, trying shells
+        echo
+        echo -e "${YELLOW}Gathering information for container '$container_name' from inside container (exec -it sh|bash|ash):${NC}"
+        echo
+        echo -e "${BOLD}${BLUE}--- Container Info ---${RESET}" # Use main script colors here
+        echo
+    
+        # Define the internal script content once
+        # IMPORTANT: Comments are removed from inside the single quotes below
+        # to prevent "command not found" errors.
+        read -r -d '' internal_script << 'EOF'
+# Define colors and bold inside the container shell as well,
+# as they are needed for the internal sections headers.
+BLUE_INT=$(tput setaf 4 2>/dev/null) ;
+BOLD_INT=$(tput bold 2>/dev/null) ;
+RESET_INT=$(tput sgr0 2>/dev/null) ;
+if [ -z "$BLUE_INT" ]; then BLUE_INT="\e[1;34m"; BOLD_INT="\e[1m"; RESET_INT="\e[0m"; fi;
+
+echo -e "${BOLD_INT}${BLUE_INT}--- Container System Info ---${RESET_INT}" ;
+# Removed blank line after this header
+
+# Consolidated Initial Info
+echo -e "${BOLD_INT}Hostname:${RESET_INT} $(hostname 2>/dev/null || echo "(Not available)")" ;
+# Parse uptime to get just the duration (e.g., "19:56")
+echo -e "${BOLD_INT}Uptime:${RESET_INT} $(uptime 2>/dev/null | sed "s/.* up //; s/,.*//")" ;
+# Parse uptime to get just the load average (e.g., "5.07, 4.94, 3.32")
+echo -e "${BOLD_INT}Load Average:${RESET_INT} $(uptime 2>/dev/null | sed "s/.* load average: //" || echo "(Not available)")" ;
+echo -e "${BOLD_INT}CPU Cores:${RESET_INT} $(nproc 2>/dev/null || echo "(Not available)")" ;
+echo -e "${BOLD_INT}Kernel:${RESET_INT} $(uname -a 2>/dev/null || echo "(Not available)")" ;
+# Memory is complex to summarize on one line, refer to detailed section
+echo -e "${BOLD_INT}Memory:${RESET_INT} See detailed section below" ;
+
+# OS Info (removed URLs)
+echo "" ;
+echo -e "${BOLD_INT}${BLUE_INT}--- OS Info ---${RESET_INT}";
+cat /etc/os-release 2>/dev/null | grep -v "URL=" || echo "(Not available)" ;
+
+# Memory Usage (free -h or free -m)
+echo "" ;
+echo -e "${BOLD_INT}${BLUE_INT}--- Memory Usage ---${RESET_INT}";
+free -h 2>/dev/null || free -m 2>/dev/null || echo "(Not available)" ;
+echo "Note: 'Used' shows memory from the container's perspective.";
+
+# Disk Usage (df -h or df -P)
+echo "" ;
+echo -e "${BOLD_INT}${BLUE_INT}--- Disk Usage (/) ---${RESET_INT}";
+df -h / 2>/dev/null || df -P / 2>/dev/null || echo "(Not available)" ;
+echo "Note: 'Used' shows total on underlying filesystem, often shared.";
+
+# Network Interfaces (ip addr or ifconfig)
+echo "" ;
+echo -e "${BOLD_INT}${BLUE_INT}--- Network Interfaces ---${RESET_INT}";
+(ip addr show 2>/dev/null || ifconfig 2>/dev/null) || echo "(Not available or network tools missing)" ;
+
+# Listening Ports (ss or netstat -tulnp)
+echo "" ;
+echo -e "${BOLD_INT}${BLUE_INT}--- Listening Ports ---${RESET_INT}";
+(ss -tulnp 2>/dev/null || netstat -tulnp 2>/dev/null) || echo "(Not available, tools missing, or may require elevated privileges)" ;
+
+# # Processes (ps aux sorted by CPU, command truncated)
+# echo "" ;
+# echo -e "${BOLD_INT}${BLUE_INT}--- Processes (ps aux, sorted by %CPU) ---${RESET_INT}";
+# # Print manual header, then ps auxww --no-header for no header, sorted by %CPU,
+# # filtered to remove the info script commands, and truncated.
+# echo "USER PID %CPU %MEM VSZ RSS TTY STAT START TIME COMMAND" ;
+# ps auxww --no-header 2>/dev/null | \
+# grep -vE "(ps auxww|bash -c .* Container System Info|sh -c .* Container System Info|ash -c .* Container System Info)" | \
+# sort -rnk3 2>/dev/null | \
+# cut -c -150 || echo "(Not available)" ;
+
+# Processes (ps aux sorted by CPU, command truncated)
+# Print manual header, then ps auxww --no-header for no header, sorted by %CPU,
+# filtered to remove the info script commands, and truncated.
+echo
+echo -e "${BOLD_INT}${BLUE_INT}--- Processes (ps aux, sorted by %CPU) ---${RESET_INT}";
+output_string=$(
+echo "USER PID %CPU %MEM VSZ RSS TTY STAT START TIME COMMAND" ;
+ps auxww --no-header 2>/dev/null | \
+grep -vE "(ps auxww|bash -c .* Container System Info|sh -c .* Container System Info|ash -c .* Container System Info)" | \
+sort -rnk3 2>/dev/null | \
+cut -c -150 || echo "(Not available)" ;
+)
+# echo $output_string | column -t
+echo "$output_string" | awk '
+{
+    # Define the tighter printf format string for header and data
+    # Fields: USER, PID, %CPU, %MEM, VSZ, RSS, TTY, STAT, START, TIME, COMMAND
+    fmt = "%-5s %-5s %-4s %-4s %-7s %-6s %-5s %-4s %-5s %-5s %s\n";
+
+    # Handle specific lines first
+    if ($0 ~ /---\ Processes.*---/) { # Match the title line
+        print
+        next
+    }
+    if (/^$/) { # Empty line
+        print
+        next
+    }
+    if ($0 == "(Not available)") { # (Not available) message
+        print
+        next
+    }
+
+    if ($1 == "USER" && $2 == "PID" && $3 == "%CPU" && $4 == "%MEM") { # Likely the header line
+        command_header = $11
+        for (i = 12; i <= NF; i++) { command_header = command_header " " $i }
+        printf fmt, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, command_header;
+    } else if (NF >= 10) { # Likely a data line from ps
+        command = ""
+        if (NF >= 11) {
+            command = $11;
+            for (i = 12; i <= NF; i++) {
+                command = command " " $i;
+            }
+        }
+        printf fmt, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, command;
+    } else {
+        # Default for any other lines
+        print;
+    }
+}
+'
+# Relevant Mounted Filesystems (filtered)
+echo "" ;
+echo -e "${BOLD_INT}${BLUE_INT}--- Relevant Mounted Filesystems ---${RESET_INT}";
+# Filter out common pseudo/docker internal mounts and standard device/loopback mounts
+mount 2>/dev/null | grep -vE "^(proc|sysfs|tmpfs|mqueue|shm|overlay|cgroup|devpts|/dev/|/sys/|/proc/|devicemapper|/dev/loop)" || echo "(Not available. Note: Docker volume mounts are appear as normal filesystems to the container, so are not shown as mounts)" ;
+
+echo "" ; # Final blank line
+EOF
+        # Attempt to execute the internal script with different shells (bash, sh, ash)
+        # Redirect stderr for each exec attempt to suppress "executable file not found" errors
+        if docker exec -it "$container_name" bash -c "$internal_script" 2>/dev/null; then
+            : # Success - script already printed output
+        elif docker exec -it "$container_name" sh -c "$internal_script" 2>/dev/null; then
+            : # Success - script already printed output
+        elif docker exec -it "$container_name" ash -c "$internal_script" 2>/dev/null; then
+            : # Success - script already printed output
+        else
+            # All shell attempts failed
+            echo "Error: Failed to execute internal info script using bash, sh, or ash in container '$container_name'." >&2
+            echo "Container might not have an internal shell, usually done for security reasons."
+            exit 1 # Indicate failure
+        fi
+    
+        # The overall script exit status is determined by the if/elif/else block.
+        ;; # End of the info case
+    it)
+        # Check if container name ($1) is provided
+        if [ $# -eq 0 ]; then
+            echo "Usage: dk it <container_name> [command...]"
+            echo ""
+            echo "Description:"
+            echo "  If [command...] is provided, execute it in the container."
+            echo "  If no command is provided, attempt to enter an interactive shell (bash, sh, ash)."
+            exit 1 # Indicate improper usage and exit
+        fi
+    
+        container_name="$1" # Store the container name
+    
+        if [ $# -gt 1 ]; then
+            # If arguments are provided after the container name ($# > 1)
+            # Execute the provided command(s) inside the container
+            command_to_exec="${@:2}" # Get all arguments from the second one onwards
+            echo "Executing command in container '$container_name': $command_to_exec"
+            docker exec -it "$container_name" "$command_to_exec" # Pass the command string directly
+            exit $? # Exit with the status of the executed command
+    
+        else
+            # If only the container name is provided ($# == 1)
+            # Attempt to enter an interactive shell, trying common shells in order
+    
+            echo "Attempting interactive shell (bash, sh, ash) in '$container_name'..."
+    
+            # Try common shells. We redirect stderr (2>) to /dev/null for each attempt
+            # to suppress the "OCI runtime exec failed: executable file not found" messages
+            # from docker itself when a shell isn't present.
+            docker exec -it "$container_name" bash 2>/dev/null || \
+            docker exec -it "$container_name" sh 2>/dev/null || \
+            docker exec -it "$container_name" ash 2>/dev/null
+    
+            # Check the exit status of the last command in the chain.
+            # If any of the 'docker exec' calls succeeded, $? will be 0 (once the user exits the shell).
+            # If all 'docker exec' attempts failed (shells not found), $? will be non-zero.
+            if [ $? -ne 0 ]; then
+                # If all shell attempts failed, print our concise error message
+                echo "Error: None of the common shells (bash, sh, ash) were found or accessible in container '$container_name'." >&2
+                echo "You may need to execute a specific command, e.g., 'dk it <container> <command>', or the container may not support interactive sessions." >&2
+                exit 1 # Indicate failure
+            fi
+            # If a shell was successfully entered, the script effectively paused.
+            # When the user exits the shell, the docker exec finishes, and the script
+            # continues here. If the shell was entered, $? is 0, the above if condition
+            # is false, and the script naturally exits with status 0.
+        fi
+        ;;
+    rm)
+        color_echo "docker rm $1"
+        docker rm "$1"
+        ;;
+
+    rmi)
+        color_echo "docker rmi $1"
+        docker rmi "$1"
+        ;;
+
+    logs)
+        color_echo "docker logs -f $1"
+        docker logs -f "$1"
+        ;;
+
+    prune)
+        color_echo "docker system prune -f"
+        docker system prune -f
+        ;;
+
+    volprune)
+        color_echo "docker volume prune -f"
+        docker volume prune -f
+        ;;
+
+    clean)
+        print_line
+        color_echo "docker stop $(docker ps -q)"
+        docker stop $(docker ps -q)
+        print_line
+        color_echo "docker rm $(docker ps -aq)"
+        docker rm $(docker ps -aq)
+        print_line
+        color_echo "docker rmi $(docker images -q)"
+        docker rmi $(docker images -q)
+        print_line
+        color_echo "docker volume prune -f"
+        docker volume prune -f
+        ;;
+
+    *)
+        echo -e "${RED}Unknown option: $cmd${NC}" >&2
+        help_text
+        exit 1
+        ;;
+esac

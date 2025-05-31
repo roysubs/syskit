@@ -1,0 +1,805 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+
+Linux Web Server applications:
+
+• qBittorrent-nox, Default Port: 8080
+Web UI for qBittorrent
+sudo apt install qbittorrent-nox
+qbittorrent-nox
+First login: admin/adminadmin, change via Web UI
+
+• Transmission, Default Port: 9091
+BitTorrent client with web UI
+sudo apt install transmission-daemon
+Edit /etc/transmission-daemon/settings.json
+
+• Glances, Default Port: 61208
+System monitoring
+sudo apt install glances
+glances -w
+
+• Navidrome, Default Port: 4533
+Music server with Subsonic API
+curl -fsSL https://navidrome.org/install.sh | sh
+Edit config.toml in ~/.config/navidrome/
+
+• Jellyfin, Default Port: 8096
+Media server (movies, TV, music, photos)
+sudo apt install jellyfin
+Web UI at http://localhost:8096
+
+• Plex Media Server, Default Port: 32400
+Media streaming
+wget https://downloads.plex.tv/latest/debian64.deb
+sudo dpkg -i debian64.deb
+Web UI at http://localhost:32400/web
+
+• Radarr, Default Port: 7878
+Movie management for torrents/Usenet
+sudo apt install radarr
+Web UI at http://localhost:7878
+
+• Sonarr, Default Port: 8989
+TV show management for torrents/Usenet
+sudo apt install sonarr
+Web UI at http://localhost:8989
+
+• Lidarr, Default Port: 8686
+Music management for torrents/Usenet
+sudo apt install lidarr
+Web UI at http://localhost:8686
+
+• Prowlarr, Default Port: 9696
+Indexer manager for Radarr/Sonarr/Lidarr
+sudo apt install prowlarr
+Web UI at http://localhost:9696
+
+• Bazarr, Default Port: 6767
+Subtitle downloader for Sonarr/Radarr
+sudo apt install bazarr
+Web UI at http://localhost:6767
+
+• Syncthing, Default Port: 8384
+Decentralized file sync
+sudo apt install syncthing
+syncthing
+Web UI at http://localhost:8384
+
+• Pi-hole, Default Port: 80
+Network-wide ad blocker
+curl -sSL https://install.pi-hole.net | bash
+Web UI at http://pi.hole/admin
+
+• Home Assistant, Default Port: 8123
+Home automation
+pip install homeassistant
+hass
+Web UI at http://localhost:8123
+
+• Caddy, Default Port: 2015 (configurable)
+Automatic HTTPS web server
+sudo apt install caddy
+Edit /etc/caddy/Caddyfile
+
+• Portainer, Default Port: 9000
+Docker container manager
+docker volume create portainer_data
+docker run -d -p 9000:9000 -v /var/run/docker.sock:/var/run/docker.sock portainer/portainer-ce
+Web UI at http://localhost:9000
+
+• Gitea, Default Port: 3000
+Lightweight Git server
+sudo apt install gitea
+Web UI at http://localhost:3000
+
+• Nextcloud, Default Port: 80
+Self-hosted cloud storage
+sudo apt install nextcloud
+Web UI at http://localhost/nextcloud
+
+• Miniflux, Default Port: 8080
+Minimalist RSS reader
+docker run -d -p 8080:8080 miniflux/miniflux
+Web UI at http://localhost:8080
+
+• BookStack, Default Port: 6875
+Wiki/documentation platform
+docker run -d -p 6875:80 linuxserver/bookstack
+Web UI at http://localhost:6875
+
+• Paperless-ngx, Default Port: 8000
+Document management system
+docker run -d -p 8000:8000 ghcr.io/paperless-ngx/paperless-ngx
+Web UI at http://localhost:8000
+
+• Uptime Kuma, Default Port: 3001
+Self-hosted status page
+docker run -d -p 3001:3001 louislam/uptime-kuma
+Web UI at http://localhost:3001
+
+• Heimdall, Default Port: 80
+Dashboard for self-hosted services
+docker run -d -p 80:80 linuxserver/heimdall
+Web UI at http://localhost
+
+• FreshRSS, Default Port: 8080
+Self-hosted RSS reader
+docker run -d -p 8080:80 linuxserver/freshrss
+Web UI at http://localhost:8080
+
+• Vikunja, Default Port: 3456
+Self-hosted task manager
+docker run -d -p 3456:3456 vikunja/api
+Web UI at http://localhost:3456
+
+• Mealie, Default Port: 9000
+Self-hosted recipe manager
+
+docker run -d -p 9000:9000 hkotel/mealie
+Web UI at http://localhost:9000
+
+• Vikunja Frontend, Default Port: 80
+Web UI for Vikunja task manager
+docker run -d -p 80:80 vikunja/frontend
+Point to http://localhost:3456 for API
+
+• Whoogle, Default Port: 5000
+Self-hosted Google search proxy
+docker run -d -p 5000:5000 benbusby/whoogle-search
+Web UI at http://localhost:5000
+
+• RSS-Bridge, Default Port: 3000
+Converts websites to RSS feeds
+docker run -d -p 3000:3000 rssbridge/rss-bridge
+Web UI at http://localhost:3000
+
+• FileBrowser, Default Port: 8081
+Web-based file manager
+docker run -d -p 8081:80 filebrowser/filebrowser
+Web UI at http://localhost:8081
+
+• Tiny Tiny RSS, Default Port: 80
+Self-hosted RSS reader
+docker run -d -p 80:80 linuxserver/tt-rss
+Web UI at http://localhost
+
+• Plausible Analytics, Default Port: 8001
+Privacy-focused web analytics
+docker run -d -p 8001:8001 plausible/analytics
+Web UI at http://localhost:8001
+
+• Monica, Default Port: 8082
+Personal CRM
+docker run -d -p 8082:80 monica
+Web UI at http://localhost:8082
+
+• Dashy, Default Port: 4000
+Self-hosted start page
+docker run -d -p 4000:80 lissy93/dashy
+Web UI at http://localhost:4000
+
+• Kimai, Default Port: 8002
+Time tracking software
+docker run -d -p 8002:80 kimai/kimai2
+Web UI at http://localhost:8002
+
+• Overleaf, Default Port: 8003
+Self-hosted LaTeX editor
+docker run -d -p 8003:80 overleaf/overleaf
+Web UI at http://localhost:8003
+
+• Ghost, Default Port: 2368
+Self-hosted blogging platform
+docker run -d -p 2368:2368 ghost
+Web UI at http://localhost:2368
+
+• Vikunja API, Default Port: 3456
+API backend for Vikunja
+docker run -d -p 3456:3456 vikunja/api
+Web UI at http://localhost:3456
+
+• Code-Server, Default Port: 8083
+VS Code in the browser
+curl -fsSL https://code-server.dev/install.sh | sh
+code-server
+Web UI at http://localhost:8083
+
+• Dashmachine, Default Port: 5005
+Customizable dashboard
+docker run -d -p 5005:5005 rmountjoy/dashmachine
+Web UI at http://localhost:5005
+
+• Watchtower, Default Port: N/A
+Automates Docker container updates
+docker run -d -v /var/run/docker.sock:/var/run/docker.sock containrrr/watchtower
+Runs in background, updates containers
+
+• Organizr, Default Port: 80
+Unified dashboard for self-hosted apps
+docker run -d -p 80:80 organizr/organizr
+Web UI at http://localhost
+
+• Rallly, Default Port: 3002
+Self-hosted scheduling tool
+docker run -d -p 3002:3002 lukevella/rallly
+Web UI at http://localhost:3002
+
+• Nginx Proxy Manager, Default Port: 81
+Reverse proxy with web UI
+docker run -d -p 81:81 jc21/nginx-proxy-manager
+Web UI at http://localhost:81
+
+• Wger, Default Port: 8004
+Self-hosted workout tracker
+docker run -d -p 8004:80 wger/wger
+Web UI at http://localhost:8004
+
+• Papermerge, Default Port: 8005
+Document OCR & management
+docker run -d -p 8005:80 papermerge/papermerge
+Web UI at http://localhost:8005
+
+• Linkding, Default Port: 9090
+Self-hosted bookmark manager
+docker run -d -p 9090:9090 sissbruecker/linkding
+Web UI at http://localhost:9090
+
+• Statping, Default Port: 8084
+Status page for monitoring services
+docker run -d -p 8084:8080 adamboutcher/statping
+Web UI at http://localhost:8084
+
+• Vikunja Frontend (alt), Default Port: 80
+Web UI for Vikunja API
+docker run -d -p 80:80 vikunja/frontend
+Web UI at http://localhost
+
+• Firefly III, Default Port: 8085
+Self-hosted personal finance manager
+docker run -d -p 8085:8080 fireflyiii/core
+Web UI at http://localhost:8085
+
+
+
+
+
+
+• Miniflux
+Port: 8086
+Lightweight self-hosted RSS reader
+docker run -d -p 8086:8080 miniflux/miniflux
+Config:
+Web UI at http://localhost:8086
+
+• HedgeDoc
+Port: 3003
+Collaborative markdown editor
+docker run -d -p 3003:3000 hedgedoc/hedgedoc
+Config:
+Web UI at http://localhost:3003
+
+• Immich
+Port: 2283
+Self-hosted photo & video management
+docker run -d -p 2283:2283 ghcr.io/immich-app/immich
+Config:
+Web UI at http://localhost:2283
+
+• Homebox
+Port: 7745
+Inventory & asset management
+docker run -d -p 7745:7745 ghcr.io/hay-kot/homebox
+Config:
+Web UI at http://localhost:7745
+
+• Pwndrop
+Port: 8087
+Self-hosted file sharing
+docker run -d -p 8087:8080 linuxserver/pwndrop
+Config:
+Web UI at http://localhost:8087
+
+• Nextcloud
+Port: 8088
+Self-hosted cloud storage
+docker run -d -p 8088:80 nextcloud
+Config:
+Web UI at http://localhost:8088
+
+• Paperless-NGX
+Port: 8010
+Self-hosted document management
+docker run -d -p 8010:8000 ghcr.io/paperless-ngx/paperless-ngx
+Config:
+Web UI at http://localhost:8010
+
+• AllTube
+Port: 8089
+Self-hosted YouTube downloader
+docker run -d -p 8089:80 r0oth3x49/alltube
+Config:
+Web UI at http://localhost:8089
+
+• Actual Budget
+Port: 8080**
+Self-hosted personal finance app
+docker run -d -p 8080:5006 actualbudget/actual-server
+Config:
+Web UI at http://localhost:8080
+
+• Vikunja
+Port: 3456
+Self-hosted task manager
+docker run -d -p 3456:3456 vikunja/api
+Config:
+Web UI at http://localhost:3456
+
+• Shiori
+Port: 8090
+Self-hosted bookmark manager
+docker run -d -p 8090:8080 radhifadlillah/shiori
+Config:
+Web UI at http://localhost:8090
+
+• Kanboard
+Port: 8091
+Self-hosted project management
+docker run -d -p 8091:80 kanboard/kanboard
+Config:
+Web UI at http://localhost:8091
+
+• CodiMD
+Port: 3004
+Real-time collaborative markdown editor
+docker run -d -p 3004:3000 hackmdio/hackmd
+Config:
+Web UI at http://localhost:3004
+
+• Snibox
+Port: 8092
+Self-hosted snippet manager
+docker run -d -p 8092:5000 snibox/snibox
+Config:
+Web UI at http://localhost:8092
+
+• Scrutiny
+Port: 8085
+Self-hosted SMART monitoring
+docker run -d -p 8085:8080 ghcr.io/analogj/scrutiny
+Config:
+Web UI at http://localhost:8085
+
+• Stash
+Port: 9999
+Self-hosted media organizer
+docker run -d -p 9999:9999 stashapp/stash
+Config:
+Web UI at http://localhost:9999
+
+• Speedtest Tracker
+Port: 8765
+Self-hosted speed test history
+docker run -d -p 8765:80 henrywhitaker3/speedtest-tracker
+Config:
+Web UI at http://localhost:8765
+
+• Navidrome
+Port: 4533
+Self-hosted music streaming
+docker run -d -p 4533:4533 deluan/navidrome
+Config:
+Web UI at http://localhost:4533
+
+• Grocy
+Port: 9283
+Self-hosted groceries and household management
+docker run -d -p 9283:80 linuxserver/grocy
+Config:
+Web UI at http://localhost:9283
+
+• Pihole
+Port: 53 (DNS) / 80 (UI)
+Self-hosted DNS ad blocker
+docker run -d -p 80:80 -p 53:53/tcp pihole/pihole
+Config:
+Web UI at http://localhost/admin
+
+• AdGuard Home
+Port: 3000
+Self-hosted DNS ad blocker
+docker run -d -p 3000:3000 adguard/adguardhome
+Config:
+Web UI at http://localhost:3000
+
+• TubeArchivist
+Port: 8001
+Self-hosted YouTube archive manager
+docker run -d -p 8001:8001 bbilly1/tubearchivist
+Config:
+Web UI at http://localhost:8001
+
+• Peertube
+Port: 9000
+Self-hosted video hosting
+docker run -d -p 9000:80 chocobozzz/peertube
+Config:
+Web UI at http://localhost:9000
+
+• Ampache
+Port: 8080
+Self-hosted music streaming
+docker run -d -p 8080:80 ampache/ampache
+Config:
+Web UI at http://localhost:8080
+
+• Uptime Kuma
+Port: 3001
+Self-hosted uptime monitor
+docker run -d -p 3001:3001 louislam/uptime-kuma
+Config:
+Web UI at http://localhost:3001
+
+
+
+
+
+• Vaultwarden
+Port: 8000
+Self-hosted Bitwarden server
+docker run -d -p 8000:80 vaultwarden/server
+Config:
+Web UI at http://localhost:8000
+
+• Emby
+Port: 8096
+Self-hosted media server
+docker run -d -p 8096:8096 emby/embyserver
+Config:
+Web UI at http://localhost:8096
+
+• Jellyfin
+Port: 8096
+Open-source media server
+docker run -d -p 8096:8096 jellyfin/jellyfin
+Config:
+Web UI at http://localhost:8096
+
+• Filerun
+Port: 80
+Self-hosted file management system
+docker run -d -p 80:80 filerun/filerun
+Config:
+Web UI at http://localhost
+
+• Trilium Notes
+Port: 8080
+Self-hosted hierarchical note-taking
+docker run -d -p 8080:8080 zadam/trilium
+Config:
+Web UI at http://localhost:8080
+
+• Calibre Web
+Port: 8083
+Self-hosted eBook library management
+docker run -d -p 8083:8083 linuxserver/calibre-web
+Config:
+Web UI at http://localhost:8083
+
+• Wikijs
+Port: 3000
+Self-hosted wiki platform
+docker run -d -p 3000:3000 requarks/wiki
+Config:
+Web UI at http://localhost:3000
+
+• DuckDNS
+Port: 80
+Self-hosted dynamic DNS service
+docker run -d -p 80:80 linuxserver/duckdns
+Config:
+Web UI at http://localhost
+
+• YunoHost
+Port: 80
+Self-hosted server administration platform
+docker run -d -p 80:80 yunohost/yunohost
+Config:
+Web UI at http://localhost
+
+• Synapse
+Port: 8008
+Self-hosted Matrix server
+docker run -d -p 8008:8008 matrixdotorg/synapse
+Config:
+Web UI at http://localhost:8008
+
+• Redash
+Port: 5000
+Self-hosted data visualization platform
+docker run -d -p 5000:5000 redash/redash
+Config:
+Web UI at http://localhost:5000
+
+• The Lounge
+Port: 9000
+Self-hosted IRC client
+docker run -d -p 9000:9000 tlaverdure/thelounge
+Config:
+Web UI at http://localhost:9000
+
+• Bitwarden_RS
+Port: 80
+Self-hosted password manager
+docker run -d -p 80:80 bitwardenrs/server
+Config:
+Web UI at http://localhost
+
+• Ghost
+Port: 2368
+Self-hosted blogging platform
+docker run -d -p 2368:2368 ghost/ghost
+Config:
+Web UI at http://localhost:2368
+
+• OpenProject
+Port: 8080
+Self-hosted project management
+docker run -d -p 8080:80 openproject/community
+Config:
+Web UI at http://localhost:8080
+
+• Zapier (n8n)
+Port: 5678
+Self-hosted workflow automation
+docker run -d -p 5678:5678 n8nio/n8n
+Config:
+Web UI at http://localhost:5678
+
+• FileRun
+Port: 80
+Self-hosted file manager
+docker run -d -p 80:80 filerun/filerun
+Config:
+Web UI at http://localhost
+
+• Piwik PRO
+Port: 8080
+Self-hosted web analytics
+docker run -d -p 8080:80 piwik/pro
+Config:
+Web UI at http://localhost:8080
+
+• Zammad
+Port: 3000
+Self-hosted helpdesk and ticketing system
+docker run -d -p 3000:3000 zammad/zammad-docker-compose
+Config:
+Web UI at http://localhost:3000
+
+• Gitea
+Port: 3000
+Self-hosted Git server
+docker run -d -p 3000:3000 gitea/gitea
+Config:
+Web UI at http://localhost:3000
+
+• Organizr
+Port: 80
+Self-hosted dashboard for web apps
+docker run -d -p 80:80 organizr/organizr
+Config:
+Web UI at http://localhost
+
+• CouchPotato
+Port: 5050
+Self-hosted movie downloader
+docker run -d -p 5050:5050 linuxserver/couchpotato
+Config:
+Web UI at http://localhost:5050
+
+• Plex
+Port: 32400
+Self-hosted media server
+docker run -d -p 32400:32400 plexinc/plex
+Config:
+Web UI at http://localhost:32400
+
+• Radarr
+Port: 7878
+Self-hosted movie manager
+docker run -d -p 7878:7878 linuxserver/radarr
+Config:
+Web UI at http://localhost:7878
+
+• Sonarr
+Port: 8989
+Self-hosted TV show manager
+docker run -d -p 8989:8989 linuxserver/sonarr
+Config:
+Web UI at http://localhost:8989
+
+• Rclone
+Port: 5572
+Cloud storage manager
+docker run -d -p 5572:5572 rclone/rclone-webui
+Config:
+Web UI at http://localhost:5572
+
+
+
+
+• Paperless-ng
+Port: 8000
+Self-hosted document management system
+docker run -d -p 8000:8000 paperless-ng/paperless-ng
+Config:
+Web UI at http://localhost:8000
+
+• Home Assistant
+Port: 8123
+Self-hosted home automation platform
+docker run -d -p 8123:8123 homeassistant/home-assistant
+Config:
+Web UI at http://localhost:8123
+
+• Docker Registry
+Port: 5000
+Private Docker registry
+docker run -d -p 5000:5000 registry
+Config:
+Web UI at http://localhost:5000
+
+• Wiki.js
+Port: 3000
+Self-hosted wiki platform
+docker run -d -p 3000:3000 requarks/wiki
+Config:
+Web UI at http://localhost:3000
+
+• Vault
+Port: 8200
+Self-hosted secrets management system
+docker run -d -p 8200:8200 vault
+Config:
+Web UI at http://localhost:8200
+
+• CouchDB
+Port: 5984
+Self-hosted database server
+docker run -d -p 5984:5984 couchdb
+Config:
+Web UI at http://localhost:5984
+
+• Snipe-IT
+Port: 8000
+Self-hosted asset management system
+docker run -d -p 8000:8000 snipe/snipe-it
+Config:
+Web UI at http://localhost:8000
+
+• Monica
+Port: 8081
+Self-hosted personal relationship manager
+docker run -d -p 8081:8081 monica/monica
+Config:
+Web UI at http://localhost:8081
+
+• Metabase
+Port: 3000
+Self-hosted business intelligence platform
+docker run -d -p 3000:3000 metabase/metabase
+Config:
+Web UI at http://localhost:3000
+
+• Kanboard
+Port: 80
+Self-hosted project management system
+docker run -d -p 80:80 kanboard/kanboard
+Config:
+Web UI at http://localhost
+
+• PlexRequests
+Port: 3000
+Self-hosted media request system for Plex
+docker run -d -p 3000:3000 plexrequests/plexrequests
+Config:
+Web UI at http://localhost:3000
+
+• Shiori
+Port: 8080
+Self-hosted bookmark manager
+docker run -d -p 8080:8080 reruth/shiori
+Config:
+Web UI at http://localhost:8080
+
+• Radicale
+Port: 5232
+Self-hosted calendar and contact manager
+docker run -d -p 5232:5232 radicale/radicale
+Config:
+Web UI at http://localhost:5232
+
+• Rocket.Chat
+Port: 3000
+Self-hosted team communication platform
+docker run -d -p 3000:3000 rocketchat/rocket.chat
+Config:
+Web UI at http://localhost:3000
+
+• Wallabag
+Port: 80
+Self-hosted read-it-later service
+docker run -d -p 80:80 wallabag/wallabag
+Config:
+Web UI at http://localhost
+
+• Node-RED
+Port: 1880
+Self-hosted flow-based programming
+docker run -d -p 1880:1880 nodered/node-red
+Config:
+Web UI at http://localhost:1880
+
+• Jellyfin
+Port: 8096
+Self-hosted media streaming platform
+docker run -d -p 8096:8096 jellyfin/jellyfin
+Config:
+Web UI at http://localhost:8096
+
+• Tiny Tiny RSS
+Port: 8080
+Self-hosted RSS feed reader
+docker run -d -p 8080:8080 csonni/tt-rss
+Config:
+Web UI at http://localhost:8080
+
+• Miniflux
+Port: 8080
+Self-hosted RSS feed reader
+docker run -d -p 8080:8080 miniflux/miniflux
+Config:
+Web UI at http://localhost:8080
+
+• Hugo
+Port: 1313
+Static site generator
+docker run -d -p 1313:1313 klakegg/hugo
+Config:
+Web UI at http://localhost:1313
+
+• Vaultwarden (Bitwarden_RS)
+Port: 80
+Self-hosted password manager
+docker run -d -p 80:80 vaultwarden/server
+Config:
+Web UI at http://localhost
+
+• Papermerge
+Port: 8000
+Self-hosted document management system
+docker run -d -p 8000:8000 papermerge/papermerge
+Config:
+Web UI at http://localhost:8000
+
+• YACReader Server
+Port: 9090
+Self-hosted comic book reader
+docker run -d -p 9090:9090 yacreader/yacreader-server
+Config:
+Web UI at http://localhost:9090
+
+• SyncThing
+Port: 8384
+Self-hosted file synchronization platform
+docker run -d -p 8384:8384 syncthing/syncthing
+Config:
+Web UI at http://localhost:8384
+
+EOF
+) | less -R

@@ -1,0 +1,117 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Calc Notes
+==========
+
+`calc` is an arbitrary precision command-line calculator. It provides a wide range of mathematical functions and operations.
+
+- **Basic Usage**:
+    - Just type `calc` in your terminal to start an interactive session.
+    - Enter expressions directly and press Enter to evaluate.
+    - Type `quit` or `exit` to leave the interactive session.
+    - You can also pass an expression as a command-line argument: `calc 'expression'` (use quotes for complex expressions).
+
+- **Arithmetic Operators**:
+    - `+`: Addition
+    - `-`: Subtraction
+    - `*`: Multiplication
+    - `/`: Division
+    - `%`: Modulo (remainder)
+    - `^`: Exponentiation (power)
+    - `()`: Parentheses for grouping expressions
+
+- **Variables**:
+    - You can assign values to variables using `=`. Variable names must start with a letter.
+    - Example:
+        ```calc
+        a = 10
+        b = 5
+        a * b
+        ```
+    - `calc` has some built-in constants like `pi` and `e`.
+
+- **Functions**:
+    - `calc` supports many standard mathematical functions.
+    - **Examples:**
+        - `sqrt(x)`: Square root of x
+        - `sin(x)`, `cos(x)`, `tan(x)`: Trigonometric functions (angles are in radians by default)
+        - `log(x)`: Natural logarithm (base e)
+        - `log10(x)`: Base-10 logarithm
+        - `exp(x)`: e raised to the power of x
+        - `abs(x)`: Absolute value of x
+        - `floor(x)`: Largest integer less than or equal to x
+        - `ceil(x)`: Smallest integer greater than or equal to x
+        - `round(x)`: Round x to the nearest integer
+
+- **Precision**:
+    - `calc` uses arbitrary precision. You can control the number of decimal places displayed.
+    - `precision=N`: Set precision to N decimal places.
+    - Example:
+        ```calc
+        precision=2
+        10/3
+        precision=10
+        10/3
+        ```
+
+- **Base Conversion**:
+    - `calc` can work with different number bases.
+    - `ibase=N`: Set input base to N (default is 10).
+    - `obase=N`: Set output base to N (default is 10).
+    - **Common Bases:**
+        - Base 2 (binary): `ibase=2` or `obase=2`
+        - Base 8 (octal): `ibase=8` or `obase=8`
+        - Base 10 (decimal): `ibase=10` or `obase=10`
+        - Base 16 (hexadecimal): `ibase=16` or `obase=16`
+    - **Note**: Set `ibase` before entering numbers in that base. Set `obase` before the calculation you want to see the result of in that base.
+    - Example: Convert hexadecimal FF to decimal
+        ```calc
+        ibase=16
+        FF
+        obase=10
+        FF
+        ```
+    - Example: Convert decimal 255 to hexadecimal
+        ```calc
+        ibase=10
+        255
+        obase=16
+        255
+        ```
+
+- **Comparisons and Logic**:
+    - `==`: Equal to
+    - `!=`: Not equal to
+    - `<`: Less than
+    - `>`: Greater than
+    - `<=`: Less than or equal to
+    - `>=`: Greater than or equal to
+    - `&&`: Logical AND
+    - `||`: Logical OR
+    - `!`: Logical NOT
+    - Comparison and logical operations result in 1 (true) or 0 (false).
+
+- **Other Features**:
+    - **Comments**: Lines starting with `#` are treated as comments.
+    - **Command History**: Use Up/Down arrows to navigate command history in interactive mode.
+    - **Help**: Type `help` in the interactive session for more information on functions and commands.
+
+- **Example Session**:
+    ```calc
+    # Calculate the area of a circle with radius 5
+    radius = 5
+    area = pi * radius^2
+    area
+    # Calculate square root of 144
+    sqrt(144)
+    # Change output to hexadecimal
+    obase=16
+    area
+    ```
+
+EOF
+) | less -R

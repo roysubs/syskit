@@ -1,0 +1,215 @@
+# This Docker Compose file defines a media stack using Gluetun for VPN access.
+# All services that handle torrents or need their traffic routed through the VPN
+# are configured to use Gluetun's network stack (`network_mode: service:gluetun`).
+# Ports for accessing the Web UIs of these services from the host (or local network)
+# are mapped *on the Gluetun service itself*.
+
+# Gluetun: VPN client that routes traffic for all of the below.
+# qBittorrent: Torrent client, Web UI 8080
+# Radarr: Movie management, Web UI 7878
+# Sonarr: TV Series management, Web UI 8989
+# Jackett: Torrent indexer proxy, Web UI 9117
+# Filebrowser: Web-based file browser, Web UI 8081. Not using Filebrowser currently as I
+# have SAMBA shares on same network, but this will be useful if making these services
+# available on the internet to be able to use from phone etc.
+
+services:
+
+  gluetun:
+    image: ghcr.io/qdm12/gluetun
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN     # Required for VPN tunnel creation
+    devices:
+      - /dev/net/tun  # Required device for VPN tunnel
+    # Port mappings for accessing Web UIs of services using Gluetun's network. Format is
+    # Host_Port:Container_Internal_Port. Traffic hitting the Host_Port on the Linux server
+    # is forwarded by Docker through Gluetun to the specified Container_Internal_Port on the
+    # corresponding container using Gluetun's network.
+    ports:
+      - 8080:8080     # -> qBittorrent's internal 8080 (Web UI)
+      - 9117:9117     # -> Jackett's internal 9117 (Web UI)
+      - 8989:8989     # -> Sonarr's internal 8989 (Web UI)
+      - 7878:7878     # -> Radarr's internal 7878 (Web UI)
+      # - 8081:80       # -> Filebrowser's internal 80 (Web UI) (not using currently)
+      # Add the qBittorrent *torrent* port here if you need external seeders/leechers.
+      # The specific port is configured within qBittorrent's settings (often random or manually set).
+      # You would map Host_Torrent_Port:Container_Torrent_Port/tcp and /udp
+      - 6881:6881/tcp # -> qBittorrent's internal 6881 (TCP)
+      - 6881:6881/udp # -> 6881 -> qBittorrent's internal 6881 (UDP)
+    volumes:
+      - ${CONFIG_ROOT}/gluetun:/gluetun
+    environment:
+      - VPN_TYPE=openvpn                               # Wireguard is considerably less CPU intensive, so use that if possible
+      # --- OpenVPN Specific Variables ---
+      - VPN_SERVICE_PROVIDER=${VPN_SERVICE_PROVIDER}   # From .env
+      - ${VPN_COUNTRY_OR_REGION}                       # This is a full KEY=VALUE string, e.g. 'SURFSHARK_COUNTRY=Norway'
+      - OPENVPN_USER=${VPNUSER}
+      - OPENVPN_PASSWORD=${VPNPASS}
+      # ----------------------------------
+      # --- WireGuard Specific Variables ---
+      # - WIREGUARD_PRIVATE_KEY=${VPN_SERVICE_PROVIDER}  # From .env
+      # - WIREGUARD_SERVER_PUBLIC_KEY=asdhfasldfkjaslkdjf= # Server's public key from Surfshark
+      # - WIREGUARD_ENDPOINT=xxx.xxx.xxx.xxx:51820 # Server IP and WireGuard port (confirm port if needed)
+      # - WIREGUARD_ALLOWED_IPS=0.0.0.0/0,::0/0 # Often default, but check image docs
+      # - WIREGUARD_ADDRESSES=YOUR_ASSIGNED_WIREGUARD_IP/NETMASK # Your internal WG IP if required by the image
+      # ----------------------------------
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      # Critical: Allow traffic from your local network range to bypass the VPN.
+      # This is necessary for other laptops or Windows PC's to deliver magnet
+      # links to containers running on Gluetun's network.
+      - VPN_LOCAL_NETWORK=192.168.1.0/24 # <-- Adjust this to your local network range
+      # Optional: Enable Gluetun's built-in firewall (usually 'on' by default)
+      - FIREWALL=on
+      - FIREWALL_VPN_INPUT_PORTS=6881    # 6881 is the qbittorrent default for incoming torrent connections so need VPN tunnel port
+      # Optional: Explicitly open ports in Gluetun's firewall for incoming traffic from VPN_LOCAL_NETWORK
+      # If VPN_LOCAL_NETWORK is set, traffic from that network should typically bypass
+      # the main firewall rules, but explicit rules can help diagnose if needed.
+      # - FIREWALL_INPUT_PORTS=8080,8081,9117,8989,7878
+      # Optional: Configure VPN port forwarding for torrent traffic (if needed and supported by provider)
+      # - PORT_FORWARDING=on
+    restart: unless-stopped
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent # Using LinuxServer.io image
+    container_name: qbittorrent
+    # --- CRITICAL ---
+    # Use the network stack of the gluetun container.
+    # All internet bound traffic from this container will go through the VPN.
+    network_mode: "service:gluetun"
+    # --- IMPORTANT ---
+    # Do NOT define a 'ports' section directly on this service when using "network_mode: service:gluetun"
+    # Port mappings for this service are defined in the 'gluetun' service.
+    # ---------------
+    # Ensures Gluetun starts before qBittorrent
+    depends_on:
+      - gluetun
+    environment:
+      # User ID and Group ID for running the application inside the container
+      - PUID=${PUID}
+      - PGID=${PGID}
+      # Timezone setting
+      - TZ=${TZ}
+      # Specify the internal port for the Web UI (matching the port mapped on Gluetun)
+      - WEBUI_PORT=8080
+      # Optional: Ensure Web UI listens on all interfaces inside the container (usually default)
+      # - WEBUI_LISTEN_IP=0.0.0.0
+    volumes:
+      # Mount the qBittorrent config directory. Path from CONFIG_ROOT environment variable.
+      - ${CONFIG_ROOT}/qbittorrent:/config
+      # Mount the media downloads directory.
+      # Host path: /mnt/media/downloads, standardise on this bind mount to point at wherever downloads are held
+      # Container path: /downloads. qBittorrent will see /downloads as its root for files.
+      # You will configure qBittorrent internally to save files to paths like /downloads/movies, /downloads/tv, etc.
+      # Note: This mapping means the entire /mnt/media *is not* directly visible inside qBittorrent at its root.
+      - /mnt/media/downloads:/downloads
+    restart: unless-stopped # Restart container unless it is stopped manually
+
+  radarr:   # FILM MANAGER
+    image: lscr.io/linuxserver/radarr # Using LinuxServer.io image
+    container_name: radarr
+    # Use Gluetun's network stack
+    network_mode: "service:gluetun"
+    # Do NOT define 'ports' here
+    depends_on:
+      - gluetun
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      # Mount the Radarr config directory. Path from CONFIG_ROOT environment variable.
+      - ${CONFIG_ROOT}/radarr:/config
+      # Mount the entire media root directory.
+      # Host path: /mnt/media (always use this for simplicity, bind mount it on host via scripts to true media location) 
+      # Container path: /mnt/media.
+      # Radarr will see the structure under /mnt/media on the host, including downloads, movies, and tv folders.
+      # Configure Radarr to monitor /mnt/media/downloads, and import into /mnt/media/films, etc.
+      - /mnt/media:/mnt/media
+    restart: unless-stopped
+
+  sonarr:   # TV MANAGER
+    image: lscr.io/linuxserver/sonarr # Using LinuxServer.io image
+    container_name: sonarr
+    # Use Gluetun's network stack
+    network_mode: "service:gluetun"
+    # Do NOT define 'ports' here
+    depends_on:
+      - gluetun
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      # Mount the Sonarr config directory. Path from CONFIG_ROOT environment variable.
+      - ${CONFIG_ROOT}/sonarr:/config
+      # Mount the entire media root directory.
+      # Host path: /mnt/media (always use this for simplicity, bind mount it on host via scripts to true media location)
+      # Container path: /mnt/media. 
+      # Sonarr will see the structure under /mnt/media on the host, including downloads, movies, and tv folders.
+      # Configure Sonarr to monitor /mnt/media/downloads, and import into /mnt/media/tv, etc.
+      - /mnt/media:/mnt/media
+    restart: unless-stopped
+
+  jackett:   # INDEX MANAGER
+    image: lscr.io/linuxserver/jackett # Using LinuxServer.io image
+    container_name: jackett
+    # Use Gluetun's network stack (needed to reach torrent sites via VPN)
+    network_mode: "service:gluetun"
+    # Do NOT define 'ports' here
+    depends_on:
+      - gluetun
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      # Optional: Jackett's internal port (usually 9117, matched in gluetun ports)
+      # - JACKETT_PORT=9117
+    volumes:
+      # Mount the Jackett config directory. Path from CONFIG_ROOT environment variable.
+      - ${CONFIG_ROOT}/jackett:/config
+      # Removed the /mnt/media/downloads volume mapping for Jackett (as discussed previously).
+      # If you DO need it, uncomment and adjust the path:
+      # - /mnt/media/downloads:/downloads # Example
+    restart: unless-stopped
+
+#  filebrowser:
+#    image: filebrowser/filebrowser # Using the official Filebrowser image
+#    container_name: filebrowser
+#    # Use Gluetun's network stack if you want its traffic via VPN, or if you need
+#    # it to access other containers on the gluetun network by name.
+#    # If you only need to access it from your LAN and it doesn't interact with
+#    # torrents/VPN, you could use the default bridge network and map its port there instead.
+#    # Based on the gluetun ports mapping, it's intended to go via gluetun:
+#    network_mode: "service:gluetun"
+#    # Do NOT define 'ports' here
+#    depends_on:
+#      - gluetun
+#    # User and Group ID for running Filebrowser
+#    # Ensure this user has read access to the mounted /srv directory using the specified PUID/PGID
+#    user: "${PUID}:${PGID}"
+#    volumes:
+#      # Mount the Filebrowser config database location. Path from CONFIG_ROOT environment variable.
+#      - ${CONFIG_ROOT}/filebrowser:/config
+#      # Mount the media root directory to be served by Filebrowser
+#      # Host path: /mnt/media (created/mounted by your script)
+#      # Container path: /srv (standard location for files served by Filebrowser)
+#      # You will configure Filebrowser to serve from /srv internally.
+#      - /mnt/media:/srv
+#    environment: # <-- Make sure this is the environment section for filebrowser
+#      - PUID=${PUID} # Assuming you have these in your .env for filebrowser user
+#      - PGID=${PGID} # Assuming you have these in your .env for filebrowser user
+#      - TZ=${TZ}
+#      - FB_DATABASE=/config/database.db
+#    # Required to prevent 'open /database.db: permission denied' as Filebrowser tries to create database.db
+#    # inside the container at root /, but PUID and PGID user inside the container don't have write permissions.
+#    # This command tells Filebrowser to create in config, which is external to the container.
+#    # command: ["/filebrowser", "-d", "/config/database.db"]
+#    restart: unless-stopped
+
+# Optional: Define networks if you need custom ones (not strictly needed with network_mode: service:)
+# networks:
+#   default: # Using the default bridge network for services not using network_mode: service:
+#     enable_ipv6: false # Disable IPv6 if it causes issues with VPN

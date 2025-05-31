@@ -1,0 +1,703 @@
+#!/bin/bash
+
+# p - The Ponderous Ports & Pervasive Packets Power Pundit!
+# A massively helpful wrapper for nmap, ss, lsof, ip, and other networking tools.
+
+# ANSI color codes
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+NC='\033[0m' # No Color
+
+# --- Global Variables ---
+SHOW_CMD=false
+ACTION=""
+POSITIONAL_ARGS=() # Store all non-option arguments
+
+# --- Utility Functions ---
+check_command() {
+    command -v "$1" >/dev/null 2>&1 || { echo -e "${RED}Error: Command '$1' not found. Please install it to use this feature.${NC}"; exit 1; }
+}
+
+needs_sudo_warning() {
+    echo -e "${YELLOW}Note: This command usually requires root privileges (sudo).${NC}"
+}
+
+# --- Help Display Functions ---
+
+usage() {
+    echo -e "Ports Tool.   Usage: p [OPTIONS] [ACTION] [ACTION_ARGS...]"
+    echo
+    echo -e "A wrapper for nmap, ss, lsof, ip, and other networking tools."
+    echo
+    echo -e "General Options:"
+    echo -e "  h, help                 Show this help message"
+    echo -e "  --cmd                   Show the command to be executed before running"
+    echo
+    echo -e "Help Screens (Examples & Syntax):"
+    echo -e "  hn, h-nmap              Show Nmap examples and common usage"
+    echo -e "  hs, h-ss                Show ss (socket statistics) examples"
+    echo -e "  hl, h-lsof              Show lsof networking examples"
+    echo -e "  hi, h-ip                Show iproute2 (ip command) examples"
+    echo -e "  ho, h-other             Show examples for other net tools (ping, dig, nc, curl, etc.)"
+    echo
+    echo -e "Common Actions (see specific help screens for more details and args):"
+    echo
+    echo -e "  ${CYAN}ss (Socket Statistics - Local System):${NC}"
+    echo -e "    sl, ss-listen [tcp|udp|PORT]  List listening sockets (filter by proto/port)"
+    echo -e "    sa, ss-all [tcp|udp|STATE]    List all sockets (filter by proto/state e.g., ESTAB)"
+    echo -e "    sp, ss-proc <PORT>            Show process using a local PORT"
+    echo -e "    su, ss-summary                Show socket summary statistics"
+    echo
+    echo -e "  ${CYAN}nmap (Network Mapper - Local/Remote System):${NC}"
+    echo -e "    np, nmap-scan <TARGET> [PORTS_NMAP_OPT] [EXTRA_NMAP_ARGS...]"
+    echo -e "                                  Default smart scan (SYN if sudo, Connect if not)"
+    echo -e "    nps, nmap-syn <TARGET> [PORTS] [EXTRA_NMAP_ARGS...]"
+    echo -e "                                  TCP SYN scan (sudo needed)"
+    echo -e "    npc, nmap-connect <TARGET> [PORTS] [EXTRA_NMAP_ARGS...]"
+    echo -e "                                  TCP Connect scan"
+    echo -e "    npu, nmap-udp <TARGET> [PORTS] [EXTRA_NMAP_ARGS...]"
+    echo -e "                                  UDP scan (sudo needed, can be slow)"
+    echo -e "    npv, nmap-version <TARGET> [PORTS] [EXTRA_NMAP_ARGS...]"
+    echo -e "                                  Service/Version detection (e.g., -sV)"
+    echo -e "    npo, nmap-os <TARGET> [EXTRA_NMAP_ARGS...]"
+    echo -e "                                  OS detection (sudo needed, e.g., -O)"
+    echo -e "    npsc, nmap-script <TARGET> [PORTS] [--script=...] [EXTRA_NMAP_ARGS...]"
+    echo -e "                                  Run Nmap Scripting Engine (NSE)"
+    echo -e "    npA, nmap-aggressive <TARGET> [EXTRA_NMAP_ARGS...]"
+    echo -e "                                  Aggressive scan (-A: OS, Version, Script, Traceroute)"
+    echo -e "    npF, nmap-fast <TARGET> [EXTRA_NMAP_ARGS...]"
+    echo -e "                                  Fast scan (nmap -F, top 100 ports)"
+    echo -e "    npp, nmap-ping <TARGET_OR_CIDR> [EXTRA_NMAP_ARGS...]"
+    echo -e "                                  Ping scan only (nmap -sn, host discovery)"
+    echo -e "    npt, nmap-trace <TARGET> [EXTRA_NMAP_ARGS...]"
+    echo -e "                                  Nmap traceroute (nmap --traceroute)"
+    echo -e "    npr, nmap-resolve <TARGET_OR_CIDR> [EXTRA_NMAP_ARGS...]"
+    echo -e "                                  DNS resolution scan (nmap -sL)"
+    echo
+    echo -e "  ${CYAN}lsof (List Open Files - Local System):${NC}"
+    echo -e "    lp, lsof-port <PORT>          Show process(es) using specific PORT"
+    echo -e "    lpu, lsof-user <USER>         Show network connections for a USER"
+    echo -e "    lpi, lsof-ip <IP_ADDR>        Show processes interacting with IP_ADDR"
+    echo
+    echo -e "  ${CYAN}iproute2 (ip command - Local System):${NC}"
+    echo -e "    ia, ip-addr                   Show IP addresses and interfaces"
+    echo -e "    ir, ip-route                  Show routing table"
+    echo -e "    in, ip-neigh                  Show neighbor/ARP cache"
+    echo -e "    il, ip-link                   Show link/interface states"
+    echo
+    echo -e "  ${CYAN}Connectivity & DNS Tools:${NC}"
+    echo -e "    pi, ping <TARGET> [COUNT]     Send ICMP ECHO_REQUEST to network hosts"
+    echo -e "    mtr, mtr-trace <TARGET>       Network path diagnostics (mtr or traceroute)"
+    echo -e "    di, dig <DOMAIN_OR_IP> [TYPE] DNS lookup utility"
+    echo -e "    wh, whois <DOMAIN_OR_IP>      Client for the WHOIS directory service"
+    echo -e "    ncc, nc-check <TARGET> <PORT> [udp]"
+    echo -e "                                  Quick port check using netcat (nc)"
+    echo -e "    ct, curl-test <URL_OR_IP:PORT> [EXTRA_CURL_ARGS...]"
+    echo -e "                                  Test HTTP/S endpoint with curl (shows headers)"
+    echo
+    echo -e "  ${CYAN}Utility:${NC}"
+    echo -e "    gip, get-public-ip            Display your public IP address"
+    echo -e "    lip, list-local-ips           List all local non-loopback IPv4/IPv6 addresses"
+    echo
+    echo -e "Examples:"
+    echo -e "  p sl tcp 80                   # Show processes listening on TCP port 80"
+    echo -e "  p npv scanme.nmap.org 22,80,443 # Version scan specific ports on a host"
+    echo -e "  p npA 192.168.1.1             # Aggressive nmap scan on an IP"
+    echo -e "  p lp 443                      # What process is using port 443?"
+    echo -e "  p ia                          # Show my IP addresses"
+    echo -e "  p ncc google.com 443          # Check if google.com:443 is open"
+    echo -e "  p --cmd nps 10.0.0.5 1-1000   # Show SYN scan command for first 1000 ports"
+    echo
+    echo -e "${YELLOW}Many commands, especially nmap scans like -sS, -O, or UDP scans, require root privileges.${NC}"
+    echo -e "${YELLOW}This script will attempt to use 'sudo' where appropriate. Use --cmd to review.${NC}"
+    exit 1
+}
+
+display_nmap_examples() {
+    check_command nmap
+    printf '%s\n' "\
+$(tput bold)$(tput setaf 3)NMAP EXAMPLES – PAGE 1: COMMON SCANS & TARGETS$(tput sgr0)
+==========================================================================================================
+$(tput setaf 2)Nmap ('Network Mapper') is a powerful open source tool for network exploration and security auditing.$(tput sgr0)
+$(tput setaf 1)Many options require root privileges (sudo will be prepended by 'p' where needed).$(tput sgr0)
+
+$(tput setaf 3)BASIC SCAN TYPES$(tput sgr0)                   |  $(tput setaf 3)TARGET SPECIFICATION$(tput sgr0)
+nmap <target>             # Default: 1000 TCP ports (SYN if root, else Connect)
+nmap -sS <target>         # TCP SYN scan (stealth, default for root)
+nmap -sT <target>         # TCP Connect scan (default for non-root, reliable)
+nmap -sU <target>         # UDP scan (slow, requires root)
+nmap -sA <target>         # TCP ACK scan (firewall rule testing)
+nmap -sF/-sX/-sN <target> # FIN/Xmas/Null scans (stealthy, UNIX-only targets)
+nmap -sn <target>         # Ping scan only (host discovery, no ports) - $(tput bold)p npp <target>$(tput sgr0)
+nmap -sL <target>         # List scan (DNS resolution only) - $(tput bold)p npr <target>$(tput sgr0)
+                          |  <target> can be:
+                          |    example.com (hostname)
+$(tput setaf 3)SERVICE & OS DETECTION$(tput sgr0)             |    192.168.1.1 (single IP)
+nmap -sV <target>         # Version detection - $(tput bold)p npv <target> [ports]$(tput sgr0)
+nmap -O <target>          # OS detection (needs root) - $(tput bold)p npo <target>$(tput sgr0)
+nmap -A <target>          # Aggressive: OS, Version, Scripts, Traceroute - $(tput bold)p npA <target>$(tput sgr0)
+                          |    192.168.1.0/24 (CIDR block)
+$(tput setaf 3)PORT SPECIFICATION (-p <portranges>)$(tput sgr0)|    192.168.1.1-100 (IP range)
+-p 22                     # Single port              |    -iL <file> (list from file)
+-p 1-100                  # Range of ports
+-p U:53,T:21-25,80,443    # UDP 53, TCP 21-25, 80, 443
+-p-                       # All 65535 ports
+--top-ports 10            # Scan N most common ports
+-F                        # Fast scan (top 100 ports) - $(tput bold)p npF <target>$(tput sgr0)
+
+$(tput setaf 3)TIMING & PERFORMANCE (-T<0-5>)$(tput sgr0)     |  $(tput setaf 3)SCRIPTING ENGINE (NSE)$(tput sgr0)
+-T0 (paranoid), -T1 (sneaky)  # Slower, IDS evasion
+-T2 (polite), -T3 (normal)    # Default behavior
+-T4 (aggressive), -T5 (insane) # Faster, may be intrusive
+--min-rate <num>, --max-rate <num> # Packets/sec
+--max-retries <num>       # Max port scan probe retransmissions
+                          |  nmap --script default <target>
+                          |  nmap -sC <target> (equiv. to --script default)
+                          |  nmap --script <name>,<category>
+                          |  nmap --script-args <arg1=val1,...>
+                          |  $(tput bold)p npsc <target> [--script=...]$(tput sgr0)
+
+$(tput setaf 2)Use 'p --cmd <nmap_action> ...' to see the generated command. 'man nmap' for full details.$(tput sgr0)
+----------------------------------------------------------------------------------------------------------
+Press any key to continue to page 2..."
+    read -rsn1
+    printf '%s\n' "\
+$(tput bold)$(tput setaf 3)NMAP EXAMPLES – PAGE 2: OUTPUT, EVASION & ADVANCED$(tput sgr0)
+==========================================================================================================
+
+$(tput setaf 3)OUTPUT FORMATS$(tput sgr0)                      |  $(tput setaf 3)FIREWALL/IDS EVASION & SPOOFING (ADVANCED)$(tput sgr0)
+-oN <file.nmap>   # Normal output           |  -f; --mtu <val>       # Fragment packets
+-oX <file.xml>    # XML output              |  -D <decoy1,decoy2,ME> # Cloak scan with decoys
+-oG <file.gnmap>  # Grepable output         |  -S <IP_Address>       # Spoof source address (risky!)
+-oA <basename>    # Output in all 3 formats |  --source-port <port>  # Use specific source port
+-v / -vv          # Verbosity / More verb.  |  --data-length <num>   # Append random data
+-d / -dd          # Debugging / More debug. |  --proxies <url,...>   # Relay via HTTP/SOCKS4 proxies
+--reason          # Display reason port is in a state
+--open            # Only show open (or possibly open) ports
+
+$(tput setaf 3)OTHER USEFUL OPTIONS$(tput sgr0)                 |  $(tput setaf 3)COMMON COMBINATIONS (using 'p' tool where applicable)$(tput sgr0)
+--traceroute      # Trace path to host (p npt) | p npv target.com -p 80,443 # Version on specific ports
+-6                # Enable IPv6 scanning    | sudo nmap -sS -sV -O -p- target.com -oA full_scan
+--iflist          # List interfaces/routes  | $(tput bold)p npA target.com --reason -T4 -oN detailed_A_scan.nmap$(tput sgr0)
+--send-ip / --send-eth # Send raw IP/Eth   | $(tput bold)p nps 192.168.1.0/24 -p 22,3389 --open -oG open_ports.gnmap$(tput sgr0)
+--exclude <h1,h2> # Exclude hosts/networks  | $(tput bold)p npp 10.0.0.0/8 -T5 --min-hostgroup 1024 -oN large_ping_scan$(tput sgr0)
+--excludefile <f> # Exclude from file
+
+$(tput setaf 3)NMAP SCRIPTING ENGINE (NSE) EXAMPLES$(tput sgr0)
+nmap --script default <target>                 # $(tput bold)p npsc <target>$(tput sgr0)
+nmap --script banner <target>                  # Grabs banners
+nmap --script=http-title --script-args http.max-cache-size=0 <target> -p 80,443
+nmap --script \"vuln\" <target>                # Run all scripts in 'vuln' category (use with caution!)
+nmap --script-updatedb                       # Update script database
+
+$(tput setaf 2)Tip: Combine 'p --cmd' with nmap options to craft complex scans easily and see the result.$(tput sgr0)
+$(tput setaf 2)Always ensure you have permission before scanning remote hosts.$(tput sgr0)
+----------------------------------------------------------------------------------------------------------"
+}
+
+display_ss_examples() {
+    check_command ss
+    printf '%s\n' "\
+$(tput bold)$(tput setaf 3)SS (SOCKET STATISTICS) EXAMPLES – PAGE 1: LISTING & FILTERING$(tput sgr0)
+==========================================================================================================
+$(tput setaf 2)ss is a utility to investigate sockets. It's the modern replacement for netstat.$(tput sgr0)
+$(tput setaf 1)Some options like '-p' (processes) may require root privileges for full info.$(tput sgr0)
+
+$(tput setaf 3)LISTING SOCKETS (Commonly Used)$(tput sgr0)     |  $(tput setaf 3)BASIC OPTIONS$(tput sgr0)
+ss -tulnp                 # TCP/UDP listening, numeric ports, process names $(tput bold)(Similar to p sl all)$(tput sgr0)
+ss -tuanp                 # TCP/UDP all states, numeric, process names $(tput bold)(Similar to p sa all)$(tput sgr0)
+ss -ltn                   # Listening TCP, numeric
+ss -lun                   # Listening UDP, numeric
+ss -xap                   # UNIX domain sockets, all, process
+ss -eatin                 # All TCP, extended info, timers, numeric
+                          | -t, --tcp         Display TCP sockets
+$(tput setaf 3)FILTERING BY STATE$(tput sgr0)                 | -u, --udp         Display UDP sockets
+ss -t state listening     # All listening TCP sockets | -d, --dccp        Display DCCP sockets
+ss -t state established   # All established TCP     | -w, --raw         Display RAW sockets
+ss -t state syn-sent      # TCP sockets in SYN_SENT | -x, --unix        Display Unix domain sockets
+ss state all              # All states (default)    | -S, --sctp        Display SCTP sockets
+ss state connected        # All states except listening and closed
+ss state synchronized     # All connected states where not SYN_SENT
+                          | -a, --all         Display all (listening and non-listening)
+$(tput setaf 3)FILTERING BY ADDRESS/PORT$(tput sgr0)          | -l, --listening   Display listening sockets
+ss sport = :80            # Source port is 80       | -n, --numeric     Don't resolve service names (numeric ports/hosts)
+ss dport = :443           # Destination port 443    | -p, --processes   Show process using socket
+ss src 192.168.1.5        # Source IP is 192.168.1.5| -e, --extended    Show detailed socket information
+ss dst 10.0.0.1:22        # Dest IP 10.0.0.1, port 22
+ss '( dport = :smtp or sport = :smtp )' # Logical OR
+ss '( dport = :http or dport = :https )' and src 192.168.0.0/16
+                          | -o, --options     Show timer information
+$(tput setaf 3)SHOWING PROCESS INFORMATION$(tput sgr0)         | -m, --memory      Show socket memory usage
+ss -p                     # Show processes (may need sudo) | -K, --kill        Forcefully close sockets (DANGEROUS!)
+ss -tp dst :ssh           # Processes for TCP connections to SSH port
+ss -lp sport = :http      # Listening processes on HTTP port $(tput bold)(p sp 80)$(tput sgr0)
+
+$(tput setaf 2)Use 'p --cmd <ss_action> ...' to see the generated command. 'man ss' for full details.$(tput sgr0)
+----------------------------------------------------------------------------------------------------------
+Press any key to continue to page 2..."
+    read -rsn1
+    printf '%s\n' "\
+$(tput bold)$(tput setaf 3)SS (SOCKET STATISTICS) EXAMPLES – PAGE 2: ADVANCED & OTHER INFO$(tput sgr0)
+==========================================================================================================
+
+$(tput setaf 3)OUTPUT FORMATTING & OTHER INFO$(tput sgr0)      |  $(tput setaf 3)COMBINED EXAMPLES (using 'p' tool where applicable)$(tput sgr0)
+ss -s                     # Summary statistics $(tput bold)(p su)$(tput sgr0) | p sl tcp 80     # Listening on TCP 80 (uses ss -ltnp sport = :80 or similar)
+ss -H                     # No header line          | p sp 22         # Process using port 22 (uses ss -lp sport = :22)
+ss -b                     # Show bpf filters        | p sa ESTABLISHED # All established connections
+ss -i                     # Internal TCP info       | ss -tuna src 192.168.1.100 # All TCP/UDP from specific IP
+ss -E                     # Extended statistics     | ss -tulnp sport gt :1023 # Listening on unprivileged ports
+ss -O                     # Show SO_MARK value      | ss -tn '( dport = :80 or dport = :443 )' # TCP to web ports
+                          |
+$(tput setaf 3)FILTERING WITH 'src/dst' and 'sport/dport'$(tput sgr0)|
+ss src <CIDR/IP>          # Filter by source network/IP
+ss dst <CIDR/IP>          # Filter by destination network/IP
+ss sport <operator> <port>  # Filter by source port (e.g. sport = :80, sport \\< :1024)
+ss dport <operator> <port>  # Filter by destination port (e.g. dport gt :1023)
+  Operators: =, !=, <, >, <=, >= (use \\ for <, > in shell or quotes)
+                          |
+$(tput setaf 3)FAMILIES$(tput sgr0)                            |  $(tput setaf 3)USING WITH OTHER TOOLS$(tput sgr0)
+ss -f inet                # IPv4 sockets            | ss -tulnp | grep nginx # Find sockets used by nginx
+ss -f inet6               # IPv6 sockets            | watch -d 'ss -s'       # Monitor summary stats
+ss -f unix                # Unix domain sockets     | ss -Htnp state established | awk '{print \$5}' | cut -d':' -f1 | sort -u
+ss -f link                # Netlink sockets         # Get unique destination IPs of established connections
+ss -f vsock               # VMWare VSockets
+ss -f all                 # All families
+
+$(tput setaf 3)EXPRESSIONS$(tput sgr0)
+ss can use complex boolean expressions:
+  'and', 'or', 'not', '(', ')'
+  Example: ss -tn '( src 192.168.1.0/24 and dport = :22 ) or ( dst 10.0.0.5 and dport = :3306 )'
+
+$(tput setaf 2)Tip: 'ss' is very fast. Combine its filtering with 'grep', 'awk', 'sort' for powerful queries.${NC}
+$(tput setaf 2)Remember that '-p' for process info often needs root for non-owned processes.${NC}
+----------------------------------------------------------------------------------------------------------"
+}
+
+display_lsof_examples() {
+    check_command lsof
+    printf '%s\n' "\
+$(tput bold)$(tput setaf 3)LSOF NETWORKING EXAMPLES (List Open Files)$(tput sgr0)
+==========================================================================================================
+$(tput setaf 2)lsof lists information about files opened by processes. It's very versatile for network diagnostics.$(tput sgr0)
+$(tput setaf 1)Often requires root privileges (sudo) for a complete view of all processes.${NC}
+
+$(tput setaf 3)LISTING PORTS & CONNECTIONS$(tput sgr0)         |  $(tput setaf 3)COMMON OPTIONS FOR NETWORKING$(tput sgr0)
+lsof -i                   # All Internet connections & listening ports
+lsof -i TCP               # All TCP connections/ports
+lsof -i UDP               # All UDP connections/ports
+lsof -i :22               # Connections/listening on port 22 (TCP & UDP)
+lsof -i TCP:22            # TCP connections/listening on port 22 $(tput bold)(p lp 22 can use this)$(tput sgr0)
+lsof -i UDP:53            # UDP connections/listening on port 53
+lsof -i @192.168.1.1      # Connections to/from host 192.168.1.1
+lsof -i @example.com:80   # Connections to example.com on port 80
+                          | -i [46][protocol][@hostname|hostaddr][:service|port]
+                          |   4: IPv4, 6: IPv6
+$(tput setaf 3)FILTERING BY PROCESS / USER$(tput sgr0)          |   protocol: TCP, UDP, SCTP, RAW
+lsof -i -a -p 1234        # Network connections for PID 1234
+lsof -i -a -c nginx       # Network connections for 'nginx' command
+lsof -i -a -u httpd       # Network connections for user 'httpd' $(tput bold)(p lpu httpd)$(tput sgr0)
+lsof -i TCP -a -u nobody  # TCP connections by user 'nobody'
+                          | -P                # Inhibits port number to name conversion (faster)
+$(tput setaf 3)SHOWING LISTENING PORTS$(tput sgr0)              | -n                # Inhibits host name conversion (faster)
+lsof -i -sTCP:LISTEN      # Show TCP ports in LISTEN state
+lsof -i -sUDP:LISTEN      # (UDP doesn't really have LISTEN state, shows UDP sockets)
+lsof -iTCP -P -n -sTCP:LISTEN # Numeric, TCP listening ports
+                          | -s<p>:<S>       # Filter by protocol state (e.g., TCP:LISTEN)
+$(tput setaf 3)OTHER USEFUL COMBINATIONS$(tput sgr0)            | -a                # AND conditions (default is OR)
+lsof -i -U                # UNIX domain sockets with network state
+lsof -N                   # List NFS files
+lsof +r 1                 # Repeat display every 1 second (until ^C)
+lsof -i @192.168.1.1 -a -i TCP:22 # TCP/22 connections to/from specific host
+
+$(tput setaf 2)Use 'p --cmd <lsof_action> ...' to see the generated command. 'man lsof' for full details.${NC}
+$(tput setaf 2)Output can be extensive. Use 'grep' to filter further.${NC}
+----------------------------------------------------------------------------------------------------------"
+}
+
+display_ip_examples() {
+    check_command ip
+    printf '%s\n' "\
+$(tput bold)$(tput setaf 3)IPROUTE2 (ip command) EXAMPLES – PAGE 1: ADDRESS, ROUTE, LINK$(tput sgr0)
+==========================================================================================================
+$(tput setaf 2)The 'ip' command is the modern Linux tool for managing network interfaces, IP addresses, and routes.${NC}
+
+$(tput setaf 3)IP ADDRESS MANAGEMENT (ip addr)$(tput sgr0)     |  $(tput setaf 3)COMMON 'ip addr' OPTIONS$(tput sgr0)
+ip addr show              # Show all IP addresses $(tput bold)(p ia)$(tput sgr0) | -4, -6          Only IPv4 or IPv6
+ip addr show dev eth0     # Addresses for interface eth0 | -o              One-line output
+ip addr add 192.168.1.100/24 dev eth0 # Add IP   | -br             Brief output (addr only)
+ip addr del 192.168.1.100/24 dev eth0 # Delete IP| -c              Colorized output
+ip addr flush dev eth0    # Remove all IPs from eth0
+                          | -s              Show statistics
+$(tput setaf 3)ROUTING TABLE MANAGEMENT (ip route)$(tput sgr0)  |  $(tput setaf 3)COMMON 'ip route' OPTIONS$(tput sgr0)
+ip route show             # Show routing table $(tput bold)(p ir)$(tput sgr0)  | -n              Numeric (no resolve)
+ip route get 8.8.8.8      # Get route to an IP      | to <PREFIX>     Filter by destination
+ip route add default via 192.168.1.1 # Add default route | from <PREFIX>   Filter by source (policy routing)
+ip route add 10.0.0.0/8 via 192.168.1.254 dev eth0
+ip route del default
+ip route flush cache      # Clear routing cache
+                          |
+$(tput setaf 3)LINK LAYER (ip link)$(tput sgr0)                 |  $(tput setaf 3)COMMON 'ip link' OPTIONS$(tput sgr0)
+ip link show              # Show all network interfaces $(tput bold)(p il)$(tput sgr0)| -s              Statistics
+ip link show dev eth0     # Info for interface eth0 | -br             Brief link info
+ip link set dev eth0 up   # Bring interface up      | type <TYPE>     Filter by link type (ether, vlan)
+ip link set dev eth0 down # Bring interface down    | master <DEV>    Part of a master device (bridge/bond)
+ip link set dev eth0 mtu 1400 # Set MTU
+ip link set dev eth0 address AA:BB:CC:DD:EE:FF # Set MAC (use with caution)
+                          |
+$(tput setaf 3)NEIGHBOR/ARP CACHE (ip neigh)$(tput sgr0)        |  $(tput setaf 3)COMMON 'ip neigh' OPTIONS$(tput sgr0)
+ip neigh show             # Show ARP/NDP cache $(tput bold)(p in)$(tput sgr0)   | nud <STATE>     Filter by NUD state (REACHABLE, STALE)
+ip neigh show dev eth0    # Neighbors on eth0       | proxy           Show proxy NDP entries
+ip neigh flush dev eth0   # Flush ARP for eth0      | -s              Statistics
+ip neigh add 192.168.1.50 lladdr 00:11:22:33:44:55 dev eth0 nud perm # Add static ARP
+
+$(tput setaf 2)These are common informational commands. Modifying network config often requires root.${NC}
+$(tput setaf 2)'man ip' or 'ip help <subcommand>' for more details (e.g. 'ip addr help').${NC}
+----------------------------------------------------------------------------------------------------------"
+# Page 2 for IP could include: ip tunnel, ip rule, ip maddr, ip monitor etc. but this is good for now.
+}
+
+display_other_net_examples() {
+    printf '%s\n' "\
+$(tput bold)$(tput setaf 3)OTHER NETWORKING TOOLS EXAMPLES – PAGE 1$(tput sgr0)
+==========================================================================================================
+$(tput setaf 2)Quick examples for ping, mtr/traceroute, dig, nc, curl, and whois.${NC}
+
+$(tput setaf 3)PING (ICMP Echo)$(tput sgr0)                   |  $(tput setaf 3)MTR / TRACEROUTE (Network Path)$(tput sgr0)
+ping example.com          # Ping host (p pi example.com) | mtr example.com     # Realtime path trace (preferred)
+ping -c 5 example.com     # Send 5 packets (p pi example.com 5) | traceroute example.com # Classic traceroute
+ping -4/-6 example.com    # Force IPv4/IPv6        | mtr -n example.com  # MTR, no DNS resolution
+ping -s 1000 example.com  # Packet size 1000 bytes | mtr -rwc 10 example.com # MTR report, 10 cycles
+ping -W 1 example.com     # Timeout 1 sec for reply| traceroute -I example.com # ICMP traceroute
+ping -i 0.2 example.com   # Interval 0.2 sec (flood if <0.2, needs root)
+                          |
+$(tput setaf 3)DIG (DNS Lookup)$(tput sgr0)                    |  $(tput setaf 3)NETCAT (nc - Network Utility)$(tput sgr0)
+dig example.com           # A record (p di example.com) | nc -zv example.com 80   # Check TCP port 80 $(tput bold)(p ncc example.com 80)$(tput sgr0)
+dig example.com MX        # MX records (p di example.com MX)| nc -zvu example.com 53  # Check UDP port 53 $(tput bold)(p ncc example.com 53 udp)$(tput sgr0)
+dig example.com ANY       # All record types       | echo \"GET / HTTP/1.0\\r\\n\\r\\n\" | nc example.com 80 # HTTP GET
+dig @8.8.8.8 example.com  # Query specific DNS server| nc -l -p 1234         # Listen on TCP port 1234
+dig -x 1.2.3.4            # Reverse DNS lookup (PTR)
+dig +short example.com    # Minimal output
+                          |
+$(tput setaf 3)CURL (Client URL)$(tput sgr0)                   |  $(tput setaf 3)WHOIS (Domain/IP Lookup)$(tput sgr0)
+curl http://example.com   # Fetch URL (p ct http://example.com)| whois example.com   # Whois for domain $(tput bold)(p wh example.com)$(tput sgr0)
+curl -I http://example.com# Show headers only (p ct ...) | whois 8.8.8.8       # Whois for IP $(tput bold)(p wh 8.8.8.8)$(tput sgr0)
+curl -L http://bit.ly/xyz # Follow redirects
+curl -o page.html URL     # Save output to file
+curl -X POST -d \"data\" URL # POST request
+curl -sSL https://get.example.com | bash # Silent, follow redirects, fail on error (use with care!)
+
+$(tput setaf 2)'man <command>' for full details on each tool. These are just common snippets.${NC}
+----------------------------------------------------------------------------------------------------------"
+}
+
+# --- Command Execution ---
+execute_command() {
+    local cmd="$1"
+    local needs_sudo_prefix=""
+
+    # Heuristic: if command involves nmap with options like -sS, -sU, -O, or is nmap itself
+    # and the user is not root, prepend sudo. Similar for lsof without specific user.
+    if ! [[ "$(id -u)" == "0" ]]; then
+        if [[ "$cmd" == "nmap"* || "$cmd" == *"-sS"* || "$cmd" == *"-sU"* || "$cmd" == *"-O"* || "$cmd" == "lsof -i"* && "$cmd" != *" -u "* ]]; then
+             # Check if sudo is already there
+            if [[ "$cmd" != "sudo "* ]]; then
+                needs_sudo_prefix="sudo "
+            fi
+        fi
+         if [[ "$cmd" == "ss"* && ( "$cmd" == *"-p"* || "$cmd" == *"-K"* ) ]]; then
+            if [[ "$cmd" != "sudo "* ]]; then
+                needs_sudo_prefix="sudo "
+            fi
+        fi
+    fi
+    
+    local full_cmd="${needs_sudo_prefix}${cmd}"
+
+    if [[ "$SHOW_CMD" == "true" ]]; then
+        echo -e "${WHITE}#${NC} ${GREEN}${full_cmd}${NC}"
+        if [[ -n "$needs_sudo_prefix" ]]; then
+             echo -e "${YELLOW}Note: This command is being run with 'sudo'.${NC}"
+        fi
+        echo -e "${WHITE}Press any key to execute, or Ctrl+C to cancel...${NC}"
+        read -n 1 -s
+        echo -e "\r${WHITE}Executing...                                          ${NC}"
+    fi
+    eval "${full_cmd}"
+}
+
+
+# --- Argument Parser ---
+if [[ $# -eq 0 ]]; then
+    usage
+fi
+
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        -h|--help)
+            usage ;;
+        --cmd)
+            SHOW_CMD=true; shift ;;
+        hn|h-nmap)
+            ACTION="nmap_examples"; shift ;;
+        hs|h-ss)
+            ACTION="ss_examples"; shift ;;
+        hl|h-lsof)
+            ACTION="lsof_examples"; shift ;;
+        hi|h-ip)
+            ACTION="ip_examples"; shift ;;
+        ho|h-other)
+            ACTION="other_net_examples"; shift ;;
+
+        # ss actions
+        sl|ss-listen) ACTION="ss_listen"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        sa|ss-all) ACTION="ss_all"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        sp|ss-proc) ACTION="ss_proc"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        su|ss-summary) ACTION="ss_summary"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+
+        # nmap actions
+        np|nmap-scan) ACTION="nmap_scan"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        nps|nmap-syn) ACTION="nmap_syn"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npc|nmap-connect) ACTION="nmap_connect"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npu|nmap-udp) ACTION="nmap_udp"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npv|nmap-version) ACTION="nmap_version"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npo|nmap-os) ACTION="nmap_os"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npsc|nmap-script) ACTION="nmap_script"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npA|nmap-aggressive) ACTION="nmap_aggressive"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npF|nmap-fast) ACTION="nmap_fast"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npp|nmap-ping) ACTION="nmap_ping"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npt|nmap-trace) ACTION="nmap_trace"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npr|nmap-resolve) ACTION="nmap_resolve"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+
+        # lsof actions
+        lp|lsof-port) ACTION="lsof_port"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        lpu|lsof-user) ACTION="lsof_user"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        lpi|lsof-ip) ACTION="lsof_ip"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+
+        # iproute2 actions
+        ia|ip-addr) ACTION="ip_addr"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        ir|ip-route) ACTION="ip_route"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        in|ip-neigh) ACTION="ip_neigh"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        il|ip-link) ACTION="ip_link"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+
+        # Connectivity & DNS
+        pi|ping) ACTION="ping"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        mtr|mtr-trace) ACTION="mtr_trace"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        di|dig) ACTION="dig"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        wh|whois) ACTION="whois"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        ncc|nc-check) ACTION="nc_check"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        ct|curl-test) ACTION="curl_test"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+
+        # Utility
+        gip|get-public-ip) ACTION="get_public_ip"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        lip|list-local-ips) ACTION="list_local_ips"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+
+        *)
+            echo -e "${RED}Error: Unknown option or action: $key${NC}"
+            usage
+            ;;
+    esac
+done
+
+# --- Perform Action ---
+TARGET_HOST="${POSITIONAL_ARGS[0]}"
+TARGET_PORT="${POSITIONAL_ARGS[1]}" # May be port, or second arg for some commands
+NMAP_EXTRA_ARGS=("${POSITIONAL_ARGS[@]:1}") # For nmap, target is [0], ports can be [1] or part of extra
+NMAP_PORTS_OPT="" # Will be set if ports are explicitly given as second arg for nmap
+
+case "$ACTION" in
+    nmap_examples) display_nmap_examples ;;
+    ss_examples) display_ss_examples ;;
+    lsof_examples) display_lsof_examples ;;
+    ip_examples) display_ip_examples ;;
+    other_net_examples) display_other_net_examples ;;
+
+    ss_listen)
+        check_command ss
+        PROTO_FILTER="${POSITIONAL_ARGS[0]}"
+        PORT_FILTER="${POSITIONAL_ARGS[1]}"
+        CMD_ss="ss -tulnp"
+        if [[ "$PROTO_FILTER" == "tcp" ]]; then CMD_ss="ss -tlnp";
+        elif [[ "$PROTO_FILTER" == "udp" ]]; then CMD_ss="ss -ulnp";
+        fi
+        if [[ -n "$PORT_FILTER" ]]; then
+            if [[ "$PROTO_FILTER" != "tcp" && "$PROTO_FILTER" != "udp" ]]; then # If first arg wasn't proto, it's port
+                PORT_FILTER="$PROTO_FILTER"
+            fi
+             CMD_ss+=" sport = :$PORT_FILTER"
+        elif [[ "$PROTO_FILTER" != "tcp" && "$PROTO_FILTER" != "udp" && -n "$PROTO_FILTER" ]]; then # e.g. p sl 80
+             CMD_ss+=" sport = :$PROTO_FILTER"
+        fi
+        execute_command "$CMD_ss"
+        ;;
+    ss_all)
+        check_command ss
+        PROTO_FILTER="${POSITIONAL_ARGS[0]}"
+        STATE_FILTER="${POSITIONAL_ARGS[1]}"
+        CMD_ss="ss -tuanp" # TCP, UDP, All states, Numeric, Processes
+        if [[ "$PROTO_FILTER" == "tcp" ]]; then CMD_ss="ss -tanp";
+        elif [[ "$PROTO_FILTER" == "udp" ]]; then CMD_ss="ss -uanp";
+        fi
+        if [[ -n "$STATE_FILTER" ]]; then
+             if [[ "$PROTO_FILTER" != "tcp" && "$PROTO_FILTER" != "udp" ]]; then # If first arg wasn't proto, it's state
+                STATE_FILTER="$PROTO_FILTER"
+            fi
+            CMD_ss+=" state $STATE_FILTER"
+        elif [[ "$PROTO_FILTER" != "tcp" && "$PROTO_FILTER" != "udp" && -n "$PROTO_FILTER" ]]; then # e.g. p sa ESTABLISHED
+            CMD_ss+=" state $PROTO_FILTER"
+        fi
+        execute_command "$CMD_ss"
+        ;;
+    ss_proc)
+        check_command ss
+        [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: Port number required for ss-proc.${NC}"; usage; }
+        execute_command "ss -lp sport = :${TARGET_HOST}" # TARGET_HOST is actually port here
+        ;;
+    ss_summary)
+        check_command ss
+        execute_command "ss -s"
+        ;;
+
+    nmap_scan|nmap_syn|nmap_connect|nmap_udp|nmap_version|nmap_os|nmap_script|nmap_aggressive|nmap_fast|nmap_ping|nmap_trace|nmap_resolve)
+        check_command nmap
+        [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: Target host/IP required for nmap actions.${NC}"; usage; }
+        
+        # Nmap specific port handling. If second arg looks like ports, use it.
+        # e.g. 22  or 22,80,443 or 1-1000 or U:53,T:22
+        if [[ "${#POSITIONAL_ARGS[@]}" -gt 1 ]] && [[ "${POSITIONAL_ARGS[1]}" =~ ^([0-9]+([,-][0-9]+)*|[TU]:[0-9]+([,-][0-9]+)*)+$ || "${POSITIONAL_ARGS[1]}" == "-"* ]]; then
+            if [[ "${POSITIONAL_ARGS[1]}" != "-"* ]]; then # if it's not an nmap option like -p-
+                NMAP_PORTS_OPT="-p ${POSITIONAL_ARGS[1]}"
+                NMAP_EXTRA_ARGS=("${POSITIONAL_ARGS[@]:2}") # Shift extra args
+            else # it is an nmap option, likely -p-, or other flags
+                 NMAP_EXTRA_ARGS=("${POSITIONAL_ARGS[@]:1}")
+            fi
+        else # No specific ports given as second arg, or it's not in a recognized port format
+            NMAP_EXTRA_ARGS=("${POSITIONAL_ARGS[@]:1}")
+        fi
+
+        NMAP_CMD_BASE="nmap"
+        case "$ACTION" in
+            nmap_scan) # Smart scan: -sS if sudo, -sT if not. Let execute_command handle sudo.
+                if [[ "$(id -u)" == "0" ]]; then NMAP_CMD_BASE+=" -sS"; else NMAP_CMD_BASE+=" -sT"; fi
+                ;;
+            nmap_syn) NMAP_CMD_BASE+=" -sS" ;;
+            nmap_connect) NMAP_CMD_BASE+=" -sT" ;;
+            nmap_udp) NMAP_CMD_BASE+=" -sU" ;;
+            nmap_version) NMAP_CMD_BASE+=" -sV" ;; # Often combined with -sS or -sT
+            nmap_os) NMAP_CMD_BASE+=" -O" ;;
+            nmap_script) NMAP_CMD_BASE+=" -sC" ;; # Default scripts, user can override with --script=
+            nmap_aggressive) NMAP_CMD_BASE+=" -A" ;;
+            nmap_fast) NMAP_CMD_BASE+=" -F" ;;
+            nmap_ping) NMAP_CMD_BASE+=" -sn" ;;
+            nmap_trace) NMAP_CMD_BASE+=" --traceroute" ;;
+            nmap_resolve) NMAP_CMD_BASE+=" -sL" ;;
+        esac
+        
+        # Construct the full command
+        FULL_NMAP_CMD="$NMAP_CMD_BASE"
+        if [[ -n "$NMAP_PORTS_OPT" ]] && [[ "$ACTION" != "nmap_ping" && "$ACTION" != "nmap_resolve" && "$ACTION" != "nmap_os" && "$ACTION" != "nmap_trace" && "$ACTION" != "nmap_aggressive" && "$ACTION" != "nmap_fast" ]]; then
+             # Only add -p if not implied by -F, -A or if action doesn't use ports.
+             # For -sV, -sS, -sT, -sU, -sC explicit ports are good.
+            FULL_NMAP_CMD+=" $NMAP_PORTS_OPT"
+        fi
+        FULL_NMAP_CMD+=" \"$TARGET_HOST\"" # Quote target
+        if [[ ${#NMAP_EXTRA_ARGS[@]} -gt 0 ]]; then
+            FULL_NMAP_CMD+=" ${NMAP_EXTRA_ARGS[*]}" # Add any extra nmap arguments
+        fi
+        execute_command "$FULL_NMAP_CMD"
+        ;;
+
+    lsof_port)
+        check_command lsof
+        [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: Port number required for lsof-port.${NC}"; usage; }
+        execute_command "lsof -i :${TARGET_HOST} -P -n -sTCP:LISTEN -sUDP:*" # TARGET_HOST is port
+        ;;
+    lsof_user)
+        check_command lsof
+        [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: Username required for lsof-user.${NC}"; usage; }
+        execute_command "lsof -i -a -u ${TARGET_HOST}" # TARGET_HOST is user
+        ;;
+    lsof_ip)
+        check_command lsof
+        [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: IP address required for lsof-ip.${NC}"; usage; }
+        execute_command "lsof -i @${TARGET_HOST} -P -n"
+        ;;
+
+    ip_addr) check_command ip; execute_command "ip -c addr show" ;;
+    ip_route) check_command ip; execute_command "ip -c route show" ;;
+    ip_neigh) check_command ip; execute_command "ip -c neigh show" ;;
+    ip_link) check_command ip; execute_command "ip -c -s link show" ;;
+
+    ping)
+        check_command ping
+        [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: Target host required for ping.${NC}"; usage; }
+        COUNT_ARG=""
+        if [[ -n "$TARGET_PORT" ]]; then COUNT_ARG="-c $TARGET_PORT"; fi # TARGET_PORT is count
+        execute_command "ping $COUNT_ARG \"$TARGET_HOST\""
+        ;;
+    mtr_trace)
+        if command -v mtr >/dev/null 2>&1; then
+            check_command mtr
+            [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: Target host required for mtr.${NC}"; usage; }
+            execute_command "mtr \"$TARGET_HOST\""
+        elif command -v traceroute >/dev/null 2>&1; then
+            check_command traceroute
+            echo -e "${YELLOW}mtr not found, using traceroute instead.${NC}"
+            [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: Target host required for traceroute.${NC}"; usage; }
+            execute_command "traceroute \"$TARGET_HOST\""
+        else
+            echo -e "${RED}Error: Neither mtr nor traceroute found.${NC}"; exit 1;
+        fi
+        ;;
+    dig)
+        check_command dig
+        [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: Domain or IP required for dig.${NC}"; usage; }
+        RECORD_TYPE="${TARGET_PORT:-A}" # TARGET_PORT is record type, defaults to A
+        execute_command "dig \"$TARGET_HOST\" $RECORD_TYPE"
+        ;;
+    whois)
+        check_command whois
+        [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: Domain or IP required for whois.${NC}"; usage; }
+        execute_command "whois \"$TARGET_HOST\""
+        ;;
+    nc_check)
+        check_command nc
+        [[ -z "$TARGET_HOST" || -z "$TARGET_PORT" ]] && { echo -e "${RED}Error: Target host and port required for nc-check.${NC}"; usage; }
+        UDP_FLAG=""
+        if [[ "${POSITIONAL_ARGS[2]}" == "udp" ]]; then UDP_FLAG="-u"; fi
+        execute_command "nc -zvn $UDP_FLAG \"$TARGET_HOST\" $TARGET_PORT"
+        ;;
+    curl_test)
+        check_command curl
+        [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: URL or IP:PORT required for curl-test.${NC}"; usage; }
+        # Ensure TARGET_HOST has a scheme for curl if it's not just an IP:port
+        TARGET_URL="$TARGET_HOST"
+        if [[ ! "$TARGET_URL" =~ ^[a-zA-Z]+:// ]] && [[ "$TARGET_URL" =~ :[0-9]+$ ]]; then # If it looks like IP:PORT or HOST:PORT
+            TARGET_URL="http://$TARGET_URL" # Default to http, user can override
+        elif [[ ! "$TARGET_URL" =~ ^[a-zA-Z]+:// ]]; then
+             TARGET_URL="http://$TARGET_URL"
+        fi
+        CURL_EXTRA_ARGS=("${POSITIONAL_ARGS[@]:1}")
+        execute_command "curl -IL --connect-timeout 5 ${CURL_EXTRA_ARGS[*]} \"$TARGET_URL\""
+        ;;
+    get_public_ip)
+        # Try multiple methods
+        CMD_ip='dig +short myip.opendns.com @resolver1.opendns.com || curl -s ifconfig.me || curl -s icanhazip.com || echo "Could not determine public IP"'
+        execute_command "$CMD_ip" # eval directly as it's a compound command
+        ;;
+    list_local_ips)
+        check_command ip
+        CMD_ip="ip -4 addr show | grep -oP 'inet \\K[0-9\\.]+(?=/)' | grep -v '^127\\.'; ip -6 addr show | grep -oP 'inet6 \\K[0-9a-fA-F:]+(?=/)' | grep -v '^::1'"
+        execute_command "$CMD_ip"
+        ;;
+
+    *)
+        echo -e "${RED}Error: Action '$ACTION' not implemented or no action specified.${NC}"
+        usage
+        ;;
+esac

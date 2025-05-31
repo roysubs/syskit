@@ -1,0 +1,86 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Unattended Upgrades Cheatsheet
+
+## Introduction
+`unattended-upgrades` is a package that automatically installs security
+and other updates on Debian-based systems without requiring user
+interaction.
+
+## Installation
+
+### Install `unattended-upgrades`
+- To install the package, run:
+`sudo apt install unattended-upgrades`
+- Enabling unattended-upgrades
+- Once installed, enable it to automatically install security updates:
+`sudo dpkg-reconfigure --priority=low unattended-upgrades`
+- Configuring unattended-upgrades
+The main configuration file for unattended-upgrades is:
+`sudo vi /etc/apt/apt.conf.d/50unattended-upgrades`
+By default, unattended-upgrades is configured to install only security updates. To customize this, you can modify the Allowed-Origins section.
+Example configuration to allow automatic updates for all packages (not just security updates):
+```bash
+Unattended-Upgrade::Allowed-Origins {
+    "Debian stable";
+    "Debian stable-updates";
+    "Debian security";
+};
+```
+- Enable Automatic Updates
+To configure automatic package list updates and automatic installation of updates, edit the auto-upgrades file:
+`sudo vi /etc/apt/apt.conf.d/20auto-upgrades`
+Add or modify the following lines to enable automatic updates and upgrade:
+```bash
+APT::Periodic::Update-Package-Lists "1";  # Update package lists every day
+APT::Periodic::Unattended-Upgrade "1";    # Install unattended upgrades every day
+```
+### How It Works
+The system automatically installs security updates and other updates depending on the configuration, without requiring user input.
+If the configuration is set to update the package list and perform upgrades daily, this process will occur at the specified intervals.
+- Checking the Log and Status
+To see if unattended-upgrades is working correctly, you can check its log:
+`cat /var/log/unattended-upgrades/unattended-upgrades.log`
+This will show the updates that have been installed automatically.
+
+### Example Log Output
+The log will contain entries like:
+
+```bash
+3019-12-04 10:02:57,678 INFO Starting unattended-upgrades version 1.1
+3019-12-04 10:02:57,678 INFO Allowed origins are:
+  "Debian stable"
+  "Debian security"
+3019-12-04 10:02:57,678 INFO No packages found that can be upgraded unattended
+```
+
+- Troubleshooting
+To check if unattended-upgrades is actively running:
+`systemctl status unattended-upgrades`
+  - Manual Run
+If you'd like to manually trigger unattended-upgrades to run:
+`sudo unattended-upgrade --dry-run  # Check what would be upgraded`
+`sudo unattended-upgrade            # Perform upgrades`
+  - Configuring Email Alerts
+To receive email alerts about the upgrades, you can configure unattended-upgrades to send email notifications. Ensure that your system is set up to send mail (e.g., using msmtp or postfix).
+To enable email notifications:
+`sudo vi /etc/apt/apt.conf.d/50unattended-upgrades`
+```bash
+Unattended-Upgrade::Mail "root";
+Unattended-Upgrade::MailOnlyOnError "true";
+```
+
+- Changing the Default Log Location
+If you prefer to log to a different file, change the log location in the configuration:
+`sudo vi /etc/apt/apt.conf.d/50unattended-upgrades`
+`Unattended-Upgrade::LogDir "/var/log/unattended-upgrades";`
+
+- Resources
+Official documentation: https://manpages.debian.org/buster/unattended-upgrades
+
+EOF
+) | less -R

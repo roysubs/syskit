@@ -1,0 +1,148 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Markdown Quick Notes
+====================
+
+- **Headers**:
+    - Headers are created by using hash symbols `#` for different header levels.
+    - Example:
+      ```markdown
+      # Header 1
+      ## Header 2
+      ### Header 3
+      #### Header 4
+      ##### Header 5
+      ###### Header 6
+      ```
+    - This will display as:
+      # Header 1
+      ## Header 2
+      ### Header 3
+      #### Header 4
+      ##### Header 5
+      ###### Header 6
+
+- **Text Formatting**:
+    - **Bold**: Surround text with `**` or `__`.
+      Example: `**Bold Text**` or `__Bold Text__`.
+      Displays as: **Bold Text**
+
+    - *Italic*: Surround text with `*` or `_`.
+      Example: `*Italic Text*` or `_Italic Text_`.
+      Displays as: *Italic Text*
+
+    - **_Bold and Italic_**: Combine both.
+      Example: `**_Bold and Italic_**`.
+      Displays as: **_Bold and Italic_**
+
+    - ~~Strikethrough~~: Surround text with `~~`.
+      Example: `~~Strikethrough~~`.
+      Displays as: ~~Strikethrough~~
+
+- **Lists**:
+    - **Unordered List**: Use `-`, `*`, or `+` followed by a space.
+      Example:
+      ```markdown
+      - Item 1
+      - Item 2
+      - Item 3
+      ```
+      Displays as:
+      - Item 1
+      - Item 2
+      - Item 3
+
+    - **Ordered List**: Use numbers followed by a period and space.
+      Example:
+      ```markdown
+      1. First Item
+      2. Second Item
+      3. Third Item
+      ```
+      Displays as:
+      1. First Item
+      2. Second Item
+      3. Third Item
+
+- **Links**:
+    - Create links by using `[text](URL)`.
+      Example: `[Google](https://www.google.com)`
+      Displays as: [Google](https://www.google.com)
+
+- **Images**:
+    - Images are similar to links but with a leading `!`.
+      Example: `![alt text](image-url)`
+      Displays as an image if the URL is valid.
+
+- **Blockquotes**:
+    - Use `>` to create a blockquote.
+      Example:
+      ```markdown
+      > This is a blockquote.
+      ```
+      Displays as:
+      > This is a blockquote.
+
+- **Code**:
+    - **Inline Code**: Use backticks `` ` ``.
+      Example: `` `inline code` ``.
+      Displays as: `inline code`
+
+    - **Code Block**: Use triple backticks (```` ``` ````) or indent with four spaces.
+      Example:
+      ```markdown
+      ```
+      Code block here
+      ```
+      ```
+      Displays as:
+      ```
+      Code block here
+      ```
+
+- **Horizontal Rule**:
+    - Use three dashes, asterisks, or underscores.
+      Example: `---`, `***`, `___`.
+      Displays as:
+      ---
+      ***
+      ___
+
+- **Tables**:
+    - Create tables using `|` for columns and `-` for separating headers.
+      Example:
+      ```markdown
+      | Header 1 | Header 2 |
+      |----------|----------|
+      | Row 1    | Data 1   |
+      | Row 2    | Data 2   |
+      ```
+      Displays as:
+      | Header 1 | Header 2 |
+      |----------|----------|
+      | Row 1    | Data 1   |
+      | Row 2    | Data 2   |
+
+- **Escaping Characters**:
+    - Use a backslash `\` to escape special characters.
+      Example: `\*escaped asterisk\*` will display as: *escaped asterisk*
+
+- **Footnotes**:
+    - Footnotes can be created with `[^1]` for the reference and `[^1]:` for the content.
+      Example:
+      ```markdown
+      This is a footnote reference[^1].
+      
+      [^1]: This is the footnote content.
+      ```
+      Displays as:
+      This is a footnote reference[^1].
+
+      [^1]: This is the footnote content.
+
+EOF
+) | less -R

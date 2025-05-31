@@ -1,0 +1,8 @@
+Notes on Running Games via WSLg
+WSLg supports hardware-accelerated OpenGL, so most 2D and 3D games from the apt repository should run smoothly, especially on systems with a compatible GPU and up-to-date drivers.
+
+To install any of these games, simply open your WSL terminal and use the sudo apt install command as shown above.
+
+Some games may require additional dependencies or tweaks for best performance, but most will work out of the box with WSLg.
+
+These games are all free, open-source, and readily available from the standard Ubuntu/Debian repositories, making them easy to install and play on your WSLg setup.

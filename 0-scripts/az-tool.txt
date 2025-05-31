@@ -1,0 +1,88 @@
+Bash script designed to help set up the Azure CLI on a Linux system, guide you through creating a free-tier Linux virtual machine (VM) in Azure, and then connect to it.
+
+Important Considerations:
+=====
+
+- Azure Free Account: This script aims to use Azure's free tier offerings. Typically, this includes a certain amount of usage for specific VM sizes (like Standard_B1s) for 12 months for new Azure customers, plus a $200 credit for the first 30 days.
+
+- Verify Current Offers: Azure's free offerings can change. ALWAYS check the official Azure Free Account FAQ for the most up-to-date information on eligible services, VM sizes, regions, and limitations to avoid unexpected charges.
+
+- Pay-As-You-Go: After the initial 30-day credit period (if applicable to your new account type), you'll typically need to upgrade your subscription to "Pay-As-You-Go" to continue accessing the 12-month free services. You are responsible for any usage beyond the free tier limits.
+
+- Permissions: The script will use sudo for installing the Azure CLI. You'll need sudo privileges.
+
+- Internet Connection: Required for downloading the CLI and interacting with Azure.
+
+- Idempotency: This script is not fully idempotent. Running it multiple times might lead to errors if resources (like resource groups or VMs with the same name) already exist. It's designed for a first-time setup.
+
+- Error Handling: Basic error checking is included (set -e), but for production use, more robust error handling would be needed.
+
+
+How the Script Works (Step-by-Step Explanation):
+=====
+
+Helper Functions (info, warning, error_exit, check_command_exists): These make the script's output clearer and provide a standardized way to handle messages and errors.
+check_command_exists: Ensures essential local commands like curl and ssh are available.
+
+Step 0: Prerequisites and Initial Setup:
+Displays introductory messages and crucial warnings about Azure's Free Tier.
+
+Step 1: Install Azure CLI (install_azure_cli function):
+Checks if az is already installed: If yes, it prints the version and skips installation.
+Attempts Universal Installation: Tries Microsoft's recommended one-liner install scripts first (aka.ms/InstallAzureCLIDeb for Debian/Ubuntu based, then aka.ms/InstallAzureCLIRpm for RPM-based systems like Fedora, CentOS, RHEL). These scripts handle dependencies and repository setup.
+Fallback to Distribution-Specific: If the universal scripts fail or are not preferred, it attempts to detect the Linux distribution (/etc/os-release).
+Debian/Ubuntu: Uses apt-get to add the Microsoft package repository GPG key, adds the Azure CLI repository to sources.list.d, updates package lists, and installs azure-cli.
+RHEL/CentOS/Fedora: Uses rpm --import for the Microsoft key, then adds the appropriate repository configuration using dnf install <repo-rpm> for modern versions or by creating a .repo file for older ones. It then uses dnf install azure-cli or yum install azure-cli.
+Verification: After attempting installation, it checks again if the az command is available.
+Shell Restart Note: Informs the user they might need to restart their shell for the az command to be found in the PATH.
+
+Step 2: Login to Azure:
+Checks if already logged in: Uses az account show to see if there's an active session.
+az login --use-device-code: If not logged in, it initiates the device code login flow. This is generally more robust for script-based or headless environments. You'll be given a code to enter at https://microsoft.com/devicelogin in a browser.
+Displays Current Subscription: Shows the currently active Azure subscription.
+
+Step 3: Configure Default Azure Region:
+User Input: Prompts the user for an Azure region.
+Default Location: Defaults to westeurope (Netherlands) as you are in Amsterdam. This is usually a good choice for latency.
+Lists Locations: Mentions how to list all available locations (az account list-locations).
+
+Step 4: Create a Resource Group:
+Explanation: Explains what a Resource Group is.
+User Input: Prompts for a Resource Group name, providing a unique default using the current timestamp (MyFreeTierLinuxRG-$(date +%s)).
+az group create ...: Uses the Azure CLI to create the resource group in the specified location. The -o table flag formats the output as a table.
+
+Step 5: Create a Free Tier Linux VM:
+Warnings: Reiterates warnings about Free Tier eligibility and responsibility.
+User Inputs:
+VM_NAME: Prompts for the VM name, with a unique default.
+ADMIN_USERNAME: Prompts for the admin username for the Linux VM.
+Free Tier Parameters:
+VM_SIZE="Standard_B1s": This is a common VM size eligible for the free tier (1 vCPU, 1 GiB RAM).
+VM_IMAGE_URN="Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest": Specifies a Ubuntu Server 22.04 LTS (Jammy Jellyfish) Generation 2 image. Using a specific URN (Uniform Resource Name) is more reliable than aliases like UbuntuLTS for ensuring you get the intended image type.
+--generate-ssh-keys: Instructs Azure to create a new SSH key pair if one doesn't already exist at ~/.ssh/id_rsa and ~/.ssh/id_rsa.pub. The public key will be installed on the VM for authentication.
+--public-ip-sku "Basic": Creates a public IP address with the Basic SKU. While "Standard" SKU public IPs are common in many Azure examples and have more features, "Basic" might be more aligned with minimizing costs for a simple free-tier setup if not explicitly covered by an offer. If you encounter issues or need features of the Standard SKU (like Availability Zones for the IP), you can change this to "Standard".
+--os-disk-size-gb 30: Sets the OS disk size to 30GB. Azure's free tier often includes a certain amount of SSD storage (e.g., two P6 disks, which are 64GB each). The default OS disk for a B1s VM is typically a 30GB Premium SSD or Standard SSD, which should fit within free allowances.
+Confirmation: Asks for user confirmation before proceeding with VM creation.
+az vm create ...: The core command to create the virtual machine with all the specified parameters.
+It automatically creates necessary networking resources like a Virtual Network (VNet), Network Security Group (NSG) allowing SSH on port 22, and a Network Interface (NIC).
+
+Step 6: Get VM Public IP and Connect via SSH:
+az vm show ... --query "publicIps" -o tsv: Retrieves the public IP address assigned to the newly created VM.
+--show-details: Required to get the IP information.
+--query "publicIps": Filters the JSON output to get only the public IP value.
+-o tsv: Outputs the result as tab-separated values (which for a single string, is just the string itself, without quotes).
+Display Connection Info: Shows the retrieved public IP and the SSH command to connect.
+
+Step 7: Next Steps and Cleanup Reminder:
+Crucial Reminders:
+How to stop, start, and deallocate the VM to manage costs.
+Most importantly: How to delete the entire Resource Group (az group delete ...) to remove all created resources (VM, disk, IP, NIC, NSG) and prevent ongoing charges once you're done experimenting.
+To Use the Script:
+
+Save: Copy the script content into a file, for example, azure_vm_setup.sh.
+Make Executable: Open your terminal and run chmod +x azure_vm_setup.sh.
+Run: Execute the script with ./azure_vm_setup.sh.
+Follow Prompts: The script will guide you through the steps, asking for input where necessary. You'll need to interact with your web browser for the Azure login step.
+Remember to always check the official Azure documentation for the latest information on free tier services and pricing.
+
+

@@ -1,0 +1,90 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+The Silmarillion: A Full Timeline of Arda
+=========================================
+
+### The Ainulindalë (Before Time):
+- **Pre-Time**: Eru Ilúvatar creates the Ainur and reveals the *Music of the Ainur*.  
+- **Pre-Time**: Melkor introduces discord into the Music.  
+- **Pre-Time**: Arda is formed as a reflection of the Ainur's music.  
+- **Pre-Time**: The Ainur descend into the world to shape it.
+
+---
+
+### The Years of the Lamps (c. 10,000 Valian Years):
+- **~VY 1000**: The Valar shape the lands of Arda and raise the Two Lamps, **Illuin** and **Ormal**.  
+- **~VY 3400**: Melkor secretly builds the fortress of Utumno.  
+- **~VY 3450**: Melkor destroys the Two Lamps; the world is reshaped.  
+
+---
+
+### The Years of the Trees (c. 14,000 Valian Years):
+- **VY 1**: The Two Trees, **Laurelin** and **Telperion**, are created.  
+- **VY 1050**: The Elves awaken by Cuiviénen.  
+- **VY 1085**: Oromë discovers the Elves and warns the Valar.  
+- **VY 1090**: Melkor kidnaps Elves, creating the first Orcs.  
+- **VY 1100**: The Valar imprison Melkor after a great war.  
+- **VY 1130**: The Valar bring the Elves to Aman; the Noldor, Vanyar, and Teleri form.  
+- **VY 1165**: The city of Tirion is established by the Noldor.  
+- **VY 1200**: Fëanor invents writing (the Tengwar).  
+- **VY 1250**: Melkor is released from imprisonment.  
+- **VY 1450**: Fëanor crafts the Silmarils.  
+- **VY 1495**: Melkor and Ungoliant destroy the Two Trees, steal the Silmarils, and flee.  
+- **VY 1500**: The Noldor rebel and depart for Middle-earth.  
+
+---
+
+### The First Age (Years of the Sun):
+#### Years 1–500:
+- **FA 1**: The Sun rises for the first time; Morgoth unleashes his armies from Angband.  
+- **FA 7**: The Noldor arrive in Middle-earth; the Dagor-nuin-Giliath (Battle under the Stars) occurs.  
+- **FA 60**: Fingolfin becomes High King of the Noldor.  
+- **FA 155**: Turgon begins building Gondolin.  
+- **FA 260**: Glaurung, the first dragon, emerges.  
+- **FA 455**: Dagor Bragollach (Battle of Sudden Flame); Morgoth breaks the Siege of Angband.  
+
+#### Years 500–600:
+- **FA 465**: Beren and Lúthien recover a Silmaril.  
+- **FA 495**: Gondolin is betrayed by Maeglin and destroyed.  
+- **FA 545**: The Valar march on Morgoth in the War of Wrath.  
+- **FA 590**: Morgoth is defeated and cast into the Void.
+
+---
+
+### The Second Age:
+#### Years 1–1700:
+- **SA 1**: The kingdom of Númenor is established.  
+- **SA 500**: Sauron begins rebuilding his power in Middle-earth.  
+- **SA 1200**: Sauron deceives the Elves into forging the Rings of Power.  
+- **SA 1600**: Sauron creates the One Ring and builds Barad-dûr.  
+- **SA 1693**: The War of the Elves and Sauron begins.  
+
+#### Years 1700–3441:
+- **SA 1701**: Sauron is defeated and retreats to Mordor.  
+- **SA 3262**: Sauron corrupts Númenor.  
+- **SA 3319**: Númenor is destroyed in the Downfall.  
+- **SA 3441**: Sauron is defeated by the Last Alliance of Elves and Men; the One Ring is lost.  
+
+---
+
+### The Third Age:
+#### Years 1–2000:
+- **TA 2**: Isildur is slain; the Ring is lost in the Anduin.  
+- **TA 1100**: The Istari (Wizards) arrive in Middle-earth.  
+- **TA 1300**: The Witch-king establishes Angmar.  
+- **TA 1980**: The Balrog awakens in Moria.  
+
+#### Years 2000–3021:
+- **TA 2000**: The Nazgûl lay siege to Minas Ithil (later Minas Morgul).  
+- **TA 2941**: Bilbo Baggins finds the One Ring.  
+- **TA 3019**: The War of the Ring; the One Ring is destroyed.  
+- **TA 3021**: Frodo departs Middle-earth; the Third Age ends.
+
+---
+
+EOF
+) | less -R

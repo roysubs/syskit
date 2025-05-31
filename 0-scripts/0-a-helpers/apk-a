@@ -1,0 +1,146 @@
+#!/bin/bash
+# Apk Tool Script
+# Provides utilities for apk package management with concise history (basic) and detailed info.
+
+# Define colors
+RED='\e[31m'
+GREEN='\e[32m'
+NC='\e[0m' # No Color
+
+# Function to show usage help
+show_help() {
+    echo "Apk Tool.   Usage:  [option] <package(s)>"
+    echo "Options:"
+    echo "  a|i <package(s)>  Add (install) the specified package(s) (uses sudo)"
+    echo "  d <package(s)>    Delete (remove) the specified package(s) (uses sudo)"
+    echo "  s <package(s)>    Search for the specified package(s)"
+    echo "  u             Update package lists, then upgrade packages (uses sudo)"
+    echo "  info <package(s)> View info: version, dependencies, etc"
+    echo "  contents <package(s)> Show package contents (list of files)"
+    echo "  depends <package(s)> Show direct dependencies of packages"
+    echo "  rdepends <package(s)> Show packages that depend on specified packages"
+    echo "  h             Show last few apk commands from shell history (basic)"
+    echo
+}
+
+# Function to print a command in green and execute it
+run_command() {
+    local full_cmd_string="$1"
+    echo -e "# ${GREEN}${full_cmd_string}${NC}"
+    # Execute the command string. Using bash -c is generally safe for constructed strings.
+    # Alpine often uses 'sh' as the default shell, but bash should be available in Webtop.
+    # If bash is not available, change 'bash -c' to 'sh -c'.
+    bash -c "$full_cmd_string"
+    return $? # Return the exit status of the executed command
+}
+
+# Show help if no arguments are provided
+if [ $# -eq 0 ]; then
+    show_help
+    exit 0
+fi
+
+option=$1
+shift  # Shift to access package arguments
+
+case "$option" in
+    a|i) # Add (install)
+        if [ $# -eq 0 ]; then
+            echo -e "${RED}Error: No package(s) specified for installation.${NC}\n"
+            show_help
+            exit 1
+        fi
+        # --no-cache installs packages without caching the index, which is often preferred in containers to keep the image small.
+        run_command "sudo apk add --no-cache $@";
+        ;;
+    d) # Delete (remove)
+        if [ $# -eq 0 ]; then
+            echo -e "${RED}Error: No package(s) specified for removal.${NC}\n"
+            show_help
+            exit 1
+        fi
+        run_command "sudo apk del $@";
+        ;;
+    s) # Search
+        if [ $# -eq 0 ]; then
+            echo -e "${RED}Error: No package(s) specified for search.${NC}\n"
+            show_help
+            exit 1
+        fi
+        for package in "$@"; do
+            echo "Search results for '$package':"
+            run_command "apk search $package";
+            echo
+        done
+        ;;
+    u) # Update and Upgrade
+        # Use run_command and check exit status for chaining
+        echo "Updating package lists..."
+        if run_command "sudo apk update"; then
+            echo "Upgrading packages..."
+            run_command "sudo apk upgrade"
+        fi
+        # apk autoremove is available but less frequently needed in Alpine
+        # You could add run_command "sudo apk autoremove" here if desired
+        ;;
+    info) # View package information (similar to apt info/show)
+        if [ $# -eq 0 ]; then
+            echo -e "${RED}Error: No package(s) specified for info.${NC}\n"
+            show_help
+            exit 1
+        fi
+        for package in "$@"; do
+            echo "Information for '$package' (apk info):"
+            run_command "apk info $package";
+            echo
+        done
+        ;;
+    contents) # Show package contents (similar to dpkg -L / apt-file list)
+        if [ $# -eq 0 ]; then
+            echo -e "${RED}Error: No package(s) specified for contents.${NC}\n"
+            show_help
+            exit 1
+        fi
+        for package in "$@"; do
+            echo "Contents of package '$package' (apk info --contents):"
+            run_command "apk info --contents $package";
+            echo
+        done
+        ;;
+    depends) # Show direct dependencies (similar to apt-cache depends)
+        if [ $# -eq 0 ]; then
+            echo -e "${RED}Error: No package(s) specified for dependencies.${NC}\n"
+            show_help
+            exit 1
+        fi
+        for package in "$@"; do
+            echo "Dependencies for '$package' (apk info --dependencies):"
+            run_command "apk info --dependencies $package";
+            echo
+        done
+        ;;
+    rdepends) # Show reverse dependencies (similar to apt-cache rdepends)
+        if [ $# -eq 0 ]; then
+            echo -e "${RED}Error: No package(s) specified for reverse dependencies.${NC}\n"
+            show_help
+            exit 1
+        fi
+        for package in "$@"; do
+            echo "Packages that depend on '$package' (apk info --rdepends):"
+            run_command "apk info --rdepends $package";
+            echo
+        done
+        ;;
+    h) # Basic History (from shell history)
+        echo "Last 10 'apk' commands from shell history:"
+        history | grep ' apk ' | tail -n 10
+        echo
+        ;;
+    *) # Unknown option
+        echo -e "${RED}Unknown option: $option${NC}\n"
+        show_help
+        exit 1 # Indicate error
+        ;;
+esac
+
+exit 0 # Indicate success

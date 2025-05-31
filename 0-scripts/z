@@ -1,0 +1,503 @@
+#!/bin/bash
+
+# zz - Universal Archive Tool
+# A swiss army knife for zipping, unzipping, compressing, and decompressing
+# files and folders using zip, gzip, 7z, tar, etc.
+
+shopt -s extglob # Enable extended globbing
+
+SCRIPT_NAME=${0##*/}
+
+# ANSI color codes
+GREEN='\033[0;32m'
+BLUE='\033[1;34m'
+NC='\033[0m' # No Color
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+WHITE='\033[1;37m'
+
+# --- Configuration ---
+DEFAULT_ARCHIVER="7z" # Preferred archiver: 7z or zip
+SHOW_CMD_BEFORE_EXEC=true # Global flag to show command
+
+# --- Helper Functions ---
+print_error() {
+    echo -e "${RED}Error: $1${NC}" >&2
+}
+
+print_warning() {
+    echo -e "${YELLOW}Warning: $1${NC}"
+}
+
+print_success() {
+    echo -e "${GREEN}Success: $1${NC}"
+}
+
+print_info() {
+    echo -e "${BLUE}Info: $1${NC}"
+}
+
+check_command() {
+    local cmd_name="$1"
+    local critical="${2:-false}"
+    if ! command -v "$cmd_name" > /dev/null 2>&1; then
+        if [[ "$critical" == "true" ]];
+            then print_error "Cmd '$cmd_name' not found. Please install for ${SCRIPT_NAME}." && exit 1
+            else print_warning "Cmd '$cmd_name' not found. Some functionality may be limited."
+        fi
+        return 1
+    fi
+    return 0
+}
+
+check_command "file" "true"
+
+run_command() {
+    local display_cmd_parts=()
+    local arg_idx=0
+    for arg in "$@"; do
+        # For 7z -o option, if it's like "-o/path" or "-oPath", keep it as one for display
+        # This is a heuristic and might need refinement for other tools.
+        if [[ $arg_idx -gt 0 && "${display_cmd_parts[$((arg_idx-1))]}" == "-o" && "$arg" != "-"* ]]; then
+             # If previous was -o and current doesn't start with -, assume it's the path for -o
+             # and 7z often likes it as -oPath or -o"Path with Space"
+             if [[ "$arg" == *" "* ]]; then
+                display_cmd_parts[$((arg_idx-1))]="-o\"$arg\"" # Combine and quote if path has spaces
+             else
+                display_cmd_parts[$((arg_idx-1))]="-o$arg" # Combine: -oPath
+             fi
+        elif [[ "$arg" == *" "* || "$arg" == *['!'@#\$%^\&*\(\)_+=\`~\-\]\[\{\}\;\:\'\"\<\>\?\|\\]* && "$arg" != "-o"* ]]; then
+            # Quote arguments with spaces or many special characters for display
+            # Exclude args starting with -o as they are handled above or might be options like -r-
+            display_cmd_parts+=("'$arg'")
+        else
+            display_cmd_parts+=("$arg")
+        fi
+        ((arg_idx++))
+    done
+    local display_string="${display_cmd_parts[*]}"
+
+    if [[ "$SHOW_CMD_BEFORE_EXEC" == "true" ]]; then
+        echo -e "${WHITE}#${NC} ${GREEN}${display_string}${NC}"
+    fi
+
+    "$@" # Execute the command
+    local status=$?
+    if [ $status -ne 0 ]; then
+        print_error "Command execution failed with status $status."
+    fi
+    return $status
+}
+
+show_help() {
+    echo -e "${BLUE}${SCRIPT_NAME} - Universal Archive Tool${NC}"
+    echo "Manages archives (zip, 7z, tar, gzip, etc.). Shows native commands."
+    echo
+    echo -e "${YELLOW}Usage:${NC} ${SCRIPT_NAME} [global_options] <command> [cmd_options] <archive_name> [files...]"
+    echo
+    echo -e "${YELLOW}Global Options:${NC}"
+    echo -e "  ${GREEN}--no-cmd${NC}                   Do not display the native command before execution."
+    echo -e "  ${GREEN}--force-archiver <bin>${NC}      Force archiver for 'add' (e.g., zip, 7z)."
+    echo
+    echo -e "${YELLOW}Commands:${NC}"
+    echo -e "  ${GREEN}a, add <archive> <src...>${NC}    Add to archive (default: $DEFAULT_ARCHIVER, recursive). Appends extension if none."
+    echo -e "  ${GREEN}an, add-non-recursive <archive> <files...>${NC} Add files (non-recursive). Appends extension."
+    echo -e "  ${GREEN}az, add-zip <archive.zip> <src...>${NC} Create/add to ZIP (recursive)."
+    echo -e "  ${GREEN}a7, add-7z <archive.7z> <src...>${NC} Create/add to 7z (recursive)."
+    echo -e "  ${GREEN}atgz, add-tar-gz <archive.tar.gz> <src...>${NC} Create .tar.gz archive."
+    echo -e "  ${GREEN}atbz, add-tar-bz2 <archive.tar.bz2> <src...>${NC} Create .tar.bz2 archive."
+    echo -e "  ${GREEN}atxz, add-tar-xz <archive.tar.xz> <src...>${NC} Create .tar.xz archive."
+    echo -e "  ${GREEN}x, extract <archive> [dest_dir]${NC} Extract archive (auto-detects type)."
+    echo -e "  ${GREEN}l, list <archive>${NC}            List contents of an archive (auto-detects)."
+    echo -e "  ${GREEN}g, gzip <file(s)>${NC}             Compress file(s) to .gz."
+    echo -e "  ${GREEN}gu, gunzip <file.gz(s)>${NC}        Decompress .gz file(s)."
+    echo -e "  ${GREEN}bz, bzip2 <file(s)>${NC}            Compress file(s) to .bz2."
+    echo -e "  ${GREEN}bu, bunzip2 <file.bz2(s)>${NC}       Decompress .bz2 file(s)."
+    echo -e "  ${GREEN}xzc, xz-compress <file(s)>${NC}    Compress file(s) to .xz."
+    echo -e "  ${GREEN}xzd, xz-decompress <file.xz(s)>${NC}  Decompress .xz file(s)."
+    echo -e "  ${GREEN}h, help${NC}                     Show this help message."
+    echo -e "  ${GREEN}hh, examples${NC}                Show extended help with native tool examples."
+    echo
+    echo -e "${YELLOW}Supported for extraction:${NC} 7z,zip,rar,tar,gz,tgz,bz2,tbz2,xz,txz,arj,cab,iso..."
+    echo
+}
+
+show_examples() {
+    echo -e "${BLUE}${SCRIPT_NAME} - Native Tool Usage Examples (and ${SCRIPT_NAME} equivalents)${NC}"
+    echo "---------------------------------------------------------------------"
+    echo -e "${YELLOW}CREATING ARCHIVES${NC}"
+    echo
+    echo -e "  ${WHITE}# Create a 7z archive (recursive, high compression)${NC}"
+    echo -e "    ${BLUE}Native:${NC}      ${GREEN}7z a important_backup.7z /home/user/config_files/ project_data.doc${NC}"
+    echo -e "    ${BLUE}${SCRIPT_NAME} eqv.:${NC}  ${GREEN}${SCRIPT_NAME} a7 important_backup.7z /home/user/config_files/ project_data.doc${NC}"
+    echo -e "    ${BLUE}Or (if 7z is default archiver for '${SCRIPT_NAME} a'):${NC}"
+    echo -e "    ${BLUE}${SCRIPT_NAME} eqv.:${NC}  ${GREEN}${SCRIPT_NAME} a important_backup.7z /home/user/config_files/ project_data.doc${NC}"
+    echo
+    echo -e "  ${WHITE}# Create a ZIP archive (recursive)${NC}"
+    echo -e "    ${BLUE}Native:${NC}      ${GREEN}zip -r web_assets.zip images/ css/ scripts/${NC}"
+    echo -e "    ${BLUE}${SCRIPT_NAME} eqv.:${NC}  ${GREEN}${SCRIPT_NAME} az web_assets.zip images/ css/ scripts/${NC}"
+    echo
+    echo -e "  ${WHITE}# Create a tar.gz archive${NC}"
+    echo -e "    ${BLUE}Native:${NC}      ${GREEN}tar -czvf project_src.tar.gz src/ lib/ main.c${NC}"
+    echo -e "    ${BLUE}${SCRIPT_NAME} eqv.:${NC}  ${GREEN}${SCRIPT_NAME} atgz project_src.tar.gz src/ lib/ main.c${NC}"
+    echo
+    echo -e "  ${WHITE}# Create a tar.bz2 archive${NC}"
+    echo -e "    ${BLUE}Native:${NC}      ${GREEN}tar -cjvf logs_backup.tar.bz2 /var/log/app/${NC}"
+    echo -e "    ${BLUE}${SCRIPT_NAME} eqv.:${NC}  ${GREEN}${SCRIPT_NAME} atbz logs_backup.tar.bz2 /var/log/app/${NC}"
+    echo
+    echo -e "  ${WHITE}# Add files non-recursively to a 7z archive (only specified files)${NC}"
+    echo -e "    ${BLUE}Native:${NC}      ${GREEN}7z a -r- flat_archive.7z report.doc data.csv${NC}"
+    echo -e "    ${BLUE}${SCRIPT_NAME} eqv.:${NC}  ${GREEN}${SCRIPT_NAME} an flat_archive.7z report.doc data.csv${NC} (if 7z is default)"
+    echo
+    echo -e "${YELLOW}EXTRACTING ARCHIVES${NC}"
+    echo
+    echo -e "  ${WHITE}# Extract a .zip archive to a new folder 'my_stuff'${NC}"
+    echo -e "    ${BLUE}Native (7z):${NC} ${GREEN}7z x my_stuff.zip -omy_stuff${NC}"
+    echo -e "    ${BLUE}Native (unzip):${NC}${GREEN}unzip my_stuff.zip -d my_stuff${NC}"
+    echo -e "    ${BLUE}${SCRIPT_NAME} eqv.:${NC}  ${GREEN}${SCRIPT_NAME} x my_stuff.zip my_stuff${NC} (folder name can be auto or specified)"
+    echo
+    echo -e "  ${WHITE}# Extract a .tar.gz archive to current directory${NC}"
+    echo -e "    ${BLUE}Native:${NC}      ${GREEN}tar -xzvf old_files.tar.gz${NC}"
+    echo -e "    ${BLUE}${SCRIPT_NAME} eqv.:${NC}  ${GREEN}${SCRIPT_NAME} x old_files.tar.gz .${NC} (or omit dest for auto-named folder)"
+    echo
+    echo -e "  ${WHITE}# Extract a single .gz file (e.g., document.txt.gz -> document.txt)${NC}"
+    echo -e "    ${BLUE}Native:${NC}      ${GREEN}gunzip document.txt.gz${NC}"
+    echo -e "    ${BLUE}${SCRIPT_NAME} eqv.:${NC}  ${GREEN}${SCRIPT_NAME} x document.txt.gz${NC} (extracts to current dir by default)"
+    echo -e "    ${BLUE}Or:${NC}          ${GREEN}${SCRIPT_NAME} gu document.txt.gz${NC}"
+    echo
+    echo -e "${YELLOW}LISTING ARCHIVE CONTENTS${NC}"
+    echo
+    echo -e "  ${WHITE}# List contents of a 7z archive${NC}"
+    echo -e "    ${BLUE}Native:${NC}      ${GREEN}7z l my_backup.7z${NC}"
+    echo -e "    ${BLUE}${SCRIPT_NAME} eqv.:${NC}  ${GREEN}${SCRIPT_NAME} l my_backup.7z${NC}"
+    echo
+    echo -e "  ${WHITE}# List contents of a tar.gz archive${NC}"
+    echo -e "    ${BLUE}Native:${NC}      ${GREEN}tar -tvf system_info.tar.gz${NC}"
+    echo -e "    ${BLUE}${SCRIPT_NAME} eqv.:${NC}  ${GREEN}${SCRIPT_NAME} l system_info.tar.gz${NC}"
+    echo
+    echo -e "${YELLOW}SINGLE FILE COMPRESSION/DECOMPRESSION${NC}"
+    echo
+    echo -e "  ${WHITE}# Gzip a file (creates file.log.gz)${NC}"
+    echo -e "    ${BLUE}Native:${NC}      ${GREEN}gzip big_log_file.log${NC}"
+    echo -e "    ${BLUE}${SCRIPT_NAME} eqv.:${NC}  ${GREEN}${SCRIPT_NAME} g big_log_file.log${NC}"
+    echo
+    echo -e "  ${WHITE}# Gunzip a file (restores file.log from file.log.gz)${NC}"
+    echo -e "    ${BLUE}Native:${NC}      ${GREEN}gunzip big_log_file.log.gz${NC}"
+    echo -e "    ${BLUE}${SCRIPT_NAME} eqv.:${NC}  ${GREEN}${SCRIPT_NAME} gu big_log_file.log.gz${NC}"
+    echo "---------------------------------------------------------------------"
+}
+
+# --- Main Logic ---
+CURRENT_DEFAULT_ARCHIVER="$DEFAULT_ARCHIVER"
+
+temp_args=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --no-cmd) SHOW_CMD_BEFORE_EXEC=false; shift ;;
+        --force-archiver)
+            if [[ -n "$2" && ! "$2" =~ ^- ]]; then
+                CURRENT_DEFAULT_ARCHIVER="$2"
+                print_info "Forcing archiver to: $CURRENT_DEFAULT_ARCHIVER for 'add' ops."
+                shift 2
+            else print_error "--force-archiver requires an argument." && exit 1; fi ;;
+        -*) temp_args+=("$1"); shift ;;
+        *)  temp_args+=("$1"); shift ;;
+    esac
+done
+set -- "${temp_args[@]}"
+
+if [ $# -eq 0 ]; then show_help && exit 0; fi
+
+COMMAND=$1
+shift
+
+ARCHIVER_CMD_ADD="$CURRENT_DEFAULT_ARCHIVER"
+ARCHIVER_EXT_ADD="$CURRENT_DEFAULT_ARCHIVER"
+
+# Determine primary archiver and its extension for generic 'add'
+if [[ "$CURRENT_DEFAULT_ARCHIVER" == "7z" ]]; then
+    if ! check_command "7z"; then
+        print_warning "7z (default for 'add') not found. Trying zip..."
+        if check_command "zip"; then ARCHIVER_CMD_ADD="zip"; ARCHIVER_EXT_ADD="zip";
+        else print_warning "Neither 7z nor zip found for 'add'."; fi
+    else ARCHIVER_EXT_ADD="7z"; fi
+elif [[ "$CURRENT_DEFAULT_ARCHIVER" == "zip" ]]; then
+    if ! check_command "zip"; then
+        print_warning "zip (default for 'add') not found. Trying 7z..."
+        if check_command "7z"; then ARCHIVER_CMD_ADD="7z"; ARCHIVER_EXT_ADD="7z";
+        else print_warning "Neither zip nor 7z found for 'add'."; fi
+    else ARCHIVER_EXT_ADD="zip"; fi
+else # User forced an archiver
+    if ! check_command "$CURRENT_DEFAULT_ARCHIVER"; then
+        print_warning "Forced archiver '$CURRENT_DEFAULT_ARCHIVER' not found."
+    fi
+    # Assume user knows the extension or it's generic enough
+    # For common ones, we can try to set ARCHIVER_EXT_ADD correctly
+    if [[ "$CURRENT_DEFAULT_ARCHIVER" == "p7zip" ]]; then ARCHIVER_EXT_ADD="7z";
+    elif [[ "$CURRENT_DEFAULT_ARCHIVER" == "gzip" ]]; then ARCHIVER_EXT_ADD="gz";
+    # else keep it as is, user is forcing.
+    fi
+fi
+
+# Known archive extensions (lowercase, with leading dot)
+KNOWN_ARCHIVE_EXTENSIONS=(".7z" ".zip" ".rar" ".tar" ".gz" ".tgz" ".tar.gz" ".bz2" ".tbz" ".tbz2" ".tar.bz2" ".xz" ".txz" ".tar.xz" ".jar" ".war" ".iso" ".img" ".arj" ".cab" ".zst" ".tar.zst")
+
+case "$COMMAND" in
+    a|add|ar|an|add-non-recursive)
+        if [ $# -lt 2 ]; then print_error "'$COMMAND' requires <archive_name> and <file(s)/dir(s)>"; show_help; exit 1; fi
+        archive_name_input=$1; shift
+        final_archive_name="$archive_name_input"
+        is_recursive=true
+        if [[ "$COMMAND" == "an" || "$COMMAND" == "add-non-recursive" ]]; then is_recursive=false; fi
+
+        default_ext_for_current_archiver=".${ARCHIVER_EXT_ADD}"
+        has_known_user_ext=false
+        current_input_ext_lower=""
+
+        # Check if input archive name has a known extension
+        for known_ext in "${KNOWN_ARCHIVE_EXTENSIONS[@]}"; do
+            if [[ "${archive_name_input,,}" == *"$known_ext" ]]; then # Case-insensitive suffix check
+                # More precise check to avoid partial matches like '.z' for '.zip'
+                # Check if the part after the last dot matches a known extension's part after its last dot
+                input_suffix_after_last_dot=".${archive_name_input##*.}"
+                known_ext_suffix_after_last_dot=".${known_ext##*.}"
+                if [[ "${input_suffix_after_last_dot,,}" == "${known_ext_suffix_after_last_dot,,}" ]]; then
+                    has_known_user_ext=true
+                    current_input_ext_lower="${input_suffix_after_last_dot,,}" # Store the detected extension
+                    break
+                fi
+            fi
+        done
+        
+        # If no specific known extension was found by user, append default for the archiver
+        if ! $has_known_user_ext; then
+            final_archive_name="${archive_name_input}${default_ext_for_current_archiver}"
+            print_info "No known archive ext on '$archive_name_input'. Appending '${default_ext_for_current_archiver}'. New: $final_archive_name"
+        elif [[ "$current_input_ext_lower" != "${default_ext_for_current_archiver,,}" ]]; then
+            # User provided a known extension, but it's different from the default archiver's
+            print_warning "Input '$archive_name_input' uses '$current_input_ext_lower'. Default archiver ('$ARCHIVER_CMD_ADD') uses '$default_ext_for_current_archiver'. Using specified name."
+        fi # Else, user provided the correct extension for the default archiver, or it's a forced archiver.
+
+        files_to_process=("$@")
+        if ! $is_recursive; then
+            actual_files=()
+            for item in "$@"; do
+                if [ -f "$item" ]; then actual_files+=("$item");
+                else print_warning "Skipping '$item' for non-recursive add (not a file)."; fi
+            done
+            if [ ${#actual_files[@]} -eq 0 ]; then print_error "No valid files for non-recursive add."; exit 1; fi
+            files_to_process=("${actual_files[@]}")
+        fi
+
+        if [[ "$ARCHIVER_CMD_ADD" == "7z" ]]; then
+            check_command "7z" "true"
+            if $is_recursive; then run_command 7z a "$final_archive_name" "${files_to_process[@]}";
+            else run_command 7z a -r- "$final_archive_name" "${files_to_process[@]}"; fi
+        elif [[ "$ARCHIVER_CMD_ADD" == "zip" ]]; then
+            check_command "zip" "true"
+            if $is_recursive; then run_command zip -r "$final_archive_name" "${files_to_process[@]}";
+            else run_command zip "$final_archive_name" "${files_to_process[@]}"; fi # zip is non-recursive for files by default
+        else
+            print_error "Archiver for '$COMMAND' ($ARCHIVER_CMD_ADD) not found/configured. Use 'a7'/'az' or check config."
+            exit 1
+        fi
+        ;;
+
+    az|add-zip)
+        if [ $# -lt 2 ]; then print_error "'$COMMAND' requires <archive.zip> <src...>"; exit 1; fi
+        check_command "zip" "true"; archive_name=$1; shift
+        base="${archive_name%.zip}"; final_archive_name="${base}.zip"
+        if [[ "$archive_name" != "$final_archive_name" ]]; then print_info "Adjusting to: $final_archive_name"; fi
+        run_command zip -r "$final_archive_name" "$@"
+        ;;
+    a7|add-7z)
+        if [ $# -lt 2 ]; then print_error "'$COMMAND' requires <archive.7z> <src...>"; exit 1; fi
+        check_command "7z" "true"; archive_name=$1; shift
+        base="${archive_name%.7z}"; final_archive_name="${base}.7z"
+        if [[ "$archive_name" != "$final_archive_name" ]]; then print_info "Adjusting to: $final_archive_name"; fi
+        run_command 7z a "$final_archive_name" "$@"
+        ;;
+    atgz|add-tar-gz)
+        if [ $# -lt 2 ]; then print_error "'$COMMAND' <archive.tar.gz> <src...>"; exit 1; fi
+        check_command "tar" "true"; check_command "gzip" "true"; archive_name=$1; shift
+        base="${archive_name%.tar.gz}"; base="${base%.tgz}"; base="${base%.tar}"
+        final_archive_name="${base}.tar.gz"
+        if [[ "$archive_name" != "$final_archive_name" ]]; then print_info "Adjusting to: $final_archive_name"; fi
+        run_command tar -czvf "$final_archive_name" "$@"
+        ;;
+    atbz|add-tar-bz2)
+        if [ $# -lt 2 ]; then print_error "'$COMMAND' <archive.tar.bz2> <src...>"; exit 1; fi
+        check_command "tar" "true"; check_command "bzip2" "true"; archive_name=$1; shift
+        base="${archive_name%.tar.bz2}"; base="${base%.tbz}"; base="${base%.tbz2}"; base="${base%.tar}"
+        final_archive_name="${base}.tar.bz2"
+        if [[ "$archive_name" != "$final_archive_name" ]]; then print_info "Adjusting to: $final_archive_name"; fi
+        run_command tar -cjvf "$final_archive_name" "$@"
+        ;;
+    atxz|add-tar-xz)
+        if [ $# -lt 2 ]; then print_error "'$COMMAND' <archive.tar.xz> <src...>"; exit 1; fi
+        check_command "tar" "true"; check_command "xz" "true"; archive_name=$1; shift
+        base="${archive_name%.tar.xz}"; base="${base%.txz}"; base="${base%.tar}"
+        final_archive_name="${base}.tar.xz"
+        if [[ "$archive_name" != "$final_archive_name" ]]; then print_info "Adjusting to: $final_archive_name"; fi
+        run_command tar -cJvf "$final_archive_name" "$@"
+        ;;
+
+    x|extract)
+        if [ $# -lt 1 ]; then print_error "'$COMMAND' requires <archive_name>"; show_help; exit 1; fi
+        archive_file="$1"; user_dest_dir="${2:-}"
+        if [ ! -f "$archive_file" ]; then print_error "Archive file '$archive_file' not found."; exit 1; fi
+
+        file_type=$(file -b "$archive_file"); base_name=$(basename "$archive_file")
+        dir_name_base="$base_name"
+        # Strip known extensions for output directory name
+        for ext_pattern in ".tar.gz" ".tar.bz2" ".tar.xz" ".tar.zst" ".tgz" ".tbz2" ".tbz" ".txz" ".tzst" ".7z" ".zip" ".rar" ".gz" ".bz2" ".xz" ".zst" ".tar"; do
+            if [[ "${dir_name_base,,}" == *"$ext_pattern" ]]; then # case insensitive suffix
+                 # More robustly remove the longest matching suffix
+                 temp_base="${dir_name_base%$ext_pattern}" # Try exact case
+                 if [[ "$temp_base" == "$dir_name_base" ]]; then # Didn't match exact, try case insensitive
+                    shopt -s nocasematch
+                    temp_base="${dir_name_base%%$ext_pattern}"
+                    shopt -u nocasematch
+                 fi
+                 if [[ -n "$temp_base" ]]; then dir_name_base="$temp_base"; else break; fi # Stop if it emptied name
+            fi
+        done
+        if [ -z "$dir_name_base" ]; then dir_name_base="$base_name"; fi # Fallback
+
+        is_single_compressed_file=false
+        case "${archive_file,,}" in # case insensitive match for single files
+            *.gz)   if [[ ! "$archive_file" =~ \.tar\.gz$ && ! "$archive_file" =~ \.tgz$ ]]; then is_single_compressed_file=true; fi ;;
+            *.bz2)  if [[ ! "$archive_file" =~ \.tar\.bz2$ && ! "$archive_file" =~ \.tbz2?$ && ! "$archive_file" =~ \.tbz$ ]]; then is_single_compressed_file=true; fi ;;
+            *.xz)   if [[ ! "$archive_file" =~ \.tar\.xz$ && ! "$archive_file" =~ \.txz$ ]]; then is_single_compressed_file=true; fi ;;
+            *.zst)  if [[ ! "$archive_file" =~ \.tar\.zst$ && ! "$archive_file" =~ \.tzst$ ]]; then is_single_compressed_file=true; fi ;;
+        esac
+
+        final_dest_path=""
+        if [[ -n "$user_dest_dir" ]]; then
+            final_dest_path="$user_dest_dir"
+            if ! mkdir -p "$final_dest_path"; then print_error "Could not create dest dir '$final_dest_path'"; exit 1; fi
+        elif $is_single_compressed_file; then
+            final_dest_path="." # Extract single .gz, .bz2, .xz to current directory
+        else
+            final_dest_path="${dir_name_base}_extracted"
+            if [ -d "$final_dest_path" ]; then print_warning "Output dir '$final_dest_path' exists. Files may be overwritten."; fi
+            if ! mkdir -p "$final_dest_path"; then print_error "Could not create dir '$final_dest_path'"; exit 1; fi
+        fi
+
+        print_info "Detected: $file_type"; print_info "Attempting to extract '$archive_file' to '$final_dest_path'..."
+        extraction_successful=false; extraction_status=1
+
+        if $is_single_compressed_file && [[ "$final_dest_path" == "." ]]; then
+            case "${archive_file,,}" in
+                *.gz)  if check_command "gunzip"; then run_command gunzip "$archive_file"; extraction_status=$?; fi ;;
+                *.bz2) if check_command "bunzip2"; then run_command bunzip2 "$archive_file"; extraction_status=$?; fi ;;
+                *.xz)  if check_command "unxz" || check_command "xz"; then
+                           local xz_d_cmd="unxz"; if ! command -v unxz >/dev/null 2>&1; then xz_d_cmd="xz -d"; fi
+                           run_command $xz_d_cmd "$archive_file"; extraction_status=$?
+                       fi ;;
+                *.zst) if check_command "unzstd" || check_command "zstd"; then
+                           local zstd_d_cmd="unzstd"; if ! command -v unzstd >/dev/null 2>&1; then zstd_d_cmd="zstd -d"; fi
+                           run_command $zstd_d_cmd "$archive_file"; extraction_status=$?
+                        fi ;;
+            esac
+            [[ $extraction_status -eq 0 ]] && extraction_successful=true
+        fi
+
+        if ! $extraction_successful && check_command "7z"; then
+            print_info "Trying with 7z..."
+            local seven_zip_cmd_verb="x" # Default to 'x' for archives (preserves paths)
+            if $is_single_compressed_file && [[ -n "$user_dest_dir" && "$user_dest_dir" != "." ]] ; then
+                 seven_zip_cmd_verb="e" # Use 'e' for single compressed files IF specific dest_dir is given
+            fi
+            # 7z -o option: no space for simple paths, quotes for paths with spaces
+            # run_command passes -o and path as separate args if path has spaces.
+            if run_command 7z "$seven_zip_cmd_verb" "$archive_file" "-o$final_dest_path"; then
+                extraction_successful=true
+            else
+                 # If the above failed and path has spaces, 7z might need -o "path with spaces"
+                 # The run_command's display logic handles how -o and path are shown.
+                 # The execution passes them as separate arguments if final_dest_path contains spaces.
+                 # The previous attempt with "-o$final_dest_path" might fail if final_dest_path has spaces
+                 # and 7z interprets it wrongly. Let's ensure we try passing them separately if needed.
+                 # This is implicitly handled by run_command if -o and path are separate args.
+                 # The issue is when they are combined like "-o/path/with space" which is wrong.
+                 # So, if path has space, always pass -o and path separately.
+                 if [[ "$final_dest_path" == *" "* ]]; then
+                    print_info "Retrying 7z with separate -o for path with spaces..."
+                    if run_command 7z "$seven_zip_cmd_verb" "$archive_file" -o "$final_dest_path"; then
+                        extraction_successful=true
+                    else
+                        print_warning "7z extraction failed."
+                    fi
+                 elif [[ $? -ne 0 ]]; then # if previous 7z command failed for other reasons
+                    print_warning "7z extraction failed."
+                 fi
+            fi
+        fi
+
+        if ! $extraction_successful && ( [[ "$file_type" == *tar* || "${archive_file,,}" =~ \.tar|\.tgz|\.tbz|\.txz|\.tzst ]] ); then
+            if check_command "tar"; then
+                print_info "Trying with tar..."; local tar_ops=("-xaf" "$archive_file")
+                if [[ "$final_dest_path" != "." ]]; then tar_ops+=("-C" "$final_dest_path"); fi
+                if run_command tar "${tar_ops[@]}"; then extraction_successful=true; fi
+            fi
+        fi
+
+        if ! $extraction_successful && ( [[ "$file_type" == *Zip\ archive* || "${archive_file,,}" == *.zip ]] ); then
+            if check_command "unzip"; then
+                print_info "Trying with unzip..."; local unzip_ops=("$archive_file")
+                if [[ "$final_dest_path" != "." ]]; then unzip_ops+=("-d" "$final_dest_path"); fi
+                if run_command unzip -q "${unzip_ops[@]}"; then extraction_successful=true; fi # Added -q for quieter unzip
+            fi
+        fi
+
+        if $extraction_successful; then
+            print_success "Extraction of '$archive_file' to '$final_dest_path' completed."
+        else
+            print_error "Could not extract '$archive_file'. Unsupported or tools missing/failed."
+            if [[ -z "$user_dest_dir" ]] && ! $is_single_compressed_file && [ -d "$final_dest_path" ] && [ -z "$(ls -A "$final_dest_path")" ]; then
+                print_info "Removing empty auto-created extraction directory: $final_dest_path"; rmdir "$final_dest_path"
+            fi; exit 1
+        fi
+        ;;
+
+    l|list)
+        if [ $# -ne 1 ]; then print_error "'$COMMAND' requires <archive_name>"; exit 1; fi
+        archive_file="$1"; if [ ! -f "$archive_file" ]; then print_error "File '$archive_file' not found."; exit 1; fi
+        file_type=$(file -b "$archive_file"); listed=false
+        if check_command "7z"; then if run_command 7z l "$archive_file"; then listed=true; fi; fi
+        if ! $listed && ( [[ "$file_type" == *tar* || "${archive_file,,}" =~ \.tar|\.tgz|\.tbz|\.txz|\.tzst ]] ); then
+            if check_command "tar"; then if run_command tar -tvaf "$archive_file"; then listed=true; fi; fi; fi
+        if ! $listed && ( [[ "$file_type" == *Zip\ archive* || "${archive_file,,}" == *.zip ]] ); then
+             if check_command "unzip"; then if run_command unzip -l "$archive_file"; then listed=true; fi; fi; fi
+        if ! $listed; then print_error "Could not list '$archive_file'."; exit 1; fi
+        ;;
+
+    g|gzip) if [ $# -lt 1 ]; then print_error "'$COMMAND' <file(s)>"; exit 1; fi; check_command "gzip" "true"; for f in "$@"; do [ -f "$f" ] && run_command gzip "$f" || print_warning "Skipping $f"; done;;
+    gu|gunzip) if [ $# -lt 1 ]; then print_error "'$COMMAND' <file.gz(s)>"; exit 1; fi; check_command "gunzip" "true"; for f in "$@"; do [[ "${f,,}" == *.gz && -f "$f" ]] && run_command gunzip "$f" || print_warning "Skipping $f"; done;;
+    bz|bzip2) if [ $# -lt 1 ]; then print_error "'$COMMAND' <file(s)>"; exit 1; fi; check_command "bzip2" "true"; for f in "$@"; do [ -f "$f" ] && run_command bzip2 "$f" || print_warning "Skipping $f"; done;;
+    bu|bunzip2) if [ $# -lt 1 ]; then print_error "'$COMMAND' <file.bz2(s)>"; exit 1; fi; check_command "bunzip2" "true"; for f in "$@"; do [[ "${f,,}" == *.bz2 && -f "$f" ]] && run_command bunzip2 "$f" || print_warning "Skipping $f"; done;;
+    xzc|xz-compress) if [ $# -lt 1 ]; then print_error "'$COMMAND' <file(s)>"; exit 1; fi; check_command "xz" "true"; for f in "$@"; do [ -f "$f" ] && run_command xz "$f" || print_warning "Skipping $f"; done;;
+    xzd|xz-decompress) if [ $# -lt 1 ]; then print_error "'$COMMAND' <file.xz(s)>"; exit 1; fi; local cmd="unxz"; if ! command -v unxz >/dev/null 2>&1 && command -v xz >/dev/null 2>&1; then cmd="xz -d"; check_command "xz" "true"; else check_command "unxz" "true"; fi; for f in "$@"; do [[ "${f,,}" == *.xz && -f "$f" ]] && run_command $cmd "$f" || print_warning "Skipping $f"; done;;
+
+    h|help) show_help ;;
+    hh|examples) show_examples ;;
+    *) print_error "Invalid command: $COMMAND"; show_help; exit 1 ;;
+esac
+
+exit 0
+```
+
+**Key improvements in this version:**
+
+* **`run_command` Display:** The logic for displaying the command has been refined to better quote arguments with spaces or special characters, aiming for a more accurate representation of the executed command. It also tries to handle the `7z -oPath` or `-o"Path With Space"` display correctly.
+* **`show_examples` (hh):** Now clearly distinguishes between "Native" tool syntax and the "`${SCRIPT_NAME}` eqv." (equivalent) for each example.
+* **Extension Handling for `a, add, an`:**
+    * It now checks against a list of `KNOWN_ARCHIVE_EXTENSIONS`.
+    * If the user provides an archive name without a known extension (e.g., `zz a myarchive file.txt`), it appends the default extension for the *currently active archiver* (e.g., `.7z` or `.zip`).
+    * If the user provides an archive name *with* a known extension (e.g., `zz a myarchive.zip file.txt`), it respects that name. If this extension is different from what the default archiver would use (e.g., default is 7z, user gives .zip), it issues a warning but proceeds with the user's specified name.
+* **Tar Extension Correction:** The `atgz`, `atbz`, `atxz` commands now use a more straightforward method to ensure the correct final extension (e.g., `myarchive.tar.gz`).
+* **Case Insensitivity:** Many file extension checks (e.g., for `.gz`, `.zip`, `.tar.gz`) are now case-insensitive (`${variable,,}`).
+* **Zstandard (.zst) basic support:** Added `.zst` and `.tar.zst` to known extensions and a basic single-file extraction case for `.zst` files using `unzstd` or `zstd -d`.
+
+This version should align much better with your vision of the tool as both a convenient wrapper and an educational aid for the underlying command-line utilities. Test it o

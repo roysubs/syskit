@@ -1,0 +1,433 @@
+#!/bin/bash
+
+# f - Enhanced Find and Grep Script
+# A wrapper for find and grep commands with common operations pre-configured
+
+# ANSI color codes
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+WHITE='\033[1;37m'
+
+usage() {
+    echo "Usage: f [OPTIONS] [PATH] [ARGUMENTS]"
+    echo
+    echo "Enhanced find and grep utility with common operations"
+    echo
+    echo "General Options:"
+    echo "  h, help               Show this help message"
+    echo "  --cmd                 Show the command to be executed before running"
+    echo
+    echo "Find Options (uses 'find' command):"
+    echo "  hf, h-find            Show various find syntax examples"
+    echo "  b, big, biggest [N]   Find N biggest files (default: 10)"
+    echo "  n, new, newest [N]    Find N newest files (default: 10)"
+    echo "  o, old, oldest [N]    Find N oldest files (default: 10)"
+    echo "  e, empty              Find empty files"
+    echo "  ed, empty-dirs        Find empty directories"
+    echo "  d, duplicates         Find duplicate files (by content)"
+    echo "  p, permissions MODE   Find files with specific permissions (e.g., 777)"
+    echo "  s, size SIZE          Find files by size (e.g., +10M, -1G)"
+    echo "  t, type TYPE          Find by type (f:file, d:directory, l:symlink)"
+    echo "  m, modified DAYS      Find files modified in last N days"
+    echo "  a, accessed DAYS      Find files accessed in last N days"
+    echo "  x, exec COMMAND       Execute command on each file found (use {} as placeholder)"
+    echo "  r, regex PATTERN      Find files matching regex pattern (filename)"
+    echo "  g, grep PATTERN       Find files (via find) containing text pattern (lists filenames)"
+    echo "  l, symlinks           Find broken symlinks"
+    echo "  f, fast               Use -xdev to skip other filesystems (faster for find)"
+    echo
+    echo "Grep Options (uses 'grep' command directly for recursive content search):"
+    echo "  hg, h-grep                        Show various grep syntax examples"
+    echo "  gl, grep-lines PATTERN [PATH]     Recursively grep for PATTERN, show matching lines"
+    echo "  gli, grep-lines-i PATTERN [PATH]  Case-insensitive recursive grep, show matching lines"
+    echo "  glw, grep-lines-w PATTERN [PATH]  Recursive grep for whole word PATTERN, show matching lines"
+    echo "  gf, grep-files PATTERN [PATH]     Recursively grep for PATTERN, list matching filenames only"
+    echo
+    echo "Examples:"
+    echo "  f b 5 /home                   Find 5 biggest files in /home"
+    echo "  f n /var/log                  Find 10 newest files in /var/log"
+    echo "  f s +100M /var                Find files larger than 100MB in /var"
+    echo "  f m 7 ~                       Find files modified in the last 7 days in home directory"
+    echo "  f x 'chmod 644 {}'            Find files and change permissions to 644"
+    echo "  f g \"myFunction\" ./src      Find files under ./src containing \"myFunction\""
+    echo "  f gl \"ERROR_CODE\" /var/log  Recursively search lines with \"ERROR_CODE\" in /var/log"
+    echo "  f gfi \"debug_mode\" .        Case-insensitively list files containing \"debug_mode\" in current dir"
+    exit 1
+}
+
+display_grep_examples() {
+    printf '%s\n' "\
+$(tput bold)$(tput setaf 3)GREP COMMAND – PAGE 1: CORE USAGE$(tput sgr0)
+==========================================================================================================
+
+$(tput setaf 3)BASIC SEARCH$(tput sgr0)                                             |  $(tput setaf 3)CASE INSENSITIVE & INVERT$(tput sgr0)
+grep \"pattern\" file.txt    # Search in a single file     |  grep -i \"pattern\" file.txt  # Case-insensitive
+grep \"pattern\" f1.txt f2.txt # Search in multiple files  |  grep -v \"pattern\" file.txt  # Invert match (lines not matching)
+grep \"pattern\" /dir/* # Search in all files in dir       |  grep -iv \"pattern\" file.txt # Both
+                                                         |
+$(tput setaf 3)RECURSIVE SEARCH$(tput sgr0)                                         |  $(tput setaf 3)OUTPUT CONTROL$(tput sgr0)
+grep -r \"pattern\" .        # Recursive in current dir    |  grep -l \"pattern\" /dir/* # List filenames only
+grep -R \"pattern\" .        # Follow symlinks recursively |  grep -L \"pattern\" /dir/* # List filenames NOT matching
+grep -rI \"pattern\" .       # Ignore binary files (GNU)   |  grep -o \"pattern\" file.txt  # Show only matching part of line
+                                                         |  grep -c \"pattern\" file.txt  # Count of matching lines
+$(tput setaf 3)LINE NUMBERS & FILENAMES$(tput sgr0)                                 |  $(tput setaf 3)WHOLE WORDS & LINES$(tput sgr0)
+grep -n \"pattern\" file.txt # Show line numbers           |  grep -w \"pattern\" file.txt  # Match whole words
+grep -H \"pattern\" /dir/* # Show filename for each match  |  grep -x \"pattern\" file.txt  # Match whole lines
+grep -h \"pattern\" /dir/* # Suppress filenames            |  grep -F \"PAT.*[]\" file.txt  # Fixed string (no regex)
+                                                         |
+$(tput setaf 3)CONTEXT CONTROL$(tput sgr0)                                          |  $(tput setaf 3)REGEX TYPES$(tput sgr0)
+grep -A 3 \"pattern\" file.txt # Show 3 lines AFTER match  |  grep -E \"pat1|pat2\" file.txt # Extended regex (ERE)
+grep -B 2 \"pattern\" file.txt # Show 2 lines BEFORE match |  grep -P \"pat\\w+\" file.txt   # Perl compatible regex (PCRE)
+grep -C 1 \"pattern\" file.txt # Show 1 line CONTEXT       |  grep -G \"pat.*\" file.txt    # Basic regex (BRE, default)
+$(tput setaf 2)Note: GNU grep often provides more features like -I, --color. Options might vary by OS.$(tput sgr0)
+
+----------------------------------------------------------------------------------------------------------
+
+Press any key to continue to page 2..."
+    read -rsn1
+
+    printf '%s\n' "\
+$(tput bold)$(tput setaf 3)GREP COMMAND – PAGE 2: ADVANCED & COMBINED USAGE$(tput sgr0)
+==========================================================================================================
+
+$(tput setaf 3)MULTIPLE PATTERNS$(tput sgr0)                                        |  $(tput setaf 3)SEARCHING SPECIFIC FILE TYPES$(tput sgr0)
+grep -e \"pat1\" -e \"pat2\" file   # OR logic for patterns  |  grep --include=\"*.c\" -rn \"main\" . # Only in .c files
+cat patterns.txt | grep -f - file   # Read from file     |  grep --exclude=\"*.log\" -rn \"err\" . # Exclude .log
+grep \"pat1.*pat2\" file.txt # Regex pat1 followed by pat2 |  grep --exclude-dir=\".git\" -rn \"key\" . # Exclude .git dir
+                                                         |  find . -name \"*.py\" -exec grep -H \"def\" {} \\;
+$(tput setaf 3)PIPING AND COMBINING$(tput sgr0)                                     |  $(tput setaf 3)COLOR HIGHLIGHTING$(tput sgr0)
+ps aux | grep 'nginx'      # Filter process list         |  grep --color=always \"pattern\" file # Force color
+ls -l | grep '^d'          # Filter for directories      |  grep --color=auto \"pattern\" file   # Color if tty (often default)
+                                                         |  export GREP_OPTIONS='--color=auto' # Set default color
+$(tput setaf 3)SILENT MODE / QUIET$(tput sgr0)                                      |  $(tput setaf 3)SPECIAL CHARACTERS$(tput sgr0)
+grep -q \"pattern\" file.txt # Quiet, exit status only     |  grep \"\\\$var\" file.txt       # Search for literal '$var'
+if grep -q \"err\"; then echo \"Found\"; fi # Use in scripts |  grep 'search term with spaces' file
+                                                         |  grep $'\\t# Tab character' file
+$(tput setaf 3)NULL-TERMINATED (for xargs)$(tput sgr0)                              |  $(tput setaf 3)USEFUL COMBINATIONS$(tput sgr0)
+grep -rIlZ \"pattern\" . | xargs -0 cmd # Safe with xargs  |  grep -rlinE \"foo|bar\" ./src # Files with ERE 'foo' or 'bar'
+                                                         |  grep -A 2 -B 1 -rIHn \"warning\" /logs
+$(tput setaf 2)Tip: For complex logic, combine grep with find, awk, sed. Check 'man grep' for all options.$(tput sgr0)
+
+----------------------------------------------------------------------------------------------------------
+"
+}
+
+
+# Default values
+N=10
+SHOW_CMD=false
+SEARCH_PATH="."
+FAST_ARG="" # Changed from FAST to FAST_ARG to avoid conflict
+
+# Parse command line arguments
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        -h|--help)
+            usage
+            ;;
+        --cmd)
+            SHOW_CMD=true
+            shift
+            ;;
+        hf|h-find) # Find examples
+            ACTION="find_examples"
+            shift
+            ;;
+        hg|grep-examples) # Grep examples
+            ACTION="grep_examples"
+            shift
+            ;;
+        b|biggest)
+            ACTION="biggest"
+            if [[ $2 =~ ^[0-9]+$ ]]; then N="$2"; shift; fi
+            shift
+            ;;
+        n|newest)
+            ACTION="newest"
+            if [[ $2 =~ ^[0-9]+$ ]]; then N="$2"; shift; fi
+            shift
+            ;;
+        o|oldest)
+            ACTION="oldest"
+            if [[ $2 =~ ^[0-9]+$ ]]; then N="$2"; shift; fi
+            shift
+            ;;
+        e|empty)
+            ACTION="empty"
+            shift
+            ;;
+        ed|empty-dirs)
+            ACTION="empty-dirs"
+            shift
+            ;;
+        d|duplicates)
+            ACTION="duplicates"
+            shift
+            ;;
+        p|permissions)
+            ACTION="permissions"
+            if [[ -n "$2" ]]; then MODE="$2"; shift; else echo "Error: Permission mode required"; exit 1; fi
+            shift
+            ;;
+        s|size)
+            ACTION="size"
+            if [[ -n "$2" ]]; then SIZE="$2"; shift; else echo "Error: Size parameter required"; exit 1; fi
+            shift
+            ;;
+        t|type)
+            ACTION="type"
+            if [[ -n "$2" ]]; then TYPE_VAL="$2"; shift; else echo "Error: Type parameter required"; exit 1; fi # Renamed TYPE to TYPE_VAL
+            shift
+            ;;
+        m|modified)
+            ACTION="modified"
+            if [[ $2 =~ ^[0-9]+$ ]]; then DAYS="$2"; shift; else echo "Error: Days parameter required"; exit 1; fi
+            shift
+            ;;
+        a|accessed)
+            ACTION="accessed"
+            if [[ $2 =~ ^[0-9]+$ ]]; then DAYS="$2"; shift; else echo "Error: Days parameter required"; exit 1; fi
+            shift
+            ;;
+        x|exec)
+            ACTION="exec"
+            if [[ -n "$2" ]]; then COMMAND="$2"; shift; else echo "Error: Command required"; exit 1; fi
+            shift
+            ;;
+        r|regex) # Find by regex (filename)
+            ACTION="regex"
+            if [[ -n "$2" ]]; then PATTERN="$2"; shift; else echo "Error: Pattern required"; exit 1; fi
+            shift
+            ;;
+        g|grep) # Find files then grep content, list filenames
+            ACTION="grep_in_found_files"
+            if [[ -n "$2" ]]; then PATTERN="$2"; shift; else echo "Error: Pattern required"; exit 1; fi
+            shift
+            ;;
+        l|symlinks)
+            ACTION="symlinks"
+            shift
+            ;;
+        f|fast) # For find command
+            FAST_ARG="-xdev"
+            shift
+            ;;
+        gl|grep-lines)
+            ACTION="grep_lines"
+            if [[ -n "$2" ]]; then PATTERN="$2"; shift; else echo "Error: Pattern required for gl"; exit 1; fi
+            shift
+            ;;
+        gli|grep-lines-i)
+            ACTION="grep_lines_i"
+            if [[ -n "$2" ]]; then PATTERN="$2"; shift; else echo "Error: Pattern required for gli"; exit 1; fi
+            shift
+            ;;
+        glw|grep-lines-w)
+            ACTION="grep_lines_w"
+            if [[ -n "$2" ]]; then PATTERN="$2"; shift; else echo "Error: Pattern required for glw"; exit 1; fi
+            shift
+            ;;
+        gf|grep-files)
+            ACTION="grep_files"
+            if [[ -n "$2" ]]; then PATTERN="$2"; shift; else echo "Error: Pattern required for gf"; exit 1; fi
+            shift
+            ;;
+        *)
+            if [[ ! "$1" =~ ^- ]] && [[ "$SEARCH_PATH" == "." ]]; then
+                SEARCH_PATH="$1"
+            elif [[ ! "$1" =~ ^- ]] && [[ -n "$ACTION" ]] && \
+                 ( [[ "$ACTION" == "grep_lines" ]] || \
+                   [[ "$ACTION" == "grep_lines_i" ]] || \
+                   [[ "$ACTION" == "grep_lines_w" ]] || \
+                   [[ "$ACTION" == "grep_files" ]] ) && \
+                 [[ -z "${POSITIONAL[0]}" ]] ; then # if it's a path for a grep option
+                SEARCH_PATH="$1"
+            else
+                POSITIONAL+=("$1") # Store unknown options or path if already set
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Restore positional parameters if any were stored for other purposes
+# For this script, primary path is handled, other positionals might indicate an error or future use
+if [ ${#POSITIONAL[@]} -gt 0 ]; then
+    # If SEARCH_PATH is still ".", and POSITIONAL[0] looks like a path, use it.
+    if [[ "$SEARCH_PATH" == "." ]] && [[ ! "${POSITIONAL[0]}" =~ ^- ]]; then
+        SEARCH_PATH="${POSITIONAL[0]}"
+        # Consider shifting POSITIONAL array or handling others if necessary
+    else
+        echo "Warning: Unhandled positional arguments: ${POSITIONAL[*]}"
+    fi
+fi
+
+
+# If no action is specified, show usage
+if [[ -z "$ACTION" ]]; then
+    usage
+fi
+
+execute_command() {
+    local cmd="$1"
+    if [[ "$SHOW_CMD" == "true" ]]; then
+        local display_cmd=$(echo "$cmd" | sed 's/\\n/\\\\n/g')
+        echo -e "${WHITE}#${NC} ${GREEN}$display_cmd${NC}"
+        echo -e "${WHITE}Press any key to execute...${NC}"
+        read -n 1 -s
+        echo -e "${WHITE}Command is executing...${NC}"
+    fi
+    eval "$cmd"
+}
+
+# Perform the selected action
+case "$ACTION" in
+    biggest)
+        CMD="find \"$SEARCH_PATH\" -type f $FAST_ARG -not -path \"*/\\.*\" -exec du -h {} \\; | sort -hr | head -n $N"
+        execute_command "$CMD"
+        ;;
+    newest)
+        CMD="find \"$SEARCH_PATH\" -type f $FAST_ARG -not -path \"*/\\.*\" -printf '%TY-%Tm-%Td %TH:%TM:%TS %p\\n' | awk '{split(\$2,t,\".\"); print \$1\" \"t[1]\" \"\$3}' | sort -r | head -n $N"
+        execute_command "$CMD"
+        ;;
+    oldest)
+        CMD="find \"$SEARCH_PATH\" -type f $FAST_ARG -not -path \"*/\\.*\" -printf '%TY-%Tm-%Td %TH:%TM:%TS %p\\n' | awk '{split(\$2,t,\".\"); print \$1\" \"t[1]\" \"\$3}' | sort | head -n $N"
+        execute_command "$CMD"
+        ;;
+    empty)
+        CMD="find \"$SEARCH_PATH\" -type f -empty $FAST_ARG"
+        execute_command "$CMD"
+        ;;
+    empty-dirs)
+        CMD="find \"$SEARCH_PATH\" -type d -empty $FAST_ARG"
+        execute_command "$CMD"
+        ;;
+    duplicates)
+        CMD="find \"$SEARCH_PATH\" -type f $FAST_ARG -not -empty -printf '%s\\n' | sort -rn | uniq -d | xargs -I{} find \"$SEARCH_PATH\" -type f -size {}c -print0 | xargs -0 md5sum | sort | uniq -w32 --all-repeated=separate"
+        execute_command "$CMD"
+        ;;
+    permissions)
+        CMD="find \"$SEARCH_PATH\" -perm $MODE $FAST_ARG"
+        execute_command "$CMD"
+        ;;
+    size)
+        CMD="find \"$SEARCH_PATH\" -size $SIZE $FAST_ARG"
+        execute_command "$CMD"
+        ;;
+    type)
+        case "$TYPE_VAL" in # Was TYPE
+            f|file) TYPE_ARG="-type f" ;;
+            d|dir|directory) TYPE_ARG="-type d" ;;
+            l|link|symlink) TYPE_ARG="-type l" ;;
+            *) echo "Unknown type: $TYPE_VAL"; exit 1 ;;
+        esac
+        CMD="find \"$SEARCH_PATH\" $TYPE_ARG $FAST_ARG"
+        execute_command "$CMD"
+        ;;
+    modified)
+        CMD="find \"$SEARCH_PATH\" -type f -mtime -$DAYS $FAST_ARG"
+        execute_command "$CMD"
+        ;;
+    accessed)
+        CMD="find \"$SEARCH_PATH\" -type f -atime -$DAYS $FAST_ARG"
+        execute_command "$CMD"
+        ;;
+    exec)
+        CMD="find \"$SEARCH_PATH\" -type f $FAST_ARG -exec $COMMAND \\;"
+        execute_command "$CMD"
+        ;;
+    regex) # Find by filename regex
+        CMD="find \"$SEARCH_PATH\" -regextype posix-extended -regex \"$PATTERN\" $FAST_ARG"
+        execute_command "$CMD"
+        ;;
+    grep_in_found_files) # Original 'g' option
+        CMD="find \"$SEARCH_PATH\" -type f $FAST_ARG -exec grep --color=auto -l \"$PATTERN\" {} \\;"
+        execute_command "$CMD"
+        ;;
+    symlinks)
+        CMD="find \"$SEARCH_PATH\" -type l $FAST_ARG -exec test ! -e {} \\; -print"
+        execute_command "$CMD"
+        ;;
+    find_examples) # Was 'examples'
+        printf '%s\n' "\
+$(tput bold)$(tput setaf 3)FIND COMMAND – PAGE 1: CORE USAGE$(tput sgr0)
+==========================================================================================================
+
+$(tput setaf 3)BASICS$(tput sgr0)                                                |  $(tput setaf 3)FILTER BY NAME$(tput sgr0)
+find . -type f       # All files                      |  find . -name \"*.txt\"     # Files with .txt extension
+find /dir -type d    # All dirs in /dir               |  find . -iname \"*.JPG\"    # Case-insensitive search
+                                                      |
+$(tput setaf 3)BY TYPE$(tput sgr0)                                               |  $(tput setaf 3)BY SIZE$(tput sgr0)
+find . -type f       # Regular files                  |  find . -size +10M        # Larger than 10MB
+find . -type l       # Symlinks                       |  find . -size -1k         # Smaller than 1KB
+                                                      |
+$(tput setaf 3)BY TIME$(tput sgr0)                                               |  $(tput setaf 3)EXECUTE COMMANDS$(tput sgr0)
+find . -mtime -1     # Modified < 1 day               |  find . -type f -exec echo {} \;  # {} are the found files
+find . -atime +7     # Accessed > 7 days              |  find . -exec chmod 644 {} +     # Batch chmod
+find . -ctime -2     # Perm, ownership, contents      | $(tput setaf 2){} are the found files, \\; to end the line$(tput sgr0)
+                                                      |
+$(tput setaf 3)DEPTH / PRUNE$(tput sgr0)                                         |  $(tput setaf 3)PRINTING & FORMATTING$(tput sgr0)
+find . -maxdepth 1   # Only this dir                  |  find . -ls               # Detailed long list
+find / -mindepth 2   # Skip top levels                |  find . -printf \"%p\\n\"   # Custom path output
+find . -path \"./.git\" -prune -o -name \"*.sh\" -print # Prune: skip matching dirs early
+find . -type f -name \"*.sh\" -prune -o -print        # Prune: skip matching dirs early
+$(tput setaf 2)Note: -prune prevents descent into matched directories – great for skipping .git etc.$(tput sgr0)
+
+----------------------------------------------------------------------------------------------------------
+
+Press any key to continue to page 2..."
+        read -rsn1
+
+        printf '%s\n' "\
+$(tput bold)$(tput setaf 3)FIND COMMAND – PAGE 2: ADVANCED USAGE$(tput sgr0)
+==========================================================================================================
+
+$(tput setaf 3)lOGICAL OPERATORS$(tput sgr0) $(tput setaf 2)-o 'OR', -a 'AND'$(tput sgr0)                   |  $(tput setaf 3)NEGATION & COMPOUNDING$(tput sgr0)
+find . \\( -name \"*.sh\" -o -name \"*.py\" \\)             |  find . ! -name \"*.txt\"          # Not .txt
+find . -type f -a -size +1M # Files AND >1MB          |  find . -type f \\( -empty -o -size 0 \\)
+                                                      |     # Empty files or 0-byte
+                                                      |
+$(tput setaf 3)PERMISSIONS / OWNERSHIP$(tput sgr0)                               |  $(tput setaf 3)SYMLINK HANDLING$(tput sgr0)
+find . -perm 644       # Exact perm 644               |  find . -type l           # Symlinks only
+find . -perm -111      # Any execute bit              |  find . -L -type f        # Follow symlinks
+find . -user bob       # Files owned by bob           |
+                                                      |
+$(tput setaf 3)FILESYSTEM BOUNDARIES$(tput sgr0)                                 |  $(tput setaf 3)EXCLUDE BY EXTENSION$(tput sgr0)
+find . -xdev           # Stay on same fs              |  find . ! -name \"*.log\"       # Exclude .log files
+find /mnt -xdev        # Skip mounted drives          |  find . ! \\( -name \"*.bak\" -o -name \"*.tmp\" \\)
+                                                      |     # Exclude .bak / .tmp items (files or folders)
+                                                      |
+$(tput setaf 3)HANDLING SPECIAL CHARS$(tput sgr0)                                |  $(tput setaf 3)NULL-SAFE OUTPUT$(tput sgr0)
+find . -name \"* *\"     # Names with spaces            |  find . -print0           # Safer with xargs -0
+find . -name \"*[*]*\"   # Names with brackets          |  find . -type f -print0 | xargs -0 rm -v
+$(tput setaf 2)Note: Always quote patterns with wildcards or spaces to avoid shell globbing$(tput sgr0)
+
+----------------------------------------------------------------------------------------------------------
+"
+        ;;
+    grep_examples)
+        display_grep_examples
+        ;;
+    grep_lines)
+        CMD="grep --color=always -rIHn \"$PATTERN\" \"$SEARCH_PATH\"" # I=ignore binary, H=show filename, n=line number
+        execute_command "$CMD"
+        ;;
+    grep_lines_i)
+        CMD="grep --color=always -rIHin \"$PATTERN\" \"$SEARCH_PATH\"" # i=case-insensitive
+        execute_command "$CMD"
+        ;;
+    grep_lines_w)
+        CMD="grep --color=always -rIHwn \"$PATTERN\" \"$SEARCH_PATH\"" # w=whole word
+        execute_command "$CMD"
+        ;;
+    grep_files)
+        CMD="grep --color=auto -rIl \"$PATTERN\" \"$SEARCH_PATH\"" # l=list filenames, I=ignore binary
+        execute_command "$CMD"
+        ;;
+    *)
+        echo "Unknown action: $ACTION"
+        usage
+        ;;
+esac

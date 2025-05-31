@@ -1,0 +1,223 @@
+---
+- name: Configure a new Debian-based system
+  hosts: localhost
+  become: true
+  tasks:
+
+    # Update and Upgrade System
+    - name: Update and upgrade system packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    # Install Essential Tools
+    - name: Install basic utilities
+      apt:
+        name:
+        #  - build-essential
+        #  - software-properties-common
+          - curl
+          - wget
+          - git
+          - vim
+          - neovim
+          - htop
+          - unzip
+          - zip
+          - net-tools
+          - dnsutils
+        state: present
+
+    # # Enable and Configure Firewall
+    # - name: Install and enable UFW
+    #   apt:
+    #     name: ufw
+    #     state: present
+    # - name: Allow SSH through UFW
+    #   ufw:
+    #     rule: allow
+    #     name: OpenSSH
+    # - name: Enable UFW
+    #   ufw:
+    #     state: enabled
+    #     logging: on
+
+    # Install Common Developer Tools
+    - name: Install development tools
+      apt:
+        name:
+          - python3
+          - python3-pip
+          - python3-venv
+          - pipx
+          - default-jre
+          - nodejs
+          - npm
+          # - docker.io
+          # - docker-compose
+        state: present
+
+    # # Set Up Docker Permissions
+    # - name: Add current user to the docker group
+    #   user:
+    #     name: "{{ ansible_user }}"
+    #     groups: docker
+    #     append: yes
+
+    # Security Hardening
+    - name: Disable root SSH login
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PermitRootLogin'
+        line: 'PermitRootLogin no'
+        state: present
+      notify: restart sshd
+
+    - name: Set up automatic updates
+      apt:
+        name: unattended-upgrades
+        state: present
+    - name: Enable unattended upgrades
+      lineinfile:
+        path: /etc/apt/apt.conf.d/20auto-upgrades
+        line: '{{ item }}'
+        create: yes
+      with_items:
+        - 'APT::Periodic::Update-Package-Lists "1";'
+        - 'APT::Periodic::Unattended-Upgrade "1";'
+
+    # Performance Optimizations
+    - name: Enable swapfile
+      command: fallocate -l 2G /swapfile
+      args:
+        creates: /swapfile
+    - name: Set swapfile permissions
+      file:
+        path: /swapfile
+        mode: '0600'
+    - name: Set up swap space
+      command: mkswap /swapfile
+      args:
+        creates: /swapfile
+    - name: Enable swapfile
+      command: swapon /swapfile
+      args:
+        creates: /swapfile
+    - name: Persist swapfile in fstab
+      lineinfile:
+        path: /etc/fstab
+        line: '/swapfile none swap sw 0 0'
+
+    # Configure GNOME (if GNOME is used)
+    - name: Disable GNOME auto-suspend
+      command: gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
+      ignore_errors: yes
+
+    # Add Aliases and Environment Tweaks
+    - name: Add useful aliases to .bashrc
+      lineinfile:
+        path: ~/.bashrc
+        line: '{{ item }}'
+      with_items:
+        - "alias ll='ls -alF'"
+        - "alias gs='git status'"
+        - "alias ..='cd ..'"
+
+    # Install Useful Desktop Tools (Optional)
+    - name: Install desktop utilities
+      apt:
+        name:
+          - chromium
+          # - gnome-tweaks
+          # - vlc
+          # - gimp
+          # - flameshot
+          # - thunderbird
+          # - audacity
+          # - krita
+          # - obs-studio
+          # - blender
+        state: present
+      when: ansible_environment.SESSION != ""
+
+    # Improve Terminal Experience
+    - name: Install Zsh and Oh-My-Zsh
+      apt:
+        name:
+          - zsh
+        state: present
+    - name: Set Zsh as default shell
+      command: chsh -s /usr/bin/zsh {{ ansible_user }}
+    - name: Install Oh-My-Zsh
+      git:
+        repo: https://github.com/ohmyzsh/ohmyzsh.git
+        dest: ~/.oh-my-zsh
+      when: not ansible_check_mode
+
+    # Install System Monitoring Tools
+    - name: Install system monitoring tools
+      apt:
+        name:
+          - glances
+          - iftop
+          - iotop
+          - sysstat
+        state: present
+
+    # Install Fonts and Themes
+    - name: Install fonts and themes for desktop environment
+      apt:
+        name:
+          - fonts-powerline
+          - fonts-firacode
+          - papirus-icon-theme
+          - arc-theme
+        state: present
+
+    # # Configure Snap and Flatpak
+    # - name: Install Snap
+    #   apt:
+    #     name: snapd
+    #     state: present
+    # - name: Install Flatpak
+    #   apt:
+    #     name: flatpak
+    #     state: present
+    # - name: Enable Flatpak repository
+    #   command: flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+    #   ignore_errors: yes
+
+    # Install Networking Tools
+    - name: Install networking tools
+      apt:
+        name:
+          - openvpn
+          - wireguard-tools
+          - traceroute
+        state: present
+
+    # Install Backup Tools
+    - name: Install backup tools
+      apt:
+        name:
+          - rsync
+          - duplicity
+          - borgbackup
+        state: present
+
+    # # Multimedia and Productivity Tools
+    # - name: Install multimedia and productivity tools
+    #   apt:
+    #     name:
+    #       - libreoffice
+    #       - kdenlive
+    #       - handbrake
+    #       - inkscape
+    #     state: present
+
+  handlers:
+    - name: restart sshd
+      service:
+        name: sshd
+        state: restarted
+

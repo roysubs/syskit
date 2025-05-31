@@ -1,0 +1,197 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# RuneQuest 2 Combat Process Cheatsheet
+
+## Combat Sequence
+
+1. **Declare Intentions**:
+   - Each player declares what their character intends to do during the round.
+
+2. **Determine Initiative**:
+   - Roll for initiative to determine the order of actions.
+   - Typically, DEX ranks are used to resolve actions.
+   
+3. **Movement**:
+   - Characters move according to their movement rates.
+   - Movement can be a walk, run, or charge.
+
+4. **Actions**:
+   - Characters perform their actions, such as attacking, casting spells, or other maneuvers.
+
+## Attack Procedure
+
+### Roll to Hit
+
+Roll percentage dice against the character's weapon skill.
+- **Success**: If the roll is equal to or less than the skill, the attack hits.
+- **Special**: If the roll is equal to or less than 1/5th of the skill, it's a special hit.
+- **Critical**: If the roll is equal to or less than 1/20th of the skill, it's a critical hit.
+- **Fumble**: If the roll is above 96% or other specific conditions, it's a fumble.
+
+### Hit Table
+
+| Roll   | Result      |
+|--------|-------------|
+| <= Skill%      | Normal Hit  |
+| <= Skill%/5    | Special Hit |
+| <= Skill%/20   | Critical Hit|
+| 96-00 | Fumble      |
+
+### Defense Roll
+
+The defender may choose to:
+- **Parry**: Roll against the weapon's parry skill.
+- **Dodge**: Roll against the character's dodge skill.
+
+### Damage Resolution
+
+1. **Roll for Damage**:
+   - Roll the damage dice for the weapon used.
+   - Add any relevant modifiers for strength, skill, etc.
+
+2. **Subtract Armor**:
+   - Subtract the target's armor points for the hit location from the damage rolled.
+   - The remaining damage is applied to the hit location.
+
+3. **Apply Damage**:
+   - Deduct the final damage from the hit points of the target's hit location.
+
+### Hit Location Table
+
+| d20 Roll | Location    |
+|----------|-------------|
+| 1-3      | Left Leg    |
+| 4-6      | Right Leg   |
+| 7-9      | Abdomen     |
+| 10-12    | Chest       |
+| 13-15    | Left Arm    |
+| 16-18    | Right Arm   |
+| 19-20    | Head        |
+
+### Example of an Attack
+
+1. **Player**: "I attack the troll with my broadsword!"
+2. **DM**: "Roll to hit."
+3. **Player**: Rolls d100 and gets 45, which is a hit (weapon skill is 60%).
+4. **DM**: "Roll for damage."
+5. **Player**: Rolls 1d8+1d4 for damage and gets 10.
+6. **DM**: Subtracts the troll's armor (3) from the damage. "The troll takes 7 points of damage."
+
+### Damage and Healing
+
+1. **Hit Points**: 
+   - Each hit location has its own hit points.
+   - When a location's hit points reach zero, it becomes incapacitated.
+   
+2. **Major Wounds**:
+   - If a location takes damage equal to or greater than its hit points, it may be severed or rendered unusable.
+
+3. **Healing**:
+   - Natural healing: Characters heal 1 hit point per location per week of rest.
+   - Magical healing: Spells and potions can restore hit points more quickly.
+
+### Example of Damage Application
+
+1. **Player**: "I attack the goblin with my axe!"
+2. **DM**: "Roll to hit."
+3. **Player**: Rolls d100 and gets 15, which is a special hit (weapon skill is 75%, special hit threshold is 15).
+4. **DM**: "Roll for damage."
+5. **Player**: Rolls 1d6+2 for damage and gets 6. Adds 6 for special hit damage = 12.
+6. **DM**: Subtracts the goblin's armor (2) from the damage. "The goblin takes 10 points of damage to its right arm."
+
+### Conditions and Effects
+
+#### Common Conditions
+
+- **Blinded**: The character cannot see, making attacks at disadvantage.
+- **Stunned**: The character cannot act for a number of rounds.
+- **Prone**: The character is on the ground and must spend a turn standing up.
+
+#### Table of Conditions
+
+| Condition | Effect                                             |
+|-----------|----------------------------------------------------|
+| Blinded   | Cannot see, attacks at disadvantage                |
+| Stunned   | Cannot act for a number of rounds                  |
+| Prone     | On the ground, must spend a turn to stand up       |
+
+### Special Rules
+
+1. **Fumbles**: Rolling a 96% or higher results in a fumble.
+   - Effects vary: Dropping weapons, falling, hurting oneself.
+2. **Critical Hits**: Rolling a critical hit results in maximum damage and additional effects.
+3. **Special Attacks**: Certain maneuvers or spells may have unique effects.
+
+### Example of a Fumble
+
+1. **Player**: "I attack the skeleton with my spear!"
+2. **DM**: "Roll to hit."
+3. **Player**: Rolls d100 and gets 97, a fumble.
+4. **DM**: "Your spear slips from your hand and lands on the ground."
+
+### Extended Combat Example
+
+#### Setup
+
+- **Participants**: 2 Players (Warrior and Mage) and the DM.
+- **Enemies**: 3 Skeletons.
+- **Initiative**: Warrior (18), Skeletons (15), Mage (12).
+
+#### Round 1
+
+##### Warrior's Turn
+
+- **Movement**: Moves 10 feet to engage nearest skeleton.
+- **Action**: Attacks with a longsword.
+- **Roll to hit**: d100 = 32 (hits, skill is 65%).
+- **Damage**: Rolls 1d8+1 = 7.
+- **Result**: Skeleton takes 7 damage.
+
+##### Skeletons' Turn
+
+- **Skeleton 1**: Attacks the Warrior.
+  - **Roll to hit**: d100 = 70 (misses).
+- **Skeleton 2**: Attacks the Mage.
+  - **Roll to hit**: d100 = 55 (hits, skill is 60%).
+  - **Damage**: Rolls 1d6 = 4.
+  - **Result**: Mage takes 4 damage.
+- **Skeleton 3**: Moves to flank the Warrior.
+
+##### Mage's Turn
+
+- **Movement**: Steps back to avoid close combat.
+- **Action**: Casts Fireball at Skeleton 3.
+- **Roll to hit**: d100 = 22 (hits, skill is 50%).
+- **Damage**: Rolls 2d6 = 8.
+- **Result**: Skeleton 3 takes 8 damage and crumbles.
+
+#### Round 2
+
+##### Warrior's Turn
+
+- **Movement**: None.
+- **Action**: Attacks Skeleton 1.
+- **Roll to hit**: d100 = 05 (critical hit, skill is 65%).
+- **Damage**: Rolls maximum damage 1d8+1 = 9.
+- **Result**: Skeleton 1 is shattered.
+
+##### Skeletons' Turn
+
+- **Skeleton 2**: Continues attacking the Mage.
+  - **Roll to hit**: d100 = 92 (fumbles).
+  - **Result**: The skeleton's sword slips and it falls prone.
+
+##### Mage's Turn
+
+- **Movement**: Positions to better see Skeleton 2.
+- **Action**: Casts Lightning Bolt.
+- **Roll to hit**: d100 = 48 (hits, skill is 55%).
+- **Damage**: Rolls 3d6 = 11.
+- **Result**: Skeleton 2 takes 11 damage and is destroyed.
+
+EOF
+) | less -R

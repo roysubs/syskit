@@ -1,0 +1,70 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+The Hobbit and The Lord of the Rings: A Comprehensive Timeline
+==============================================================
+
+### The Hobbit (2941–2942 Third Age)
+
+- **April 27, 2941**: Gandalf visits Bilbo Baggins in the Shire.  
+- **April 28**: Bilbo encounters Thorin and Company; the adventure begins.  
+- **May 1**: The company departs from Hobbiton.  
+- **June 15**: Captured by trolls; Gandalf rescues them.  
+- **June 30**: Arrive at Rivendell; Elrond examines Thorin's map and sword.  
+- **July 7**: Enter the Misty Mountains; encounter goblins.  
+- **July 9**: Bilbo meets Gollum and finds the One Ring.  
+- **July 10**: Escape goblins; wolves and Wargs attack; rescued by eagles.  
+- **July 15**: Visit Beorn.  
+- **July 25**: Enter Mirkwood.  
+- **August 20**: Captured by spiders; Bilbo proves his courage and frees the dwarves.  
+- **August 31**: Captured by the Wood-elves.  
+- **September 22**: Escape in barrels; arrive at Lake-town (Esgaroth).  
+- **October 1**: Leave Lake-town for Erebor.  
+- **October 25**: Smaug attacks Lake-town; Bard slays him.  
+- **November 23**: The Battle of the Five Armies; Thorin Oakenshield dies.  
+- **December 31**: Bilbo begins his journey home.  
+- **June 22, 2942**: Bilbo arrives back at Bag End.  
+
+---
+
+### The Fellowship of the Ring (3001–3019 Third Age)
+
+- **September 22, 3001**: Bilbo's 111th birthday; he leaves the Shire.  
+- **April 12, 3018**: Gandalf discovers the Ring's identity in Gondor's archives.  
+- **September 23, 3018**: Frodo and Sam leave Bag End; pursued by Black Riders.  
+- **September 29**: Frodo, Sam, and Pippin encounter Tom Bombadil.  
+- **October 6**: Arrive in Bree; meet Aragorn (Strider).  
+- **October 11**: Attack on Weathertop; Frodo is wounded by the Witch-king.  
+- **October 20**: Arrive at Rivendell; Frodo healed by Elrond.  
+- **October 25**: The Council of Elrond decides to destroy the Ring.  
+- **December 25**: The Fellowship departs from Rivendell.  
+
+---
+
+### The Two Towers (3019 Third Age)
+
+- **January 15, 3019**: Gandalf defeats the Balrog in Moria.  
+- **February 26**: The Fellowship breaks at Parth Galen; Boromir is slain.  
+- **February 28**: Frodo and Sam meet Gollum.  
+- **March 2**: Battle of Helm's Deep; Saruman defeated at Isengard.  
+- **March 5**: Gandalf confronts Saruman.  
+
+---
+
+### The Return of the King (3019 Third Age)
+
+- **March 9**: Frodo and Sam cross into Mordor.  
+- **March 15**: Battle of the Pelennor Fields; Witch-king slain by Éowyn and Merry.  
+- **March 25**: The One Ring is destroyed; Sauron is defeated.  
+- **May 1**: Aragorn crowned King of Gondor.  
+- **October 6**: Frodo, Sam, Merry, and Pippin return to the Shire.  
+- **November 3**: Saruman killed by Gríma Wormtongue in the Shire.  
+- **September 22, 3021**: Frodo departs Middle-earth with Gandalf and the Elves.  
+
+---
+
+EOF
+) | less -R

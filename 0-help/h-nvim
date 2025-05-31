@@ -1,0 +1,107 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Neovim Quick Notes
+================
+
+Why Neovim (nvim) is Better Than Vim
+==================================
+
+- **Built-in Asynchronous Support**:
+    - **Vim**: Needs external plugins like `vim-async` to handle asynchronous tasks.
+    - **Neovim**: Fully integrated asynchronous job control. This makes tasks like linting, autocompletion, and file operations smoother.
+    - Example: 
+      ```lua
+      vim.lsp.buf.hover()  -- Hover functionality with async.
+      ```
+
+- **Improved Plugin Architecture**:
+    - **Vim**: Uses Vimscript or third-party plugins that may not be as efficient.
+    - **Neovim**: Uses built-in support for plugins written in modern languages like Lua, Python, and Ruby, making it faster and easier to integrate.
+    - Example:
+      ```lua
+      use 'nvim-treesitter/nvim-treesitter'  -- Lua-based plugin manager for improved syntax highlighting.
+      ```
+
+- **Lua Configuration**:
+    - **Vim**: Uses Vimscript for configuration.
+    - **Neovim**: Uses Lua for configuration, which is faster, more flexible, and allows for better integration with modern tools.
+    - Example of Lua config for nvim:
+      ```lua
+      vim.opt.number = true  -- Enable line numbers.
+      vim.cmd('colorscheme gruvbox')  -- Set color scheme.
+      ```
+
+- **Built-in LSP Support**:
+    - **Vim**: Requires external plugins like `coc.nvim` or `ale` for language server protocol (LSP) integration.
+    - **Neovim**: Native support for LSP (since v0.5), with better performance and built-in features for code completion, diagnostics, and more.
+    - Example:
+      ```lua
+      require'lspconfig'.pyright.setup{}  -- Setup for Python LSP.
+      ```
+
+- **Tree-sitter Integration**:
+    - **Vim**: Requires additional plugins like `vim-treesitter`.
+    - **Neovim**: Built-in Tree-sitter support for advanced syntax highlighting, code folding, and parsing.
+    - Example:
+      ```lua
+      require'nvim-treesitter.configs'.setup {
+        ensure_installed = "python",  -- Automatically install Python parser.
+        highlight = { enable = true }  -- Enable syntax highlighting with Tree-sitter.
+      }
+      ```
+
+- **Floating Windows**:
+    - **Vim**: Limited or no support for floating windows.
+    - **Neovim**: Native support for floating windows, used for things like popups, diagnostics, or floating terminal windows.
+    - Example: 
+      ```lua
+      vim.api.nvim_open_win(buf, true, {relative='cursor', width=20, height=1, row=1, col=0})
+      ```
+
+- **True Color Support**:
+    - **Vim**: Limited support for true colors.
+    - **Neovim**: Fully supports true colors, allowing for better visual appeal and custom color schemes.
+    - Example: 
+      ```lua
+      vim.opt.termguicolors = true  -- Enable true color support.
+      ```
+
+- **Easier Customization with Plugins**:
+    - **Vim**: Plugin ecosystem is mature but slower to adapt modern features.
+    - **Neovim**: Plugin ecosystem supports modern paradigms like async processes, enhanced UI, and modular integration.
+    - Example: 
+      ```lua
+      require'packer'.startup(function()
+        use 'neovim/nvim-lspconfig'
+        use 'nvim-treesitter/nvim-treesitter'
+      end)
+      ```
+
+- **Built-in Terminal Emulator**:
+    - **Vim**: Needs plugins like `vim-terminal` or `vim-shell` for terminal integration.
+    - **Neovim**: Native support for an integrated terminal inside Neovim, allowing for running shell commands directly within the editor.
+    - Example:
+      ```bash
+      :term  # Open a terminal inside Neovim.
+      ```
+
+- **Built-in Clipboard Support**:
+    - **Vim**: Clipboard support requires compiling with `+clipboard` or using external tools.
+    - **Neovim**: Native clipboard support without requiring additional setup.
+    - Example:
+      ```bash
+      "+y  # Yank (copy) text to system clipboard.
+      ```
+
+- **Better Community Support and Development**:
+    - **Vim**: Developed primarily by a single person (Bram Moolenaar), with some community contributions.
+    - **Neovim**: A community-driven project with regular updates, features, and bug fixes from a large group of contributors.
+    - Example:
+      - Neovim has a vibrant community and regular updates, making it a forward-looking choice for modern workflows.
+
+EOF
+) | less -R

@@ -1,0 +1,84 @@
+# This Docker Compose file defines a monitoring stack using Prometheus and Grafana.
+# Prometheus scrapes metrics from target machines running Node Exporter.
+# Grafana connects to Prometheus to build dashboards for visualization.
+
+services:
+
+  # Prometheus: The time-series database and scraping engine
+  prometheus:
+    image: prom/prometheus:latest # Use the official Prometheus image
+    container_name: prometheus
+    # Expose Prometheus Web UI (default 9090)
+    ports:
+      - 9090:9090
+    volumes:
+      # Mount the configuration file. This needs to be created by the setup script.
+      - ${CONFIG_ROOT}/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      # Mount a volume for Prometheus data persistence. Use a named volume or bind mount.
+      # Using a bind mount within the config root for consistency with other services.
+      - ${CONFIG_ROOT}/prometheus/data:/prometheus
+    command:
+      # Command line arguments for Prometheus.
+      # --config.file points to the config mounted from the host.
+      # --storage.tsdb.path sets the data directory.
+      # --web.console.libraries and --web.console.templates are needed for the basic console UI.
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.console.libraries=/usr/share/prometheus/console_libraries
+      - --web.console.templates=/usr/share/prometheus/consoles
+    # User and Group ID - Often less critical for official images like prom/prometheus,
+    # but included for potential volume permission consistency if needed.
+    # Prometheus runs as its own user internally, so volume ownership is more important.
+    user: "${PUID}:${PGID}"
+    # Optional: Limit resources if needed
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '0.5'
+    #       memory: 512M
+    restart: unless-stopped # Restart unless stopped manually
+
+  # Grafana: The visualization and dashboarding tool
+  grafana:
+    image: grafana/grafana:latest # Use the official Grafana image
+    container_name: grafana
+    # Expose Grafana Web UI (default 3000)
+    ports:
+      - 3000:3000
+    volumes:
+      # Mount a volume for Grafana data persistence (dashboards, database, etc.)
+      - ${CONFIG_ROOT}/grafana:/var/lib/grafana
+      # Optional: Mount configuration file(s) if needed (e.g., custom provisioning)
+      # - ${CONFIG_ROOT}/grafana/grafana.ini:/etc/grafana/grafana.ini
+      # - ${CONFIG_ROOT}/grafana/provisioning/:/etc/grafana/provisioning/
+    environment:
+      # User ID and Group ID for running the application inside the container.
+      # Grafana often runs as its own user, but PUID/PGID can help with volume permissions.
+      - PUID=${PUID} # Note: Grafana user is typically grafana, PUID might not apply directly
+      - PGID=${PGID} # but volume ownership is still important.
+      # Timezone setting
+      - TZ=Europe/Amsterdam # <--- Adjust to your timezone
+      # Optional: Set admin user/password during initial setup.
+      # It's generally recommended to set these after deployment via the UI or provisioning.
+      # Default login is admin/admin (you'll be prompted to change on first login).
+      # - GF_SECURITY_ADMIN_USER=admin
+      # - GF_SECURITY_ADMIN_PASSWORD=your_secure_password
+      # Optional: Configure data sources, dashboards, etc. via provisioning (advanced)
+      # - GF_INSTALL_PLUGINS=briangann-wordcloud-panel
+    # Ensure Prometheus is up before Grafana starts
+    depends_on:
+      - prometheus
+    # Optional: Limit resources if needed
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '0.5'
+    #       memory: 512M
+    restart: unless-stopped # Restart unless stopped manually
+
+# Optional: Define a network if you want to isolate these services
+# (Not strictly necessary with default bridge network for this simple setup)
+# networks:
+#   monitor-net:
+#     driver: bridge
+#     enable_ipv6: false # Disable IPv6 if it causes issues

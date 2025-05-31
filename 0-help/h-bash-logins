@@ -1,0 +1,100 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+## Bash Login Shells and Startup Files
+
+This document outlines the typical loading order of configuration files for different types of Bash sessions.
+
+### Console Login (TTY Login)
+
+When you log in directly to a terminal (e.g., after booting or via `ssh`), Bash acts as a **login shell**. It reads files in the following specific order:
+
+1.  `/etc/profile`
+    * System-wide initialization script for **all login shells** (not just Bash).
+    * Sets up environment variables and executes system-wide commands.
+2.  `~/.bash_profile`
+    * User-specific profile.
+    * **If this file exists**, Bash reads it and then **stops**. It does *not* read `~/.bash_login` or `~/.profile`.
+3.  `~/.bash_login`
+    * User-specific login script.
+    * Read **only if** `~/.bash_profile` is missing.
+    * If this file exists, Bash reads it and then **stops**. It does *not* read `~/.profile`.
+4.  `~/.profile`
+    * User-specific profile, widely used by many shells.
+    * Read **only if** both `~/.bash_profile` and `~/.bash_login` are missing.
+    * This is often the default user login file sourced on Debian/Ubuntu based systems.
+5.  `~/.bashrc`
+    * This file is typically read by **non-login interactive shells**.
+    * It is **not** read by default in a login shell session.
+    * However, it is **common practice** to explicitly `source` `~/.bashrc` from within `~/.bash_profile`, `~/.bash_login`, or `~/.profile` to ensure consistent settings for both login and non-login interactive shells.
+
+### GUI Login (via Display Manager, e.g., GDM, LightDM)
+
+Logging in through a graphical display manager typically starts a **non-login shell** (or executes scripts in a non-login context). The exact files loaded depend heavily on the **Desktop Environment (DE)**, but a common pattern includes:
+
+1.  `/etc/profile`
+    * Often sourced by the display manager during the login process to set system-wide environment variables for the graphical session.
+2.  `~/.profile`
+    * Frequently executed by the display manager or the DE's session startup scripts. This is a common place for user-specific environment variables for GUI sessions.
+3.  **DE-Specific Files**
+    * Files like `~/.gnomerc` (GNOME), `~/.xprofile` (KDE, XFCE, etc.), or scripts in `~/.config/autostart/` are executed by the Desktop Environment itself.
+4.  **System-wide DE Configuration**
+    * Scripts and configuration files within `/etc/X11/Xsession.d/` or the main `/etc/X11/Xsession` script are also commonly executed by the display manager.
+
+**Note:** `~/.bash_profile` and `~/.bash_login` are typically **not** read during a standard GUI login unless explicitly configured by the DE or sourced from `~/.profile`.
+
+### XTerm or Terminal Emulator in GUI
+
+When you open a terminal window within a GUI session (e.g., xterm, GNOME Terminal, Konsole):
+
+-   By default, these start a **non-login shell**. Bash reads only `~/.bashrc`.
+-   You can often explicitly request a **login shell** using an option like `-l` or `--login` (e.g., `xterm -l`). If started as a login shell this way, the file loading order is the same as for **Console Login**.
+
+### Non-Login Interactive Shell
+
+When Bash is started interactively but is **not** a login shell (e.g., opening a new terminal window in a GUI, running `bash` from an existing shell), it reads **only**:
+
+1.  `~/.bashrc`
+    * This is where you should place aliases, functions, prompt customizations, and settings that you want available in every interactive shell session.
+
+---
+
+## Summary of Key Files
+
+-   `/etc/profile`: System-wide startup for **login shells**.
+-   `~/.bash_profile`, `~/.bash_login`, `~/.profile`: User-specific startup files primarily for **login shells**, read in that order.
+-   `~/.bashrc`: User-specific startup file read by **non-login interactive shells**. Often sourced from login shell profiles (`~/.bash_profile`, `~/.bash_login`, or `~/.profile`) for consistency.
+
+---
+
+## Debugging Tips
+
+To understand which files are being sourced and what is happening during shell startup:
+
+-   **Check Shell Type**:
+    ```bash
+    echo $0
+    ```
+    This command typically shows `bash` for a non-login shell and `-bash` for a login shell.
+
+-   **Trace Login Shell Startup**:
+    ```bash
+    bash -x --login
+    ```
+    This command starts a login shell and prints a trace (`+` followed by the command) of every command executed from the startup files.
+
+-   **Trace Non-Login Shell Startup**:
+    ```bash
+    bash -x
+    ```
+    This command starts a non-login interactive shell and prints a trace of commands executed from `~/.bashrc`.
+
+---
+
+Remember: The behavior of startup files can be complex and influenced by shell options and how Bash is invoked. Always refer to the official Bash manual (`man bash`) for the most comprehensive and authoritative information, especially the section on 'INVOCATION'.
+
+EOF
+) | less -R

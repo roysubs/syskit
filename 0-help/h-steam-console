@@ -1,0 +1,96 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Managing Steam Collection from Console
+
+SteamCMD is the main tool for managing Steam games from the console.
+liberator is a tool to list games, show Steam stats, and check compatibility.
+You can use Proton, Wine, and Lutris to manage compatibility between Linux and Windows games.
+Use Steam Remote Play to stream games across devices.
+Third-party apps like SteamDB and Heroic Games Launcher help with managing your collection, finding Linux-compatible games, and integrating with Epic Games Store or GOG.
+
+## SteamCMD (steamcmd)
+SteamCMD is the command-line version of Steam, allowing you to install and manage Steam games from the console.
+- Install: `sudo apt install steamcmd`
+- Basic Usage: `steamcmd +login <username> +force_install_dir <path> +app_update <appid> validate +quit`
+- SteamCMD can be used to install Steam games without the Steam client.
+
+## Steam Console Tools
+Steam offers several console tools for managing your games:
+- `steam` : Launch Steam in the console (not fully functional, limited features).
+- `steamcmd` : Command-line tool for installing and updating Steam games.
+
+## Tools for Managing Steam Games
+
+### Steam Library Management (liberator)
+liberator is a console tool for managing your Steam library, especially useful for viewing games and stats.
+- Install: `git clone https://github.com/geras90/liberator.git && cd liberator && make && sudo make install`
+- Usage: `liberator -l` : List installed Steam games.
+- Usage: `liberator -s` : Show Steam statistics.
+- Usage: `liberator -c` : Check game compatibility with Linux.
+
+### Steam's Compatibility Tools (Proton, Wine, etc.)
+Proton is a tool developed by Steam to allow Windows games to run on Linux.
+- Install Proton (if not installed by default): `sudo apt install proton`
+- Configure Proton via Steam client, or specify Proton version via `STEAM_COMPAT_DATA_PATH`.
+- For non-Steam Windows games, use `wine` or `playonlinux`.
+
+## SteamOS and Linux-Compatible Games
+To filter your games by Linux compatibility:
+- Use the `steam` client UI under "Settings" > "Steam Play" to enable Steam Play for all titles.
+- In the Steam Library, games that are compatible with Linux are marked with a SteamOS icon.
+- In the console, you can use `steamcmd` and other third-party tools like `liberator` to list and filter Linux-compatible games.
+
+### 3rd Party Apps for Steam Management
+Several third-party apps and tools allow you to manage your Steam collection efficiently.
+
+#### SteamDB (steamdb)
+SteamDB is a web app that allows you to browse and search Steam’s database for game stats, prices, compatibility, etc.
+- Website: [https://steamdb.info](https://steamdb.info)
+- Use `steamdb` to view the list of Linux-compatible games, sales history, and even Steam server information.
+
+#### Lutris (lutris)
+Lutris is a gaming platform that integrates with Steam and helps manage Windows and Linux games.
+- Install: `sudo apt install lutris`
+- Usage: `lutris` : Launch Lutris, which manages your game libraries and compatibility layers.
+
+#### Heroic Games Launcher (heroic-games-launcher)
+Heroic is an open-source game launcher for managing games from the Epic Games Store, GOG, and Steam on Linux.
+- Install: `sudo apt install heroic-games-launcher`
+- Usage: `heroic` : Launch Heroic and add Steam games to its library for better management.
+
+#### Steam Remote Play (steam-remote-play)
+Remote Play allows you to stream games from your PC to another device.
+- Install: `sudo apt install steam`
+- Usage: From Steam client, enable Steam Remote Play under "Settings" > "Remote Play."
+
+## Installing Steam Games via Console
+
+### Using SteamCMD:
+You can install games directly from the console using SteamCMD.
+- Login to SteamCMD: `steamcmd +login <username>`
+- Install a game by appid: `steamcmd +login <username> +app_update <appid> validate +quit`
+
+### Using Steam’s Game Library Command:
+After installing SteamCMD, games can be installed via Steam’s console using:
+- `steamcmd +login <username> +force_install_dir <path> +app_update <appid> validate +quit`
+
+### Installing Proton Games via Console:
+You can use Proton to install and run Windows-only games.
+- Example: `STEAM_COMPAT_DATA_PATH=$HOME/.steam/steam/steamapps/compatdata <appid>/pfx wine <path-to-installer>.exe`
+
+## Game Stats and Library Management
+For game stats, achievements, and tracking:
+- Use `liberator` to list installed games: `liberator -l`
+- Use `steamcmd` to check game updates or validate installation: `steamcmd +app_update <appid> validate +quit`
+
+## Tips & Tricks
+- Use `steamcmd` to batch-install or update multiple games at once.
+- You can script `steamcmd` to update all games in your library.
+- Use Proton's `STEAM_COMPAT_DATA_PATH` variable to configure individual game compatibility layers for Steam Play.
+
+EOF
+) | less -R

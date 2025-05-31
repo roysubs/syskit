@@ -1,0 +1,166 @@
+#!/usr/bin/expect -f
+# Start session with 'tmux new -s moria_session' so that expect can use this name
+# to manipulate the session in the background.
+# In the tmux session, start Moria and pick race, sex, and get it to the point of
+# the "Hit space to re-roll or ESC to accept characteristics:" prompt.
+# Now detach from the session with C-b d (C- means Ctrl).
+# Now run this script, written in the expect language.
+# After the script completes, 'tmux attach' to return to the session.
+#
+# It is possible to watch the progress of the automation while it is running:
+# To see a snapshot of the tmux session:      tmux capture-pane -t moria_session -p
+# To attach view-only and watch the rolling:  tmux attach -t moria_session
+# Or, to start with split-window view output: tmux split-window -t moria_session
+
+# Set up the log file
+set script_name [file tail [info script]]
+set log_file [file rootname $script_name].log
+set log_path [file join [pwd] $log_file]
+
+# Attach to the tmux session and send the initial keypress
+exec tmux send-keys -t moria_session " " C-m
+
+# Get a timestamp in the required format
+proc timestamp {} {
+    set now [clock seconds]
+    set millis [expr {[clock milliseconds] % 1000}]
+    return [format "%s_%03d" [clock format $now -format "%Y-%m-%d_%H-%M-%S"] $millis]
+}
+
+# Function to log messages
+proc log_message {log_path message} {
+    catch {
+        set log_file [open $log_path "a"]
+        puts $log_file $message
+        close $log_file
+    } err
+    if {$err != ""} {
+        send_user "Error writing to log file: $err\n"
+    }
+}
+
+proc extract_concise_info {pane_output failed_attempts} {
+    set concise_output ""
+
+    # Initialize variables with default values
+    set age "N/A"
+    set height "N/A"
+    set weight "N/A"
+    set social_class "N/A"
+    set str "N/A"
+    set int "N/A"
+    set wis "N/A"
+    set dex "N/A"
+    set con "N/A"
+    set chr "N/A"
+    set to_hit "N/A"
+    set to_damage "N/A"
+    set to_ac "N/A"
+    set total_ac "N/A"
+
+    # Extract values (use regex as before)
+    regexp {Age\s*:\s*(\d+).*?Height\s*:\s*(\d+).*?Weight\s*:\s*(\d+).*?Social Class\s*:\s*(\d+)} $pane_output -> age height weight social_class
+    regexp {STR\s*:\s*(\S+).*?INT\s*:\s*(\S+).*?WIS\s*:\s*(\S+).*?DEX\s*:\s*(\S+).*?CON\s*:\s*(\S+).*?CHR\s*:\s*(\S+)} $pane_output -> str int wis dex con chr
+    regexp {\+ To Hit\s*:\s*(-?\d+).*?\+ To Damage\s*:\s*(-?\d+).*?\+ To AC\s*:\s*(-?\d+).*?Total AC\s*:\s*(-?\d+)} $pane_output -> to_hit to_damage to_ac total_ac
+
+    # Include datetime and failed_attempts
+    set datetime [clock format [clock seconds] -format "%Y-%m-%d_%H-%M-%S"]
+    append concise_output "$datetime, Attempt: $failed_attempts\n"
+    append concise_output "Age: $age, Height: $height, Weight: $weight, Social Class: $social_class\n"
+    append concise_output "STR: $str, INT: $int, WIS: $wis, DEX: $dex, CON: $con, CHR: $chr\n"
+    append concise_output "+ To Hit: $to_hit, + To Damage: $to_damage, + To AC: $to_ac, Total AC: $total_ac\n"
+
+    return $concise_output
+}
+
+proc reroll {log_path current_attempt_number} {
+    # Capture the current tmux pane output
+    set pane_output [exec tmux capture-pane -t moria_session -p]
+
+    # Debug: Log the raw pane output (uncomment if needed for further debugging)
+    # log_message $log_path "[timestamp] Raw Pane Output on attempt $current_attempt_number:\n$pane_output\n"
+
+    # Extract concise information for logging
+    set concise_output [extract_concise_info $pane_output $current_attempt_number]
+    log_message $log_path $concise_output
+
+    # Check for the desired stat (INT 18/20 or higher)
+    # Regex: INT, optional spaces, colon, optional spaces, "18/", then a digit 2-9, then any digit.
+    if {[regexp {INT\s*:\s*18/([2-9][0-9])} $pane_output match found_int_suffix]} {
+        set actual_int_found "18/$found_int_suffix"
+        set message "[timestamp] Attempt $current_attempt_number: Desired INT $actual_int_found found. Stopping."
+        log_message $log_path $message
+        send_user "\n$message\n"
+        return 1  ;# Indicating success (target found)
+    }
+
+    # If not found, send space to reroll
+    log_message $log_path "[timestamp] Attempt $current_attempt_number: Desired INT not found. Sending space key to tmux."
+    exec tmux send-keys -t moria_session " " C-m
+    return 0 ;# Indicating target NOT found, continue rolling
+}
+
+# # Function to capture pane output and reroll
+# proc reroll {log_path failed_attempts} {
+#     # Capture the current tmux pane output
+#     set pane_output [exec tmux capture-pane -t moria_session -p]
+# 
+#     # Debug: Log the raw pane output
+#     # log_message $log_path "[timestamp] Raw Pane Output:\n$pane_output\n"
+# 
+#     # Extract the INT value if present
+#     if {[regexp {INT\s+:\s+18\/([0-9]{2})} $pane_output match int_value]} {
+#         # Log the timestamp and INT value
+#         set log_entry "[timestamp] INT=18/$int_value\n"
+#         log_message $log_path $log_entry
+# 
+#         # Convert the extracted value to a number and check if it's >= 20
+#         set int_value_num [expr {[scan $int_value %d]}]
+#         if {$int_value_num >= 20} {
+#             send_user "Value of '18/$int_value' found. Stopping.\n"
+#             return 1  ;# Indicating success
+#         }
+# 
+#         # # Convert the extracted value to a number and check if it's >= 19
+#         # set int_value_num [expr {$int_value + 0}]
+#         # if {$int_value_num >= 19} {
+#         #     send_user "Value of '18/$int_value' found. Stopping.\n"
+#         #     return 1  ;# Indicating success
+#         # }
+#     } else {
+#         # Log if no INT value is found
+#         log_message $log_path "[timestamp] No valid INT found in this roll.\n"
+#     }
+# 
+#     # If not found, send space to reroll
+#     log_message $log_path "[timestamp] Sending space key to tmux."
+#     exec tmux send-keys -t moria_session " " C-m
+# 
+#     # Increment the failed attempts counter
+#     incr $failed_attempts
+# }
+
+# Initialize counters for failed attempts and start time
+set failed_attempts 0
+set start_time [clock seconds]
+
+# Loop to keep rerolling until the desired stat is found
+while {1} {
+    set failed_attempts [reroll $log_path $failed_attempts]
+    if {$failed_attempts == 1} {
+        # Stop the loop if the value is found
+        break
+    }
+    # Small delay to allow Moria to render the new roll
+    sleep 0.3
+}
+
+# Calculate the time taken in minutes and seconds
+set elapsed_time [expr {[clock seconds] - $start_time}]
+set minutes [expr {$elapsed_time / 60}]
+set seconds [expr {$elapsed_time % 60}]
+
+# Final output
+send_user "\nStopped at INT value of '18/19' found\n"
+send_user "Failed attempts: $failed_attempts, took $minutes min $seconds sec.\n"
+

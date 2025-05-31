@@ -1,0 +1,85 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+
+IBM Cognos Console Management Quick Notes
+========================================
+
+1. **Important Files**:
+   - **cogstartup.xml**: Main configuration file for the Cognos server.
+   - **cogserver.xml**: Contains details for the Cognos services (like dispatcher and content manager).
+   - **cogstartup.log**: Log file for Cognos service startup.
+   - **logs/**: Folder that stores all Cognos log files.
+   - **configuration/**: Directory for configuration files (e.g., dispatcher, content manager).
+   - **server.conf**: Main configuration file for environment settings and ports.
+
+2. **Log Files**:
+   - **cogserver.log**: Main server log (all server-side events).
+   - **dispatcher.log**: Logs related to dispatcher activity (e.g., client requests).
+   - **contentmanager.log**: Logs for the content manager services (e.g., authentication and user activity).
+   - **audit.log**: Contains audit trail logs for tracking user interactions.
+
+3. **Interpreting Log Files**:
+   - **Timestamp Format**: Most logs are timestamped in `yyyy-mm-dd hh:mm:ss` format for easy tracking.
+   - **Error Levels**: 
+     - **ERROR**: Critical issues requiring immediate attention.
+     - **WARN**: Warnings that may require future attention.
+     - **INFO**: Informational messages about server activities.
+     - **DEBUG**: Detailed debugging information, often for troubleshooting.
+   - **Common Errors**:
+     - **504 Gateway Timeout**: Dispatcher unable to connect to the Content Manager. Check network/firewall configurations.
+     - **Server not running**: Typically in `cogserver.log`. Check if the service is started using `ps aux | grep cognos`.
+
+4. **Dump and Lock Files**:
+   - **.dump files**: Generated during crashes or unhandled exceptions. Analyze them with tools like `gdb` or review them for JVM stack traces.
+   - **.lock files**: Created when Cognos services are started. Prevent multiple instances of services running simultaneously. Delete carefully if you are sure no service is active.
+   - **Location**: Usually found in `/opt/ibm/cognos/cogstartup/` or `/logs/`.
+
+5. **Common Troubleshooting**:
+   - **Service not starting**: Check `cogserver.log` for any initialization errors. Ensure that no `.lock` files remain from previous sessions.
+   - **Performance Issues**: Inspect `dispatcher.log` for high request times. Look for database connection issues in `contentmanager.log`.
+   - **Memory Issues**: Check `server.conf` for allocated heap size (e.g., `-Xmx` value).
+   - **License Errors**: Verify the correct license file is present in the configuration directory. License validation errors are typically logged in `cogserver.log`.
+
+6. **Starting and Stopping Cognos**:
+   - Start: `./cogstartup.sh start`
+   - Stop: `./cogstartup.sh stop`
+   - Restart: `./cogstartup.sh restart`
+   - Monitor: `tail -f logs/cogserver.log`
+   - Check service status: `ps aux | grep cognos`
+
+7. **Clearing Cache**:
+   - Clear cache for troubleshooting: `rm -rf /logs/*` (be cautious, clearing logs may remove diagnostic data).
+   - Reset dispatcher cache: `./cogstartup.sh reset-dispatcher`
+
+8. **Backup and Restore**:
+   - **Backup Configuration**: `cp /configuration/* /backup/`
+   - **Restore**: Copy backed-up files into `/configuration/` and restart Cognos services.
+   - **Backup Database**: Use Cognos deployment manager to create backups of report definitions and data sources.
+
+9. **Configuration Tuning**:
+   - **Increase JVM Heap Size**: Modify `-Xmx` and `-Xms` parameters in `server.conf` for better memory handling.
+   - **Dispatcher Thread Count**: Increase `num_dispatcher_threads` in `cogserver.xml` for handling high request loads.
+   - **Connection Pooling**: Adjust `max_connections` in `cogserver.xml` to handle more concurrent connections.
+
+10. **Security and Permissions**:
+   - **Authentication Logs**: Check `contentmanager.log` for failed login attempts.
+   - **Permission Errors**: Review `dispatcher.log` for any access control issues (e.g., user not authorized).
+   - **SSL Configuration**: Check the SSL settings in `cogserver.xml` and `server.conf` for HTTPS communication issues.
+
+11. **Running Cognos in Debug Mode**:
+   - Debugging mode can be enabled by setting `DEBUG=true` in `server.conf` to log detailed information.
+   - Enable detailed dispatcher logs: `set DEBUG=true` in `dispatcher.conf`.
+   - Review logs for every request to analyze performance bottlenecks.
+
+12. **Important Directories**:
+   - **/logs/**: Stores logs for all services (dispatcher, content manager).
+   - **/configuration/**: Configuration files for dispatchers and content managers.
+   - **/data/**: Stores report data, cached information, and output files.
+   - **/temp/**: Temporary files generated during report execution and job processing.
+
+EOF
+) | less -R

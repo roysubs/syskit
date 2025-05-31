@@ -1,0 +1,214 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+
+# Surfshark VPN on Headless Debian
+
+We have to use the legacy Surfshark guide which will install `surfshark-vpn`. This is a little different from the gui based `surfshark` tool (the gui version can also be interacted with from the console, but it won't work if there is no gui, so don't install it for headless Linux systems).
+
+**Prerequisites:**
+
+* A headless Debian system (accessed via SSH or similar).
+* An active Surfshark subscription.
+
+**Installation (using APT repository):**
+
+Follow the guide here:
+`https://support.surfshark.com/hc/en-us/articles/360017418334-How-to-set-up-Surfshark-VPN-on-Linux-Legacy-version`
+
+Right-click on the link in step 1 to get the latest download link (to download the .deb installer)
+`sudo wget <link>`
+`sudo dpkg -i <deb-package>`
+
+The above will install the surfshark apt repository
+
+`sudo apt update`
+`sudo apt install surfshark-vpn`
+
+**Start Surfshark:**
+
+`sudo surfshark-vpn`
+
+
+# Logging In:
+```bash
+surfshark-vpn login
+# Follow the prompts to enter your email and password or authenticate via the website.
+
+# Connecting to a Surfshark Server:
+# List available servers (optional)
+surfshark-vpn server list
+
+# Connect to the fastest server
+surfshark-vpn connect
+
+# Connect to a specific country (e.g., US)
+surfshark-vpn connect US
+
+# Connect to a specific city (e.g., New York)
+surfshark-vpn connect New York
+
+# Connect using a specific server code (from 'server list')
+surfshark-vpn connect us-nyc-c01
+```
+
+# Checking Connection Status:
+```bash
+surfshark status
+
+# Disconnecting:
+surfshark disconnect
+```
+
+# Other Useful Commands:
+```bash
+# Enable the Kill Switch (blocks internet if VPN disconnects)
+surfshark killswitch on
+
+# Disable the Kill Switch
+surfshark killswitch off
+
+# Connect to a MultiHop location (e.g., entry in NL, exit in US)
+surfshark connect --multihop NL US
+
+# List available MultiHop locations
+surfshark multihop list
+
+# Log out of the Surfshark client
+surfshark logout
+Integrating with qBittorrent-nox (Recommended):
+```
+
+To ensure qBittorrent-nox traffic is only routed through the VPN, you can bind it to the VPN interface.
+
+Identify the VPN Interface: After connecting to Surfshark, find the VPN interface name (e.g., tun0, wg0) using:
+
+Bash
+
+ip a
+Look for an interface with an IP address in a private range (like 10.x.x.x) and a name possibly containing "tun" or "wg".
+
+Edit qBittorrent Configuration: Open the qBittorrent configuration file (usually at ~/.config/qBittorrent/qBittorrent.conf) using a text editor:
+
+Bash
+
+nano ~/.config/qBittorrent/qBittorrent.conf
+Find or Add BindAddress: Locate the [Network] section and find the BindAddress setting. If it doesn't exist, add it:
+
+Ini, TOML
+
+[Network]
+BindAddress=tun0  # Replace 'tun0' with your actual VPN interface name
+Save and Restart qBittorrent-nox: Save the configuration file and restart the qBittorrent-nox service:
+
+Bash
+
+sudo systemctl restart qbittorrent-nox
+Verifying the VPN Connection:
+
+Check your external IP address: Use curl ifconfig.me in the terminal. It should show the IP address of the Surfshark server, not your actual IP.
+Use Surfshark's IP and DNS leak test: Visit the official Surfshark website and look for their IP leak and DNS leak test tools to ensure your connection is secure.
+Important Notes for Headless Systems:
+
+All interactions with Surfshark will be through the command line.
+Ensure you are using the surfshark-cli package, not a GUI version.
+Binding qBittorrent-nox to the VPN interface is a crucial step for headless systems to prevent leaks if the VPN connection drops.
+This file provides a quick reference for managing your Surfshark VPN connection on your headless Debian system. Remember to consult the official Surfshark documentation for the most up-to-date information and advanced configurations.
+
+1. Check Connection Status and Server:
+
+The most direct command to see if you're connected and which server you're using is:
+
+Bash
+
+sudo surfshark-vpn status
+This command should output information like:
+
+Status: Connected or Disconnected
+Server: The specific Surfshark server you are connected to (e.g., "no-osl-c01").
+Protocol: The VPN protocol being used (likely OpenVPN).
+Your new IP address: The IP address assigned by Surfshark.
+2. Verify External IP Address:
+
+To confirm your traffic is going through the VPN in Norway, check your external IP address:
+
+Bash
+
+curl ifconfig.me
+The IP address returned should be an IP address located in Norway, different from your original IP address.
+
+3. Check if Surfshark Starts on Reboot (Systemd Service):
+
+The surfshark-vpn client might have set up a systemd service to start on boot. You can check this using:
+
+Bash
+
+sudo systemctl is-enabled surfshark-vpn.service
+If it outputs enabled, the service is configured to start on boot.
+If it outputs disabled, it won't start automatically.
+You can also check the status of the service:
+
+Bash
+
+sudo systemctl status surfshark-vpn.service
+This will show you if the service is currently running, any recent logs, and if there were any errors.
+
+4. Check Running Processes:
+
+You can see if the surfshark-vpn process is running using:
+
+Bash
+
+ps aux | grep surfshark-vpn
+This will list any processes that contain "surfshark-vpn" in their name. You should see at least one process related to the VPN connection.
+
+5. Check Network Interfaces:
+
+When a VPN connection is active, a new network interface is usually created (often named tun0). You can list your network interfaces with:
+
+Bash
+
+ip a
+Look for an interface with an IP address in a private range (like 10.x.x.x or 172.x.x.x) and a name that might include tun. This indicates the VPN tunnel.
+
+6. Check DNS Servers:
+
+To ensure your DNS requests are also going through Surfshark and not your default ISP, you can check your DNS server settings. A common way to do this is:
+
+Bash
+
+resolvectl status | grep "Current DNS Server"
+The output should show DNS servers provided by Surfshark. Alternatively, you can use a tool like dig:
+
+Bash
+
+dig +short myip.opendns.com @resolver1.opendns.com
+Then, while connected to Surfshark, run:
+
+Bash
+
+dig +short whoami.akamai.net @208.67.222.222 # Using OpenDNS server
+The result should not reveal your actual location. For a more comprehensive DNS leak test, you can use online tools like https://www.dnsleaktest.com/ (visit this link from a browser on a different machine if your headless system doesn't have one).
+
+7. Surfshark Specific Commands (from the tutorial you provided):
+
+Remember the commands from the tutorial you shared:
+
+sudo surfshark-vpn help: Shows all available commands for the surfshark-vpn client.
+sudo surfshark-vpn down: Disconnects from the VPN.
+sudo surfshark-vpn attack: Quick-connects to your optimal location (might not be Norway if that wasn't your manually selected optimal).
+sudo surfshark-vpn forget: Logs you out of the client.
+sudo surfshark-vpn multi: Connects to a MultiHop location (if this feature is available in the legacy client).
+Important Considerations:
+
+Legacy Client: Keep in mind that the surfshark-vpn client might be an older version. Surfshark might recommend using their newer surfshark-cli client for the latest features and updates.
+Firewall: Consider configuring your firewall (like ufw or iptables) to only allow traffic through the VPN interface for enhanced security.
+Leak Tests: Regularly perform IP and DNS leak tests to ensure your anonymity.
+By using these commands, you should get a good understanding of your Surfshark VPN connection status on your headless Debian system.
+
+
+EOF
+) | less -R

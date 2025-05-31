@@ -1,0 +1,36 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+The difference in behavior you're noticing between SSH and Mosh is due to how each handles terminal input/output and the scroll buffer:
+
+SSH (via PowerShell): Typically, SSH uses the terminal emulator's default scroll buffer. When you scroll with the mouse wheel, it scrolls through the terminal's previous output, allowing you to see past history, regardless of whether it's input or output.
+
+Mosh (via WSL): Mosh is designed to be more interactive and focuses on maintaining a responsive connection, especially over unreliable networks. It tries to optimize terminal performance, which is why scrolling with the mouse wheel in Mosh acts like pressing the up arrow (scrolling through previous commands in the current session).
+
+Unfortunately, Mosh doesn't handle terminal scroll buffers in the same way SSH does. It essentially uses a simplified terminal interface optimized for low-latency interactions, which leads to this difference in behavior.
+
+To alter this behavior in Mosh and have it behave more like SSH, you could try the following:
+
+Use mosh with tmux or screen: Start a tmux or screen session inside your Mosh session. Both tmux and screen offer robust scrollback buffers, and you can scroll through previous output with the mouse wheel, even in Mosh.
+
+First, start Mosh:
+bash
+Copy code
+mosh user@hostname
+Then, start a tmux session:
+bash
+Copy code
+tmux
+You can now scroll through the output in the buffer by pressing Ctrl-b followed by [ to enter scroll mode in tmux. Use the arrow keys or the mouse wheel to scroll through the history.
+Use mosh with less or more: If you're dealing with large outputs, you can pipe the output through less or more to make it easier to scroll back through the output:
+
+bash
+Copy code
+some_command | less
+These approaches will give you a more familiar way to navigate through previous output while using Mosh.
+
+EOF
+) | less -R

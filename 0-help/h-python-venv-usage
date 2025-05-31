@@ -1,0 +1,120 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Python Virtual Environment (venv) Usage Guide
+
+Using virtual environments is highly recommended for Python projects to manage dependencies effectively and avoid conflicts between projects or with system-wide packages. This guide outlines the simplest steps to create, activate, and use a `venv`.
+
+## 1. Navigate to Your Project Directory
+
+First, open your terminal and change to the directory where your Python project and script(s) are located.
+
+```bash
+cd /path/to/your/project-directory
+```
+Replace `/path/to/your/project-directory` with the actual path to your project.
+
+## 2. Create the Virtual Environment
+
+Once inside your project directory, create the virtual environment. A common name for the environment directory is `venv` or `.venv`. We'll use `venv` here.
+
+```bash
+python3 -m venv venv
+```
+* `python3`: Specifies that you are using Python 3. If you use just `python`, ensure it points to a Python 3 interpreter.
+* `-m venv`: Tells Python to run the `venv` module.
+* The second `venv`: This is the name of the directory that will be created to store the virtual environment's files. You can choose a different name if you prefer.
+
+After this command, you will see a new folder named `venv` (or your chosen name) in your project directory.
+
+## 3. Activate the Virtual Environment
+
+To start using the virtual environment, you need to "activate" it. This modifies your current shell session to use the Python interpreter and packages installed within this specific `venv`.
+
+```bash
+source venv/bin/activate
+```
+* If you named your environment directory something other than `venv`, replace `venv` in the command above with your chosen name.
+* **For Windows users:** The activation command is slightly different:
+    ```bash
+    .\venv\Scripts\activate
+    ```
+
+After activation, your terminal prompt will usually change to indicate that the virtual environment is active (e.g., `(venv) your-user@your-host:~/path/to/project-directory$`).
+
+## 4. Install Required Packages
+
+With the virtual environment active, you can now install Python packages. These packages will be installed *only* within this environment, not system-wide. Use `pip` for installation.
+
+```bash
+pip install package1 package2 another-package
+```
+For example, if your script needs `requests` and `beautifulsoup4`:
+```bash
+pip install requests beautifulsoup4
+```
+This command should execute without warnings about system-wide installations because `pip` is operating within the active `venv`.
+
+## 5. Run Your Python Script
+
+Now that your environment is set up and the necessary packages are installed, you can run your Python script.
+
+```bash
+python your_script_name.py
+```
+Replace `your_script_name.py` with the actual name of your Python script.
+
+If your script is executable (e.g., via `chmod +x your_script_name.py`) and has a "shebang" line at the top (like `#!/usr/bin/env python3` or `#!/path/to/your/venv/bin/python`), you might be able to run it directly:
+
+```bash
+./your_script_name.py
+```
+When a `venv` is active, `#!/usr/bin/env python3` will correctly use the Python interpreter from the active `venv` because the `venv/bin` directory is prepended to your shell's `PATH`.
+
+## 6. Deactivate the Virtual Environment
+
+When you are finished working on your project or want to switch to another project/global environment, you can deactivate the current virtual environment.
+
+```bash
+deactivate
+```
+Your terminal prompt will return to its normal state.
+
+---
+
+## Quick Recap / TL;DR
+
+For a project located at `/path/to/your/project-directory` requiring `packageA` and `packageB`:
+
+1.  **Go to project:**
+    ```bash
+    cd /path/to/your/project-directory
+    ```
+2.  **Create venv** (only once per project):
+    ```bash
+    python3 -m venv venv
+    ```
+3.  **Activate venv** (each time you work on the project in a new terminal):
+    ```bash
+    source venv/bin/activate
+    ```
+4.  **Install packages** (once, or when adding/updating packages):
+    ```bash
+    pip install packageA packageB
+    ```
+5.  **Run script:**
+    ```bash
+    python your_script.py
+    ```
+6.  **Deactivate** (when done):
+    ```bash
+    deactivate
+    ```
+
+This workflow helps maintain clean, isolated, and reproducible Python environments for all your projects.
+
+EOF
+) | less -R

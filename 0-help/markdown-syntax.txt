@@ -1,0 +1,100 @@
+# mdcat Markdown Reference
+
+## 1. Titles & Headings
+
+# Heading 1
+## Heading 2
+### Heading 3
+#### Heading 4
+##### Heading 5
+###### Heading 6
+
+---
+
+## 2. Text Formatting
+
+- **Bold**: `**bold**` → **bold**
+- *Italic*: `*italic*` → *italic*
+- ~~Strikethrough~~: `~~strikethrough~~` → ~~strikethrough~~
+- `Inline Code`: `` `inline code` `` → `inline code`
+
+---
+
+## 3. Lists
+
+### Unordered List
+- Item 1
+- Item 2
+  - Sub-item 1
+  - Sub-item 2
+
+### Ordered List
+1. First item
+2. Second item
+   1. Sub-item 1
+   2. Sub-item 2
+
+---
+
+## 4. Code Blocks
+
+### Bash Example
+```bash
+echo "Hello, World!"
+ls -lah
+```
+
+### Python Example
+```python
+def greet():
+    print("Hello, World!")
+```
+
+---
+
+## 5. Blockquotes
+
+> This is a blockquote.
+> It can span multiple lines.
+
+---
+
+## 6. Links
+
+- [Example Website](https://example.com)
+- Plain URL: <https://example.com>
+
+---
+
+## 7. Images (Text Reference Only)
+
+![Alt Text](image.png)
+
+---
+
+## 8. Tables
+
+| Header 1 | Header 2 |
+|----------|----------|
+| Data 1   | Data 2   |
+| Data 3   | Data 4   |
+
+---
+
+## 9. Horizontal Rule
+
+---
+
+## 10. Footnotes
+
+This is a sentence with a footnote.[^1]
+
+[^1]: This is the footnote text.
+
+---
+
+## End of Reference
+
+This document provides a reference for how `mdcat` renders various Markdown elements in the terminal.
+
+

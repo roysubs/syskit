@@ -1,0 +1,42 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Microsoft Edge Keyboard Shortcuts and Tech Tricks
+
+## Keyboard Shortcuts
+
+- **Navigation**: Back: `Alt + Left Arrow` | Forward: `Alt + Right Arrow` | Reload: `Ctrl + R` or `F5` | Home: `Alt + Home`
+- **Tabs**: New Tab: `Ctrl + T` | Close Tab: `Ctrl + W` | Reopen Closed Tab: `Ctrl + Shift + T` | Next/Previous Tab: `Ctrl + Tab` / `Ctrl + Shift + Tab`
+- **Windows**: New Window: `Ctrl + N` | Private Window: `Ctrl + Shift + N` | Close Window: `Ctrl + Shift + W`
+- **Search**: Focus Search Bar: `Ctrl + L` or `Alt + D` | Search in Page: `Ctrl + F` | Next Result: `Enter` | Previous Result: `Shift + Enter`
+- **Zoom**: Zoom In/Out: `Ctrl + +` / `Ctrl + -` | Reset Zoom: `Ctrl + 0`
+- **Bookmarks/Favorites**: Bookmark Page: `Ctrl + D` | Open Favorites: `Ctrl + Shift + O`
+- **Developer Tools**: Toggle DevTools: `F12` or `Ctrl + Shift + I` | Inspect Element: `Ctrl + Shift + C` | Console: `Ctrl + Shift + J`
+- **Miscellaneous**: Fullscreen: `F11` | Open Downloads: `Ctrl + J` | Print: `Ctrl + P` | History: `Ctrl + H`
+
+## Tech Tricks
+
+- **Vertical Tabs**: Click on the tab icon in the top-left corner to enable vertical tabs for better organization.
+- **Collections**: Use `Ctrl + Shift + Y` to open Collections. Group links, text, and images for quick access.
+- **Sleeping Tabs**: Enable sleeping tabs in Settings > System to save resources on inactive tabs.
+- **Sync Across Devices**: Sign in with a Microsoft account to sync bookmarks, passwords, and settings across devices.
+- **Immersive Reader Mode**: Open articles in reader mode with `F9` or by clicking the Immersive Reader icon in the address bar.
+- **PDF Viewer**: Use built-in tools to annotate PDFs. Open PDF and click the pen icon to highlight or comment.
+- **Extensions**: Install from the Microsoft Edge Add-ons store or Chrome Web Store. Popular: `uBlock Origin` for ad-blocking, `Grammarly` for writing assistance.
+- **Quick Commands**: Use `Ctrl + Shift + U` to open the User Feedback menu quickly.
+- **Picture-in-Picture (PiP)**: Hover over a video, click the PiP icon, or right-click twice to select "Picture in Picture".
+
+## Troubleshooting Tips
+
+- **Clear Cache**: `Ctrl + Shift + Delete` > Choose "Cached images and files" > Clear Now.
+- **Reset Edge Settings**: Settings > Reset Settings > Restore settings to their default values.
+- **Disable Extensions**: Manage extensions at `edge://extensions/`.
+- **Startup Settings**: Configure startup behavior (open specific pages or continue where left off) in Settings > On startup.
+- **Hardware Acceleration**: Turn off/on in Settings > System and performance > "Use hardware acceleration when available".
+- **Keyboard Shortcut Legend**: Access a full list by searching "Keyboard shortcuts" in the Edge Help Center (via `Alt + Shift + ?`).
+
+EOF
+) | less -R

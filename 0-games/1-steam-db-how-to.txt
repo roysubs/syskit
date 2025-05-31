@@ -1,0 +1,6 @@
+1. Run steam-game-collect-info.py
+   Enter your Steam Web API Key:
+   Enter your SteamID64:
+   This will automate collecting every game you own into ~/steam-game.csv
+
+2. You can now search this using filters with steam-csv-search.py

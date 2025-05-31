@@ -1,0 +1,64 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Emacs Cheatsheet
+
+## Basics
+- Open Emacs: `emacs`
+- Save file: `C-x C-s`
+- Open file: `C-x C-f`
+- Exit Emacs: `C-x C-c`
+- Open help: `C-h`
+
+## Buffers and Windows
+- Switch buffer: `C-x b`
+- List buffers: `C-x C-b`
+- Kill buffer: `C-x k`
+- Switch window: `C-x o`
+- Split window horizontally: `C-x 2`
+- Split window vertically: `C-x 3`
+- Delete other windows: `C-x 1`
+
+## Editing
+- Undo: `C-/` or `C-x u`
+- Redo: `M-/`
+- Cut: `C-w`
+- Copy: `M-w`
+- Paste: `C-y`
+- Find text: `C-s`
+- Replace text: `M-%`
+
+## Navigation
+- Move to beginning of line: `C-a`
+- Move to end of line: `C-e`
+- Move to beginning of document: `M-<`
+- Move to end of document: `M->`
+- Move to next word: `M-f`
+- Move to previous word: `M-b`
+
+## Search and Replace
+- Search: `C-s` (forward), `C-r` (backward)
+- Query replace: `M-%`
+- Case-insensitive search: `C-s C-s`
+
+## File Operations
+- Open directory: `M-x dired`
+- Open recent file: `C-x C-r`
+- Revert file (discard changes): `M-x revert-buffer`
+
+## Help and Documentation
+- Open help: `C-h`
+- Describe key: `C-h k`
+- Describe function: `C-h f`
+- Describe variable: `C-h v`
+- Apropos (search functions, commands, etc.): `C-h a`
+
+## Customization
+- Enable line numbers: `M-x linum-mode`
+- Set font: `M-x set-frame-font`
+- Open Emacs tutorial: `C-h t`
+EOF
+) | less -R

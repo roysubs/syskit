@@ -1,0 +1,53 @@
+The qbittorrent-nox script in this folder installs and configures the headless qbittorrent-nox package.
+The other scripts are to interact with that from a Windows desktop. This involved setting up an
+association for magnet links on Windows so that they will be silently redirected to the Linux server
+running qbittorrent-nox, which can then be accessed graphically from it's webclient interface making
+for quite an elegant setup where the Linux server does all of the processing and downloading but can
+be managed remotely.
+
+
+Redirect Magnet Links on Windows to Linux server running qBittorrent.
+==========
+
+Setup Windows so that clicking on any magnet link in a browser will send that to the Linux server
+that is running qBittorrent.
+The scripts mentioned below are in the qbittorrent subdirectory in the current path.
+
+- Setup the registry to associate magnet links with a script.
+
+$regPath = "HKCU:\Software\Classes\magnet"
+Set-ItemProperty -Path $regPath -Name "(Default)" -Value "URL:Magnet Protocol"
+Set-ItemProperty -Path $regPath -Name "URL Protocol" -Value ""
+$regShellPath = "$regPath\shell\open\command"
+if (-not (Test-Path $regShellPath)) {
+    New-Item -Path $regShellPath -Force
+}
+
+- We use a VBScript as intermediary so that no PowerShell console window is created.
+
+- The magnet link is sent as a parameter to the VBScript which then sends it to the PowerShell script.
+
+# Authenticate with qBittorrent Web UI
+$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+$response = Invoke-WebRequest -Uri "$qbWebUIHost/api/v2/auth/login" -Method Post -Body @{
+    username = $username
+    password = $password
+} -SessionVariable session -ErrorAction Stop
+# Add the magnet link to qBittorrent (correct key is 'urls', not 'magnetLink')
+$response = Invoke-WebRequest -Uri "$qbWebUIHost/api/v2/torrents/add" -Method Post -Body @{
+    urls = $magnetLink
+} -WebSession $session -ErrorAction Stop
+ 
+Registry Modifications:
+HKCU\Software\Classes\magnet: This is the registry path where we associate the magnet protocol.
+Default: Sets the label for the magnet protocol.
+URL Protocol: Ensures the protocol is recognized by Windows.
+HKCU\Software\Classes\magnet\shell\open\command: This sets the command that will run when you click a magnet link.
+The command runs PowerShell, bypasses execution policy (if required), and executes the PowerShell script (send-magnet-to-qb.ps1) with the magnet link (%1) passed as an argument.
+
+Optional - Open Ports for Web UI
+==========
+The qBittorrent Web UI must be accessible remotely (if not already set up) by opening the necessary port
+on your Windows firewall (if applicable). For example, open port 8080 if it's not already open:
+
+New-NetFirewallRule -DisplayName "Allow qBittorrent Web UI" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow

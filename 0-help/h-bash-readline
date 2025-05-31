@@ -1,0 +1,115 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Bash Readline Keybindings
+
+Bash uses GNU Readline to manage command-line editing. There are two main editing modes:
+
+- **Emacs-style mode** (default: `set -o emacs`)
+- **Vi-style mode** (`set -o vi` to switch to vi-style mode)
+
+---
+
+## Emacs-style Keybindings
+
+| Keybinding   | Description                                      |
+|--------------|--------------------------------------------------|
+| Alt+d        | Delete word after the cursor (1)                 |
+| Ctrl+w       | Delete word before the cursor (2)                |
+| Ctrl+_       | Undo (so: Ctrl+Shift+- to get the _)             |
+| Ctrl+u       | Delete from cursor to beginning of line          |
+| Ctrl+k       | Delete from cursor to end of line                |
+| Ctrl+y       | Yank (paste) last killed text                    |
+| Ctrl+l       | Clear the screen                                 |
+| Ctrl+t       | Transpose characters                             |
+| Alt+t        | Transpose words (1)                              |
+| Ctrl+r       | Search command history backwards                 |
+| Ctrl+s       | Search command history forwards (may need config)|
+
+> (1) If Alt combinations don't work, try pressing Esc followed by the key.  
+> (2) Add Ctrl+Backspace to .inputrc with:   `"\C-h": backward-kill-word`
+
+## Emacs-style Keybindings that are mostly redundant on modern keyboards
+| Keybinding     | Description                                      |
+|----------------|--------------------------------------------------|
+| Ctrl+d (or Delete key)       | Delete character under cursor (exit if line empty) |
+| Ctrl+h (or Backspace key)     | Delete character before cursor  |
+| Ctrl+a (or Home)      | Move to the beginning of the line       |
+| Ctrl+e (or End)      | Move to the end of the line              |
+| Alt+f (or Ctrl+ArrowRight) | Move forward one word              |
+| Alt+b (or Ctrl+ArrowLeft)  | Move backward one word             |
+---
+
+## Vi-style Keybindings
+
+In vi mode, Bash behaves similarly to the vi editor, using:
+
+- Insert Mode for typing
+- Command Mode for movement and editing (use Esc to enter)
+
+### Movement Commands
+
+| Keybinding | Description                            |
+|------------|----------------------------------------|
+| h / l      | Move left / right                      |
+| w / b      | Move forward / backward one word       |
+| 0 / $      | Move to start / end of line            |
+| gg / G     | Move to beginning / end of history     |
+
+### Editing Commands
+
+| Keybinding | Description                            |
+|------------|----------------------------------------|
+| x          | Delete character under cursor          |
+| dw         | Delete word                            |
+| dd         | Delete entire line                     |
+| u          | Undo                                   |
+| p          | Paste (put)                            |
+| i / a      | Enter insert mode before / after cursor|
+| v          | Enter visual mode                      |
+| r<char>    | Replace character under cursor         |
+| yy         | Yank (copy) entire line                |
+
+---
+
+## Custom Keybindings (~/.inputrc)
+
+To define or override keybindings globally or per-user, use the `~/.inputrc` file.
+
+### Example: Remap Ctrl+Backspace to delete previous word
+
+    "\C-h": backward-kill-word
+
+### Example: Create shortcut for deleting entire line
+
+    "\C-x\C-k": kill-whole-line
+
+After editing `.inputrc`, reload with:
+
+    bind -f ~/.inputrc
+
+Or restart your terminal.
+
+---
+
+## Inspect and List Bindings
+
+Use the `bind` command to inspect or modify bindings:
+
+- `bind -P` — Show all functions and bindings
+- `bind -q function-name` — Show keys bound to a function
+- `bind -s` — List user-defined key sequences
+
+---
+
+## Summary
+
+- Emacs mode is the default; vi mode mimics vim.
+- Customise keybindings with `.inputrc`.
+- Use `bind` to explore or configure readline behavior.
+
+EOF
+) | less -R

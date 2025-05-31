@@ -1,0 +1,96 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Disk Creation, Formatting, Partitioning, and Mounting Guide
+==========================================================
+
+1. **Identify the New Disk**:
+   - List all the available disks and their partitions:
+     ```bash
+     lsblk
+     ```
+   - Identify the new disk (e.g., `/dev/sdb`) that you want to work with.
+
+2. **Create a Partition Table**:
+   - Open the disk with `fdisk` (replace `/dev/sdb` with your disk):
+     ```bash
+     sudo fdisk /dev/sdb
+     ```
+   - Inside `fdisk`, create a new partition table (choose `g` for GPT or `o` for MBR). Remember that MBR has a limit of 2 TB.
+
+3. **Create a Partition**:
+   - Create a new partition with `n`:
+     ```bash
+     n  # New partition
+     ```
+   - Choose partition number, starting and ending sectors (or press Enter to accept defaults).
+   - For example:
+     ```bash
+     n
+     1
+     2048
+     100%
+     ```
+
+4. **Change Partition Type** (optional):
+   - You can change the partition type if necessary (e.g., Linux filesystem):
+     ```bash
+     t
+     83  # Linux filesystem type
+     ```
+
+5. **Write the Changes**:
+   - Write the changes and exit `fdisk`:
+     ```bash
+     w
+     ```
+
+6. **Format the Partition**:
+   - Format the partition with a filesystem (e.g., ext4):
+     ```bash
+     sudo mkfs.ext4 /dev/sdb1
+     ```
+   - If using another filesystem (e.g., xfs):
+     ```bash
+     sudo mkfs.xfs /dev/sdb1
+     ```
+
+7. **Create a Mount Point**:
+   - Create a directory where the partition will be mounted:
+     ```bash
+     sudo mkdir /mnt/mydisk
+     ```
+
+8. **Mount the Partition**:
+   - Mount the partition to the directory:
+     ```bash
+     sudo mount /dev/sdb1 /mnt/mydisk
+     ```
+
+9. **Verify the Mount**:
+   - Verify that the partition is mounted correctly:
+     ```bash
+     df -h
+     ```
+
+10. **Add the Partition to `/etc/fstab`**:
+    - To ensure the partition is mounted on boot, add it to `/etc/fstab`:
+      ```bash
+      sudo nano /etc/fstab
+      ```
+    - Add the following line (adjust for your device and mount point):
+      ```bash
+      /dev/sdb1  /mnt/mydisk  ext4  defaults  0  2
+      ```
+
+11. **Unmount the Partition (if necessary)**:
+    - If you want to unmount the partition at any point:
+      ```bash
+      sudo umount /mnt/mydisk
+      ```
+
+EOF
+) | less -R

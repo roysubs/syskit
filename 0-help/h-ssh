@@ -1,0 +1,207 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+SSH Quick Notes
+===============
+
+- **Basic SSH Commands**:
+    - Connect to a remote server:
+      ```bash
+      ssh user@hostname_or_ip
+      ```
+      Example:
+      ```bash
+      ssh admin@192.168.1.10
+      ```
+
+    - Specify a custom port for SSH connection:
+      ```bash
+      ssh -p 2222 user@hostname_or_ip
+      ```
+      Example:
+      ```bash
+      ssh -p 2222 admin@192.168.1.10
+      ```
+
+    - Connect using a specific private key:
+      ```bash
+      ssh -i /path/to/private_key user@hostname_or_ip
+      ```
+      Example:
+      ```bash
+      ssh -i ~/.ssh/id_rsa admin@192.168.1.10
+      ```
+
+    - Run a command remotely:
+      ```bash
+      ssh user@hostname_or_ip "command_to_run"
+      ```
+      Example:
+      ```bash
+      ssh admin@192.168.1.10 "ls -l /var/www"
+      ```
+
+- **Generating SSH Keys**:
+    - Generate a new SSH key pair:
+      ```bash
+      ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
+      ```
+      This command creates a private key (`id_rsa`) and a public key (`id_rsa.pub`).
+
+    - Specify a different file for the key:
+      ```bash
+      ssh-keygen -t rsa -b 4096 -f ~/.ssh/my_custom_key -C "your_email@example.com"
+      ```
+
+    - View the public key:
+      ```bash
+      cat ~/.ssh/id_rsa.pub
+      ```
+
+    - Add SSH key to the SSH agent for automatic usage:
+      ```bash
+      eval "$(ssh-agent -s)"
+      ssh-add ~/.ssh/id_rsa
+      ```
+
+- **Copying Public Key to Remote Host**:
+    - Use `ssh-copy-id` to copy your public key to a remote server for passwordless authentication:
+      ```bash
+      ssh-copy-id user@hostname_or_ip
+      ```
+      Example:
+      ```bash
+      ssh-copy-id admin@192.168.1.10
+      ```
+
+- **SSH Config File**:
+    - Create or edit the SSH configuration file (`~/.ssh/config`) to simplify SSH commands.
+      Example configuration:
+      ```bash
+      Host myserver
+        HostName 192.168.1.10
+        User admin
+        Port 2222
+        IdentityFile ~/.ssh/id_rsa
+      ```
+
+    - Now, you can connect using:
+      ```bash
+      ssh myserver
+      ```
+
+- **Managing SSH Connections**:
+    - List current SSH sessions:
+      ```bash
+      ps aux | grep ssh
+      ```
+
+    - Terminate an SSH session:
+      ```bash
+      exit
+      ```
+
+- **SSH Agent**:
+    - Start SSH agent:
+      ```bash
+      eval "$(ssh-agent)"
+      ```
+
+    - Add key to the agent:
+      ```bash
+      ssh-add ~/.ssh/id_rsa
+      ```
+
+    - List loaded keys:
+      ```bash
+      ssh-add -l
+      ```
+
+- **Port Forwarding (Tunneling)**:
+    - Local port forwarding:
+      ```bash
+      ssh -L 8080:localhost:80 user@hostname_or_ip
+      ```
+      This will forward local port 8080 to port 80 on the remote host.
+
+    - Remote port forwarding:
+      ```bash
+      ssh -R 8080:localhost:80 user@hostname_or_ip
+      ```
+      This will forward remote port 8080 to port 80 on the local machine.
+
+- **SSH Multiplexing**:
+    - Enable multiplexing to reuse SSH connections for multiple sessions:
+      ```bash
+      Host *
+        ControlMaster auto
+        ControlPath ~/.ssh/cm_socket/%r@%h:%p
+        ControlPersist 10m
+      ```
+
+    - This configuration allows SSH to reuse existing connections instead of creating a new connection for every session.
+
+- **SSH Key Permissions**:
+    - Ensure correct permissions for your private key:
+      ```bash
+      chmod 600 ~/.ssh/id_rsa
+      ```
+
+    - Set correct permissions for the `.ssh` directory:
+      ```bash
+      chmod 700 ~/.ssh
+      ```
+
+- **Securing SSH**:
+    - Disable password-based logins in the `/etc/ssh/sshd_config` file:
+      ```bash
+      PasswordAuthentication no
+      ```
+      After editing, restart the SSH service:
+      ```bash
+      sudo systemctl restart ssh
+      ```
+
+    - Change the default SSH port (to enhance security):
+      ```bash
+      Port 2222
+      ```
+      Remember to update the firewall to allow the new port.
+
+- **Troubleshooting SSH**:
+    - Check SSH service status:
+      ```bash
+      sudo systemctl status ssh
+      ```
+
+    - Restart SSH service:
+      ```bash
+      sudo systemctl restart ssh
+      ```
+
+    - Verbose output for debugging SSH connections:
+      ```bash
+      ssh -v user@hostname_or_ip
+      ```
+
+    - Debug specific connection issues:
+      ```bash
+      ssh -vvv user@hostname_or_ip
+      ```
+
+- **SSH File Transfer**:
+    - Use `scp` (secure copy) to transfer files:
+      ```bash
+      scp file.txt user@hostname:/path/to/destination
+      ```
+
+    - Use `rsync` over SSH for more efficient file transfers:
+      ```bash
+      rsync -avz -e ssh file.txt user@hostname:/path/to/destination
+      ```
+
+EOF
+) | less -R

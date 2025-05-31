@@ -1,0 +1,136 @@
+#!/bin/bash
+if ! command -v mdcat >/dev/null 2>&1; then echo "Install mdcat to render markdown."; fi
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(($(tput cols) - 5)); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Bash Bootstrap Help
+=========================
+
+- This help file explains the syskit repo and how to rapidly bootstrap any Linux system:
+
+    - Run `source ./update-bashrc-vimrc-paths.sh` in the root of `syskit`
+
+
+    - Essential `.bashrc` / `.vimrc`, `.inputrc` configuration (all idempotent and non-invasive)
+    - Menu guided new system setup to get up and running fast
+    - Idempotent Docker logic, and sane interactive defaults with various projects
+    - Git integration with SSH and clean setup scripts to connect to GitHub
+    - Help system for many aspects of Linux and common applications
+    - Deploying clean, idempotent helper scripts: `a`, `b`, `def`, `dk`, `g`, `h`, `z`, etc
+
+---
+
+▶ Purpose:
+    A reusable, modular bootstrap layer for:
+
+---
+
+Bootstrap Process
+=========================
+
+1. 🏁 Initial Setup
+    - Custom .bashrc setup provides the very useful `h` and `def` functions
+    - Ensures required tools are installed: `curl`, `git`, `vim`, `mdcat`, etc (wip)
+    - Ensures Bash and Readline behave consistently across sessions
+    - Adds 0-scripts to PATH for access to core scripts: `a`, `b`, `d`, `f`, `g`, `z`, `dk`, etc
+
+2. 🐚 .bashrc and Shell Environment
+    - Adds aliases, functions, and helper logic cleanly
+    - Idempotent: avoids duplication if `.bashrc` already contains a block
+    - Preserves any existing user logic
+
+3. 🎯 .inputrc and Navigation
+    - Adds readline keybindings:
+        - `Ctrl-k/j`: Vim-style up/down history
+        - `Ctrl-Backspace`: Delete previous word
+        - `Ctrl-Home` / `Ctrl-End`: Jump to start/end of line
+    - Detects terminal quirks (e.g. tmux) and avoids all keybinding conflicts
+
+4. 🔧 Wrapper Scripts to make essential tools more accessible
+    - `h` in .bashrc: Custom history manager with fuzzy search, timestamps, grep, and rerun
+    - `def` in .bashrc: See definitions of functions, aliases, shell commands
+    - `a`: Auto wrapper for app packaging (e.g. apt, apk, dnf, zypper, etc (wip: AppImage, pipx, Nix, brew?)
+    - `dk`: Wrapper for `docker`, provides a lot of useful shortcuts
+    - `g`: Git wrapper for common workflows, push protection, old-version retrieval
+    - `z`: Smart archive tool: extract/compress across formats
+
+5. 🐳 Docker Environment
+    - Checks for Docker/Docker Compose, installs if missing
+    - Ensures proper permissions (adds user to docker group)
+    - `dk-monitor.py`: real-time stats + I/O + sampling  
+    - Adds pre-deploy safety logic:
+        - Detects port conflicts
+        - Detects already-running containers using same image
+        - Warns if containers with the same names exist
+        - Fully idempotent: safe to re-run bootstrap anytime
+
+6. 🧠 Git Setup
+    - `g acp`: Add/commit/push with optional gitleaks scan
+    - `g pl`: Pull with inspection, backup, and diff before merge (wip)
+    - SSH setup helper: generates SSH key, prints copy-paste GitHub instructions
+    - `.gitconfig` customization with sane diff, log, and push defaults
+
+7. 💾 Vim Setup
+    - Creates a well-commented `.vimrc`, with no overriding of core vim keybindings
+    - Sets these up in both `vim` and `nvim` (`neovim`)
+    - `h-vim` help file explains usage, visual modes, and power tips
+
+8. 📁 Config Layout
+    - `~/syskit/`, `~/syskit/0-scriptsbin/`, and `~/.config/`
+    - Project-local `.env` and `config.sh` conventions supported
+    - Standard layout:  
+        ├── ~/syskit/              ← project root  
+        ├── ~/syskit/0-new-system  ← new system essentials  
+        ├── ~/syskit/0-scripts     ← Main body of scripts  
+        ├── ~/syskit/0-docker      ← Container setup scripts  
+        └── ~/syskit/0-help        ← Custom help files  
+
+---
+
+Re-running bootstrap
+=========================
+🌀 Fully Idempotent:
+    - Script detects and skips existing entries in `.bashrc`, `.inputrc`, etc
+    - Will never break your shell or duplicate entries
+    - If rerun, will:
+        - Print summary of what it would do
+        - Ask for confirmation before overwriting anything
+        - Offer `diff` style output of any proposed changes
+
+---
+
+Optional Add-ons
+=========================
+
+✅ Media-Stack containers (qBittorrent / Sonarr / Radarr)  
+    - Manage as a single container stack  
+    - Uses `wireguard` VPN container (significantly lower footprint than OpenVPN)  
+    - Media folder paths standardized under `/mnt/media` via bind mount  
+    - Media config paths standardized under `~/.config/media-stack`  
+    - Generic Wireguard setup with work with any VPN vendor  
+
+✅ Backup integration  
+    - rsync + rclone hooks available (wip)  
+    - Optional encryption with gocryptfs (wip)  
+    - Syncs project files, dotfiles, media, etc
+
+✅ Sync + Sharing  
+    - Syncthing as local or container install  
+    - Filebrowser for web UI access to `media-stack`
+
+✅ Monitoring Container Stack  
+    - `monitoring-stack` : grafana + prometheus instannt setup  
+    - CPU, mem, network, and container states  
+
+---
+
+See also:  
+    - `h-vim`           ← Vim quickstart  
+    - `h-git`           ← Git workflows and SSH key setup  
+    - `h-docker-stack`  ← Media + VPN stack deploy  
+    - `h-ssh`           ← SSH key, agent, known_hosts explained  
+    - `h-inputrc`       ← Terminal keys and .inputrc behavior  
+
+EOF
+) | less -R
+

@@ -1,0 +1,118 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Understanding `[ ]` and `[[ ]]` in Shell Scripting
+
+This document explores the differences between `[ ]` and `[[ ]]` in shell scripting, details the test types available for each, and provides examples for better understanding. These constructs are used for testing conditions in shell scripts.
+
+---
+
+## **Differences Between `[ ]` and `[[ ]]`**
+
+| Feature                 | `[ ]`                              | `[[ ]]`                               |
+|-------------------------|------------------------------------|---------------------------------------|
+| **Purpose**             | POSIX-compliant test command      | Bash-specific advanced test           |
+| **String Comparison**   | Requires quoting variables        | Handles unquoted variables safely     |
+| **Logical Operators**   | Uses `-a`, `-o` (deprecated)      | Uses `&&`, `||`                       |
+| **Pattern Matching**    | Not supported                     | Supports `=~` for regex               |
+| **Complex Conditions**  | Less readable                     | Easier grouping with `&&`, `||`       |
+
+---
+
+## **Test Types for `[ ]` and `[[ ]]`**
+
+### **File Tests:**
+These tests check the properties of files or directories.
+
+| Test           | Description                           | Example                       |
+|----------------|---------------------------------------|-------------------------------|
+| `-f`           | Is a regular file                    | `[ -f "file.txt" ]`          |
+| `-d`           | Is a directory                       | `[ -d "mydir" ]`             |
+| `-e`           | File exists                          | `[ -e "path" ]`              |
+| `-r`           | File is readable                     | `[ -r "file.txt" ]`          |
+| `-w`           | File is writable                     | `[ -w "file.txt" ]`          |
+| `-x`           | File is executable                   | `[ -x "script.sh" ]`         |
+| `-s`           | File exists and is non-empty         | `[ -s "file.txt" ]`          |
+
+---
+
+### **String Tests:**
+These tests are used to check the properties of strings.
+
+| Test           | Description                           | Example                       |
+|----------------|---------------------------------------|-------------------------------|
+| `-z`           | String is empty                      | `[ -z "$var" ]`              |
+| `-n`           | String is not empty                  | `[ -n "$var" ]`              |
+| `str1 = str2`  | Strings are equal                    | `[ "$str1" = "$str2" ]`    |
+| `str1 != str2` | Strings are not equal                | `[ "$str1" != "$str2" ]`   |
+| `str1 =~ regex`| String matches regex (only `[[ ]]`)  | `[[ "$str1" =~ ^[0-9]+$ ]]` |
+
+---
+
+### **Numeric Tests:**
+These tests are used to compare integers.
+
+| Test           | Description                           | Example                       |
+|----------------|---------------------------------------|-------------------------------|
+| `int1 -eq int2`| Equal                                | `[ "$a" -eq "$b" ]`        |
+| `int1 -ne int2`| Not equal                            | `[ "$a" -ne "$b" ]`        |
+| `int1 -gt int2`| Greater than                         | `[ "$a" -gt "$b" ]`        |
+| `int1 -lt int2`| Less than                            | `[ "$a" -lt "$b" ]`        |
+| `int1 -ge int2`| Greater than or equal                | `[ "$a" -ge "$b" ]`        |
+| `int1 -le int2`| Less than or equal                   | `[ "$a" -le "$b" ]`        |
+
+---
+
+### **Logical Operators:**
+Logical operators are used to combine conditions. The `[[ ]]` syntax provides more readable alternatives with `&&` and `||`.
+
+| Operator       | Description                           | Example                       |
+|----------------|---------------------------------------|-------------------------------|
+| `&&`           | Logical AND                          | `[[ -f "file1" && -f "file2" ]]` |
+| `||`           | Logical OR                           | `[[ -f "file1" || -d "dir" ]]`  |
+
+---
+
+### **Examples of Logical Operators:**
+
+#### **Using AND (`&&`)**
+```bash
+if [[ -f "config.txt" && -r "config.txt" ]]; then
+  echo "Config file exists and is readable."
+else
+  echo "Config file is missing or not readable."
+fi
+```
+
+#### **Using OR (`||`)**
+```bash
+if [[ -f "backup.tar" || -d "backups" ]]; then
+  echo "Backup file or directory exists."
+else
+  echo "No backup found."
+fi
+```
+
+#### **Combining AND and OR:**
+```bash
+if [[ (-f "data.csv" && -s "data.csv") || -d "data" ]]; then
+  echo "Data is ready."
+else
+  echo "Data is missing or incomplete."
+fi
+```
+
+---
+
+## **Key Notes:**
+1. Use `[[ ]]` when working in Bash for additional features like regex matching, advanced logical operators, and safe variable handling.
+2. Always quote variables inside `[ ]` to avoid errors from spaces or empty values.
+3. Use `-a` and `-o` in `[ ]` sparingly; they are deprecated in favor of `&&` and `||`.
+
+If you need further clarification or examples, feel free to ask!
+
+EOF
+) | less -R
