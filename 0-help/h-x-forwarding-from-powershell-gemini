@@ -1,0 +1,105 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# X11 Forwarding from PowerShell to Linux: The Empty DISPLAY Mystery Solved
+
+This document outlines a common problem encountered when attempting X11 forwarding from PowerShell on Windows (using the built-in OpenSSH client) to a Linux server, and its solution.
+
+## The Problem
+
+Users often find that X11 forwarding fails when connecting from a PowerShell terminal on Windows to a Linux server, even when all standard configurations seem correct.
+
+**Symptoms:**
+
+1.  **Client Command:** An attempt is made to connect with X11 forwarding enabled:
+    ```powershell
+    ssh -X your_user@your_linux_server_ip
+    # or
+    ssh -Y your_user@your_linux_server_ip
+    ```
+2.  **X Server on Windows:** An X server (e.g., VcXsrv, Xming) is running on the Windows machine, often configured with "Disable access control" checked to be more permissive.
+3.  **Server Configuration (`/etc/ssh/sshd_config` on Linux):** The SSH daemon on the Linux server is correctly configured with:
+    * `X11Forwarding yes`
+    * `X11UseLocalhost yes` (or commented out, defaulting to `yes`)
+4.  **Failure:** X applications launched on the Linux server (within the PowerShell SSH session) fail with an error like:
+    ```
+    Error: Can't open display:
+    ```
+5.  **Empty `$DISPLAY` on Server:** Checking the `DISPLAY` environment variable on the Linux server within this SSH session reveals it's empty or not set:
+    ```bash
+    # On the Linux server, in the SSH session from PowerShell
+    echo $DISPLAY
+    # (Output is blank)
+    ```
+6.  **Client-Side SSH Logs (`ssh -vvv`):** The verbose client logs from PowerShell *do* indicate that an X11 forwarding request is made, often showing a line similar to:
+    ```
+    debug1: X11 forwarding requested but DISPLAY not set
+    ```
+7.  **Server-Side `sshd` Logs:** Even with `LogLevel DEBUG3` in `/etc/ssh/sshd_config`, the server logs for connections from the PowerShell client show no X11-specific processing (no messages about accepting/rejecting X11, calling `xauth`, or setting up an X11 display like `localhost:10.0`). The server simply doesn't seem to act on the X11 request from this specific client.
+8.  **Contrasting Behavior with WSL:** X11 forwarding typically works as expected when connecting from Windows Subsystem for Linux (WSL) on the same Windows machine to the same Linux server. In such cases, `$DISPLAY` on the server is correctly set (e.g., to `localhost:10.0` or `localhost:11.0`).
+
+## The Solution
+
+The solution is to **manually set the `DISPLAY` environment variable locally in the PowerShell session on the Windows machine *before* initiating the SSH connection.**
+
+**Steps in PowerShell:**
+
+1.  **Set the local `DISPLAY` environment variable:**
+    This tells your local Windows environment (and subsequently the Windows `ssh.exe` client) where your X server (like VcXsrv) is listening. VcXsrv typically runs as display `:0` on `localhost` (TCP port 6000).
+    ```powershell
+    $env:DISPLAY = "127.0.0.1:0.0"
+    ```
+    Alternatively, `localhost:0.0` can also be used:
+    ```powershell
+    $env:DISPLAY = "localhost:0.0"
+    ```
+
+2.  **Connect via SSH with X11 forwarding:**
+    ```powershell
+    ssh -Y your_user@your_linux_server_ip
+    # Using -Y (trusted X11 forwarding) is often more reliable.
+    # -X (untrusted) can also be tried.
+    ```
+
+3.  **Test X applications:**
+    Once logged in, `$DISPLAY` on the server should now be set (e.g., `localhost:10.0`), and X applications should launch.
+
+## Why This Solution Works
+
+The core of this issue lies in a specific behavior of the OpenSSH client implementation for Windows (`ssh.exe` that PowerShell uses):
+
+1.  **Client Precondition:** Unlike OpenSSH clients on Linux or macOS (or within WSL), the native Windows OpenSSH client appears to require the *local* `DISPLAY` environment variable (`$env:DISPLAY` in PowerShell) to be set as a precondition for it to fully and correctly negotiate the X11 forwarding channel with the remote `sshd` server.
+
+2.  **Impact of Missing Local `DISPLAY`:**
+    * If `$env:DISPLAY` is not set in PowerShell before the SSH connection:
+        * The Windows `ssh.exe` client, despite being given the `-X` or `-Y` flag, seems to send an incomplete or subtly different X11 forwarding request, or it may not follow through with all necessary protocol steps to establish the X11 channel.
+        * The `sshd` server on the Linux machine, consequently, does not fully recognize or process this X11 request from the Windows client. As a result, `sshd` does not proceed to set up its end of the X11 forwarding mechanism.
+        * This explains why the `$DISPLAY` variable remained empty in the remote session on the Linux server and why the server's `DEBUG3` logs showed no X11-specific activity (like calls to `xauth` or allocation of `localhost:10.0`). The server wasn't explicitly rejecting X11; it was acting as if a complete X11 setup request wasn't made.
+
+3.  **Effect of Setting Local `DISPLAY`:**
+    * When `$env:DISPLAY = "127.0.0.1:0.0"` is executed in PowerShell:
+        * The Windows `ssh.exe` client now perceives that a local X server is available and configured.
+        * This enables `ssh.exe` to make a fully valid and complete X11 forwarding request to the `sshd` server.
+        * The `sshd` server on the Linux machine, now receiving the X11 request in the expected manner from this client:
+            1.  Engages its X11 forwarding procedures.
+            2.  Typically calls the `xauth` utility to manage X11 cookies for the session.
+            3.  Allocates a proxy X display on the server (e.g., `localhost:10.0`, `localhost:11.0`, etc.).
+            4.  Sets the `$DISPLAY` environment variable in the remote SSH session on the Linux server to point to this proxy display.
+        * Now, X applications launched on the Linux server use this server-side `$DISPLAY`. Their graphical output is sent to the `sshd` proxy display, which `sshd` then tunnels over the encrypted SSH connection back to the Windows `ssh.exe` client.
+        * The Windows `ssh.exe` client, having received the X11 traffic, then uses the information from the local `$env:DISPLAY` variable (`127.0.0.1:0.0`) to correctly forward this traffic to the running VcXsrv instance on the Windows machine.
+
+## Bonus: Improved `xeyes` Behavior
+
+An interesting observation was that when X11 forwarding is established using this PowerShell method (with `$env:DISPLAY` set), X applications like `xeyes` might exhibit "whole screen" mouse tracking when VcXsrv is used in "multiple windows" mode with "Disable access control" enabled. This is often considered the "correct" or more traditional behavior for `xeyes`.
+
+* **Reason:** This enhanced behavior is likely due to the more direct X11 forwarding path:
+    `Linux App -> Linux sshd -> Windows ssh.exe -> VcXsrv (running directly on Windows desktop)`
+* This direct path allows VcXsrv to provide a more integrated X environment. X applications forwarded this way may get broader access to desktop input events managed by VcXsrv, as opposed to X11 forwarding via WSL. WSL often uses an intermediary X server or compositor (like WSLg) which might provide a more sandboxed environment for each X application, potentially limiting mouse event scope to individual application windows.
+
+This solution highlights a crucial operational difference in the OpenSSH client for Windows compared to its Linux counterparts.
+
+EOF
+) | less -R

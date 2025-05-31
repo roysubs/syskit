@@ -1,0 +1,169 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# X11 Forwarding from PowerShell to Linux - Problem and Solution
+
+## Problem Description
+
+When attempting X11 forwarding from Windows PowerShell to a Linux server, applications fail to open with the error:
+
+```
+Error: Can't open display:
+```
+
+However, the same X11 forwarding works perfectly when connecting from WSL-Ubuntu to the same Linux server using identical commands.
+
+## Root Cause
+
+The issue stems from fundamental differences between PowerShell's Windows OpenSSH client and WSL's Linux OpenSSH client:
+
+### PowerShell (Windows OpenSSH)
+- Uses Win32-OpenSSH implementation
+- Requires manual DISPLAY environment variable configuration
+- Has known bugs in X11 forwarding implementation
+- Does not automatically set DISPLAY variable during SSH connection
+
+### WSL (Linux OpenSSH)
+- Uses standard Linux OpenSSH implementation
+- Automatically handles DISPLAY variable setting
+- Has mature, well-tested X11 forwarding code
+- Works "out of the box" with X servers
+
+## Prerequisites
+
+Before attempting the solution, ensure you have:
+
+1. **VcXsrv** (or similar X server) running on Windows
+2. **VcXsrv Configuration:**
+   - Display number: 0
+   - "Disable access control" enabled
+   - Listening on localhost/127.0.0.1
+
+3. **Linux Server Configuration:**
+   - OpenSSH server installed
+   - X11Forwarding enabled in `/etc/ssh/sshd_config`:
+     ```
+     X11Forwarding yes
+     ```
+
+4. **Windows OpenSSH Version:**
+   - Version 8.1p1 or later (check with `ssh -V`)
+
+## Solution
+
+### Primary Solution (Most Effective)
+
+Set the DISPLAY environment variable in PowerShell before connecting:
+
+```powershell
+$env:DISPLAY = "127.0.0.1:0.0"
+ssh -Y boss@your-server-ip
+```
+
+### Alternative DISPLAY Formats
+
+If the primary solution doesn't work, try these variations:
+
+```powershell
+# Option 1: localhost format
+$env:DISPLAY = "localhost:0.0"
+ssh -Y boss@your-server-ip
+
+# Option 2: Different display number (if VcXsrv uses different display)
+$env:DISPLAY = "127.0.0.1:1.0"
+ssh -Y boss@your-server-ip
+```
+
+### Permanent Solution
+
+To avoid setting DISPLAY every time, set it permanently:
+
+```powershell
+# Set system-wide (requires PowerShell restart)
+setx DISPLAY "127.0.0.1:0.0"
+```
+
+After setting, restart PowerShell and connect normally:
+
+```powershell
+ssh -Y boss@your-server-ip
+```
+
+## Testing
+
+Once connected, test X11 forwarding with simple applications:
+
+```bash
+# Test with xeyes
+xeyes
+
+# Test with xclock
+xclock
+
+# Test with more complex applications
+gedit
+nautilus
+```
+
+## Debugging
+
+If issues persist, use verbose SSH output to diagnose:
+
+```powershell
+$env:DISPLAY = "127.0.0.1:0.0"
+ssh -vvv -Y boss@your-server-ip
+```
+
+Look for lines containing:
+- "X11 forwarding"
+- "DISPLAY"
+- "xauth"
+
+## Common Variations and Troubleshooting
+
+### VcXsrv Not Starting Properly
+- Ensure VcXsrv is running before SSH connection
+- Check Windows Firewall isn't blocking VcXsrv
+- Verify VcXsrv is listening on correct display number
+
+### Wrong Display Number
+- If using display :1 instead of :0, adjust DISPLAY accordingly:
+  ```powershell
+  $env:DISPLAY = "127.0.0.1:1.0"
+  ```
+
+### SSH Key vs Password Authentication
+- X11 forwarding works with both authentication methods
+- Ensure `-Y` (trusted) or `-X` (untrusted) flag is used
+
+## Why This Happens
+
+The core issue is architectural:
+
+1. **WSL Environment**: Provides complete Linux compatibility layer where X11 forwarding works as designed
+2. **Windows Environment**: Requires explicit configuration due to different SSH implementation and lack of native X11 support
+
+## Summary
+
+The solution is simple but not obvious: **manually set the DISPLAY environment variable in PowerShell before SSH connection**. This one-line fix resolves months of frustration and enables seamless X11 forwarding from Windows PowerShell to Linux servers.
+
+## Quick Reference
+
+```powershell
+# The magic command sequence:
+$env:DISPLAY = "127.0.0.1:0.0"
+ssh -Y username@server-ip
+
+# Test:
+xeyes
+```
+
+---
+
+*Problem solved after 6 months of intermittent troubleshooting - sometimes the simplest solutions are the most elusive!*
+
+EOF
+) | less -R
