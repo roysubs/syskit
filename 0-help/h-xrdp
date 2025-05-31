@@ -1,0 +1,53 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+
+XRDP Quick Notes
+===============
+
+- **Install XRDP Server**:
+    - For Ubuntu/Debian: `sudo apt install xrdp`
+    - For Fedora: `sudo dnf install xrdp`
+
+- **Start XRDP Server**:
+    - Start the XRDP service: `sudo systemctl start xrdp`
+    - Enable XRDP to start on boot: `sudo systemctl enable xrdp`
+    - Check XRDP status: `sudo systemctl status xrdp`
+
+- **Configure XRDP**:
+    - Configuration file: `/etc/xrdp/xrdp.ini`
+    - Change the port: `address=0.0.0.0` (default 3389)
+    - Allow users to log in through a specific desktop environment (e.g., XFCE):
+      - Edit `/etc/xdg/autostart/xfce4-session.desktop` to launch XFCE: `Exec=xfce4-session`
+      - Modify `~/.xsession` to specify the desktop: `echo "xfce4-session" > ~/.xsession`
+
+- **Start Desktop Environment for XRDP**:
+    - If using XFCE: `echo "xfce4-session" > ~/.xsession`
+    - If using other environments (e.g., LXDE, MATE, GNOME), replace `xfce4-session` with respective commands.
+
+- **Check XRDP Logs**:
+    - Log file for debugging: `/var/log/xrdp-sesman.log`
+    - View logs: `tail -f /var/log/xrdp-sesman.log`
+
+- **Connect to XRDP Server**:
+    - From Windows: Use the built-in Remote Desktop (RDP) client.
+      - Connect to: `ip_address_of_server:3389`
+    - From Linux: Use `remmina` or `rdesktop`.
+      - `remmina -c rdp://ip_address_of_server:3389`
+
+- **Stop XRDP Server**:
+    - Stop the service: `sudo systemctl stop xrdp`
+
+- **XRDP Security**:
+    - Use SSH tunneling for secure connections: `ssh -L 3389:localhost:3389 user@server_ip`
+    - Then connect via RDP to `localhost:3389`.
+
+- **Troubleshooting**:
+    - If unable to log in, check `~/.xsession-errors` and `/var/log/xrdp-sesman.log` for errors.
+    - Ensure the correct desktop environment is installed and properly configured.
+
+EOF
+) | less -R

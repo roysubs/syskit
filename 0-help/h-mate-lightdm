@@ -1,0 +1,36 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+MATE is enabled by default on Debian with MATE.
+
+Ensure SSH is Active: Before you make these changes, ensure SSH is running to maintain remote access:
+
+To stop all graphiacal services to have a console only state to save resources, you can stop the display manager and related graphical services. Ensure SSH is Active before you make these changes, to maintain remote access:
+   sudo systemctl start ssh
+   sudo systemctl enable ssh
+
+- Identify the Display Manager: MATE typically uses lightdm, but it could be another display manager like gdm3 or sddm. Use ps and look for the name of the running display manager:
+   ps aux | grep dm
+
+- Stop the Display Manager with systemctl (replace lightdm with the display manager). This will terminate the graphical interface.
+   sudo systemctl stop lightdm   
+
+- Prevent the Display Manager from Restarting at the next boot:
+   sudo systemctl disable lightdm
+
+- Switch to Multi-User Target (a non-graphical runlevel multi-user.target) that’s designed for a console-only environment:
+   sudo systemctl set-default multi-user.target
+   sudo systemctl isolate multi-user.target   # Switches to console-only immediately
+
+Reverting to Graphical Mode:
+
+- If you need to return to the graphical interface, you can start the display manager manually or switch the default target back:
+   sudo systemctl start lightdm
+   sudo systemctl set-default graphical.target
+   sudo systemctl isolate graphical.target
+
+EOF
+) | less -R

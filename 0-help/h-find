@@ -1,0 +1,82 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Linux `find` Command Cheatsheet
+
+## Basics
+`find /pa/th -name "str1"`  # Find anything (filename or directory) matching `str1` under path `/pa/th`  
+This is recursive search by default. Use `-iname` for case-insensitive search.  
+Use `-type f` to only find files. Use `-type d` to only find directories.  
+Add `-exec ls -l {} \;` to pass each found item to `ls -l` (`{}` is the found item, then `\;` to contatenate commands.  
+Add `-print0 | xargs -0 ls -l` to find all matches first, and then pass all of them to `ls -l`.  
+Add `2>/dev/null` to the end of a search to suppress system folder errors (which often happen if `sudo` is not used).  
+
+## Common Mistakes  
+Do not: `find *.py`, this may accidentally work, but it will glob `*.py` (expand it based on the contents of the current folder) and then run that command.  
+Do not: `find . -name *.py -name *.sh`. The correct (and odd) syntax is: `find . \( -name "*.py" -o -name "*.sh" \)`    
+## Examples:
+`find ~ -type f -name "*.log" -exec wc -l {} \;`   # Find all log files under ~ and pipe each to `wc -l` to find lines per file.  
+`find ~ -type f -name "*.log" -print0 | xargs -0 wc -l`   # Find all log files. Then, pass that list to `wc -l`  
+Using `-print0 | xargs` is generally a lot faster than `-exec wc -l`  
+
+## Scenarios where `-exec` can be more useful than `-print0 | xargs`:
+1. Performing different actions on each file cannot be easily done by `xargs`:  
+`find . -name "*.txt" -exec sh -c 'echo "Processing: $0"; cat "$0" | grep "important" > "${0%.txt}.important.txt"' {} \;`  
+Echoing a message, then grepping for "important" content and saving it; multiple steps tailored to each file.  
+2. When the number of arguments might exceed xargs limits, `-exec` avoids this by executing the command for each file individually.  
+3. When you need immediate action or feedback per file (e.g., to handle errors on a per-file basis), `-exec` provides that direct interaction. With xargs, you only see the output of the batched command after all the files in the batch have been processed.  
+4. When the Exit Status of the Command per File Matters, `-exec` allows you to check $? immediately after each execution. This is harder to manage with xargs processing multiple files at once. `find . -name "*.backup" -exec test -f {} \; -a -exec rm {} \;`. Here, we only try to remove a .backup file if the test -f {} command (checking if it's a regular file) succeeds (returns an exit status of 0).  
+5. When Dealing with Interactive Commands (Less Common with find), although less typical with find, if you were using -exec to run an interactive command that requires input for each file, xargs wouldn't be suitable for that batch-oriented approach.  
+
+In Summary:
+
+Use -print0 | xargs -0 for efficiency when applying the same non-interactive command to a potentially large number of files.
+Use -exec \; when you need to perform different actions per file, when you need immediate feedback or error handling per file, when the exit status per file matters, or when you're concerned about exceeding xargs command-line length limits.
+
+## Filters
+- By size: `find /path -size +10M` (larger than 10MB), `find /path -size -1G` (smaller than 1GB)
+- By modification time: `find /path -mtime -7` (last 7 days), `find /path -mtime +30` (over 30 days)
+- By access time: `find /path -atime -5` (accessed within 5 days)
+- By permissions: `find /path -perm 644` (exact), `find /path -perm -u+x` (with execute for user)
+
+## Actions
+- Delete found files: `find /path -type f -name "*.tmp" -delete`
+- Execute command: `find /path -type f -exec rm {} \;` (delete), `find /path -exec chmod 644 {} \;`
+- List files with details: `find /path -exec ls -lh {} \;`
+
+## Advanced Filtering
+- Multiple conditions (AND): `find /path -type f -name "*.log" -size +1M`
+- Multiple conditions (OR): `find /path \( -name "*.jpg" -o -name "*.png" \)`
+- Exclude pattern: `find /path -type f ! -name "*.bak"`
+
+## Locate Large Files
+- Largest in directory: `find /path -type f -exec du -h {} + | sort -rh | head -n 10`
+
+## Symlinks
+- Find symbolic links: `find /path -type l`
+- Broken symlinks: `find /path -xtype l`
+
+## Output and Debugging
+- Show full path: `find /path -print`
+- Debug `find` process: `find /path -D search`
+- Save output to file: `find /path > output.txt`
+
+## Tips
+- Use `-maxdepth` and `-mindepth` to control recursion: `find /path -maxdepth 2 -name "*.conf"`
+- Combine with `xargs` for complex actions: `find /path -name "*.log" | xargs rm`
+- Speed up search on mounted drives with `-noleaf`.
+
+## Examples
+- Find all *.png / *.jpg, but exclude (prune) ~/backup-home
+- The -o switch is OR, so first the path is pruned, and then OR find next condition, and then OR inside the ( )
+`find ~ -path ~/backup-home -prune -o \( -name "*.png" -o -name "*.jpg" \) -print`
+- Show the filesizes the found files
+`find ~ -path ~/backup-home -prune -o \( -name "*.png" -o -name "*.jpg" \) -printf "%s %p\n"`
+- Show the filesizes in human readable format
+`find ~ -path ~/backup-home -prune -o \( -name "*.png" -o -name "*.jpg" \) -printf "%s %p\n" | awk '{printf "%.2f MB %s\n", $1/1048576, $2}'`
+
+EOF
+) | less -R

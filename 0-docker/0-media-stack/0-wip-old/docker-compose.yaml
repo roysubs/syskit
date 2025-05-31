@@ -1,0 +1,170 @@
+# This Docker Compose file defines a media stack using an integrated
+# qBittorrent+VPN container. Radarr, Lidarr, and Prowlarr run on the
+# standard Docker network and do not have their traffic routed through the VPN.
+
+# Environment variables like PUID, PGID, TZ, and CONFIG_ROOT are expected
+# to be defined in a .env file in the same directory as this docker-compose.yaml.
+# Example .env file contents:
+# PUID=1000
+# PGID=1000
+# TZ=Europe/London
+# CONFIG_ROOT=./config
+
+services:
+  qbittorrentvpn:
+    image: dyonr/qbittorrentvpn:latest    # qBittorrent-nox with WireGuard/OpenVPN
+    container_name: qbittorrentvpn
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - VPN_ENABLED=true
+      - VPN_TYPE=wireguard
+      - LAN_NETWORK=192.168.1.0/24,100.64.0.0/10
+      - LEGACY_IPTABLES=1
+    volumes:
+      - ${CONFIG_ROOT}/qbittorrentvpn:/config
+      - ${MEDIA_PATH}/downloads:/downloads
+    ports:
+      - "8080:8080"
+      - "6881:6881/tcp"
+      - "6881:6881/udp"
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    restart: unless-stopped
+
+  radarr: # Movie Manager
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/radarr:/config
+      - ${MEDIA_PATH}:/media # Radarr's root folder for movies (e.g., /media/movies)
+      - ${MEDIA_PATH}/downloads:/downloads # Radarr needs access to where qBittorrent saves completed files
+    ports:
+      - "7878:7878" # Radarr Web UI
+    restart: unless-stopped
+    depends_on: # Ensures qbittorrentvpn starts first; Radarr can then connect to it.
+      - qbittorrentvpn
+
+  lidarr: # Music Manager
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/lidarr:/config
+      - ${MEDIA_PATH}:/media # Lidarr's root folder for music (e.g., /media/music)
+      - ${MEDIA_PATH}/downloads:/downloads # Lidarr needs access to where qBittorrent saves completed files
+    ports:
+      - "8686:8686" # Lidarr Web UI
+    restart: unless-stopped
+    depends_on:
+      - qbittorrentvpn
+
+  prowlarr: # Indexer Manager
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/prowlarr:/config
+    ports:
+      - "9696:9696" # Prowlarr Web UI
+    restart: unless-stopped
+
+# --- ADD THE FOLLOWING SERVICES ---
+
+  sonarr: # TV Show Manager
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/sonarr:/config
+      - ${MEDIA_PATH}:/media        # Sonarr's root folder for TV series (e.g., /media/tv)
+      - ${MEDIA_PATH}/downloads:/downloads # Sonarr needs access to where qBittorrent saves completed files
+    ports:
+      - "8989:8989" # Sonarr Web UI
+    restart: unless-stopped
+    depends_on:
+      - qbittorrentvpn
+
+  readarr: # Book Manager (eBooks and Audiobooks)
+    image: lscr.io/linuxserver/readarr:develop # Changed from :latest to :develop
+    container_name: readarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/readarr:/config
+      - ${MEDIA_PATH}:/media        # Readarr's root folder for books (e.g., /media/books and /media/audiobooks)
+      - ${MEDIA_PATH}/downloads:/downloads # Readarr needs access to completed downloads
+    ports:
+      - "8787:8787" # Readarr Web UI
+    restart: unless-stopped
+    depends_on:
+      - qbittorrentvpn
+
+  bazarr: # Subtitle Manager
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/bazarr:/config
+      - ${MEDIA_PATH}:/media # Bazarr needs access to your media library folders.
+                          # In Bazarr's UI, point to /media/movies and /media/tv
+                          # (assuming Radarr uses /media/movies and Sonarr uses /media/tv within their containers)
+    ports:
+      - "6767:6767" # Bazarr Web UI
+    restart: unless-stopped
+    depends_on:
+      - radarr
+      - sonarr # Bazarr needs Radarr and Sonarr to connect to them
+
+# --- END OF ADDED SERVICES ---
+
+# Optional: Define a custom network for easier inter-container communication by hostname
+# and to isolate these services if desired.
+# networks:
+#   media_stack:
+#     driver: bridge
+
+# If using the custom 'media_stack' network, add the following to EACH service:
+# services:
+#   qbittorrentvpn:
+#     networks:
+#       - media_stack
+#   radarr:
+#     networks:
+#       - media_stack
+#   lidarr:
+#     networks:
+#       - media_stack
+#   prowlarr:
+#     networks:
+#       - media_stack
+#   sonarr: # Add to sonarr if using custom network
+#     networks:
+#       - media_stack
+#   readarr: # Add to readarr if using custom network
+#     networks:
+#       - media_stack
+#   bazarr: # Add to bazarr if using custom network
+#     networks:
+#       - media_stack

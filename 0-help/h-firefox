@@ -1,0 +1,41 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Firefox Keyboard Shortcuts and Tech Tricks
+
+## Keyboard Shortcuts
+
+- **Navigation**: Back: `Alt + Left Arrow` | Forward: `Alt + Right Arrow` | Reload: `Ctrl + R` or `F5` | Home: `Alt + Home`
+- **Tabs**: New Tab: `Ctrl + T` | Close Tab: `Ctrl + W` | Reopen Closed Tab: `Ctrl + Shift + T` | Next/Previous Tab: `Ctrl + Tab` / `Ctrl + Shift + Tab`
+- **Windows**: New Window: `Ctrl + N` | Private Window: `Ctrl + Shift + P` | Close Window: `Ctrl + Shift + W`
+- **Search**: Focus Search Bar: `Ctrl + K` | Search in Page: `Ctrl + F` | Next Result: `Enter` | Previous Result: `Shift + Enter`
+- **Zoom**: Zoom In/Out: `Ctrl + +` / `Ctrl + -` | Reset Zoom: `Ctrl + 0`
+- **Bookmarks**: Bookmark Page: `Ctrl + D` | Open Bookmarks Sidebar: `Ctrl + B`
+- **Developer Tools**: Toggle DevTools: `F12` or `Ctrl + Shift + I` | Inspect Element: `Ctrl + Shift + C` | Console: `Ctrl + Shift + J`
+- **Miscellaneous**: Fullscreen: `F11` | Open Downloads: `Ctrl + J` | Print: `Ctrl + P`
+
+## Tech Tricks
+
+- **Customizing Firefox**: Visit `about:config` to tweak advanced settings (e.g., disable telemetry: `toolkit.telemetry.enabled=false`).
+- **Performance Boost**: Disable animations: `about:config` > `toolkit.cosmeticAnimations.enabled=false`. Reduce cache: Clear cache in Settings > Privacy & Security > Cached Web Content.
+- **Picture-in-Picture (PiP)**: Hover over a video, click the PiP icon to pop out video.
+- **Sync Firefox**: Login with a Firefox account to sync bookmarks, history, and settings across devices.
+- **Reader Mode**: Simplify articles: Click Reader View icon in the address bar or press `F9`.
+- **Extensions and Add-ons**: Visit `about:addons` to manage or install extensions. Use `uBlock Origin` for ad-blocking, `HTTPS Everywhere` for secure browsing.
+- **Shortcut to Open About Pages**: Preferences: `about:preferences` | Plugins: `about:plugins` | Add-ons: `about:addons` | Performance Stats: `about:performance`
+- **Restore Session**: Reopen Firefox with previous tabs: Enable "Open previous windows and tabs" in Settings > General > Startup.
+- **Keyboard Shortcut Legend**: Show all shortcuts: `Shift + ?` while on a page.
+
+## Troubleshooting Tips
+
+- **Safe Mode**: Launch without extensions: `firefox --safe-mode`.
+- **Profile Manager**: Open with `firefox --profile-manager` to manage or create profiles.
+- **Clear Cache**: `Ctrl + Shift + Delete` > Choose "Cache" > Clear Now.
+- **Enable Hardware Acceleration**: Settings > General > Performance > Use recommended performance settings > Enable hardware acceleration.
+- **Fix Slow Startup**: Disable unnecessary extensions/add-ons, reduce open tabs, and clear cache regularly.
+
+EOF
+) | less -R

@@ -1,0 +1,96 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Syncthing Notes
+
+## Introduction
+Syncthing is a continuous file synchronization program that synchronizes files between two or more computers in real time, securely and without needing a cloud service.
+
+## Installation
+
+### Debian-based Systems
+- Add curl dependency and Syncthing's official repository:  
+
+   ```bash
+   sudo apt install curl apt-transport-https
+   curl -s https://syncthing.net/release-key.txt | sudo apt-key add -
+   echo "deb https://apt.syncthing.net/ syncthing stable" | sudo tee -a /etc/apt/sources.list
+   sudo apt update
+   sudo apt install syncthing
+   ```
+- Start Syncthing as a background service:
+`systemctl --user start syncthing`
+- Enable Syncthing to start on boot:
+`systemctl --user enable syncthing`
+- Check Status, verify if Syncthing is running:
+`systemctl --user status syncthing`
+- Configuration, accessing Web UI
+Syncthing provides a web interface by default at `http://localhost:8384`.
+By default this is only allowed from the local system, but you can configure this to be allowed from any machine:
+`<gui enabled="true" tls="false" debugging="false">`
+`    <address>127.0.0.1:8384</address>`
+Then restart syncthing: `systemctl --user restart syncthing`
+- Adding Folders
+On the web UI, go to Actions > Show ID and note the device ID for each device.
+To add a folder to sync, go to the Folders tab and click Add Folder.
+Select the folder path and specify the sync options.
+- Accepting Devices
+Devices must be added by sharing device IDs between machines.
+On the web UI, click on Devices and then Add Device. Enter the device ID from the other machine.
+- Folder Share Example
+On first device: Add a folder and share it with another device (use the device ID shared earlier).
+`syncthing --folder <folder-path> --device <device-id>`
+- Ignoring Files
+To ignore specific files or directories, edit the `.stignore` file in the shared folder:
+```bash
+*.bak
+.tmp/
+```
+- Operation, Syncing Files
+Once devices are connected and folders are shared, files will sync automatically between all devices that have the shared folder.
+- Operation, temporarily pause syncing for a folder:
+`syncthing --pause <folder-id>`
+- Restart Syncthing:
+`systemctl --user restart syncthing`
+- Advanced Commands, Device Management
+  To remove a device:
+  `syncthing --device <device-id> --remove`
+- Status and Logs:
+  `syncthing --status`
+- To view logs:
+  `journalctl -u syncthing -f`
+- Security and Encryption
+Syncthing automatically encrypts data during transit using TLS. No need for manual configuration.
+
+- Authentication
+To secure the web UI with a username and password, go to the Settings > GUI tab in the web UI.
+Set the username and password.
+- Firewall Configuration
+Syncthing uses TCP/UDP port 22000 by default. Ensure it's open on your firewall to allow syncing between devices:
+```bash
+sudo ufw allow 22000/tcp
+sudo ufw allow 22000/udp
+```
+
+### Tips and Tricks
+To run Syncthing as a system-wide service, you can configure it with systemd:
+`sudo systemctl enable syncthing@<user>.service`
+
+Updating Syncthing
+`sudo apt update && sudo apt upgrade syncthing`
+
+Accessing Remote Web UI using SSH port forwarding
+`ssh -L 8384:localhost:8384 user@remote-host`
+
+View Syncthing Logs for troubleshooting or checking Syncthing's performance:
+`journalctl -u syncthing --since "1 hour ago"`
+
+### Resources
+Official website: https://syncthing.net/
+Documentation: https://docs.syncthing.net/
+
+EOF
+) | less -R

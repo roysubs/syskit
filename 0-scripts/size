@@ -1,0 +1,224 @@
+#!/bin/bash
+
+count=false
+path_arg="."
+xdev_enabled=true
+top_n_count=0
+use_apparent_size_default=true # Script's default is apparent size
+
+CMD="bc"
+if ! command -v $CMD &>/dev/null; then
+    read -p "$CMD not found. Install (y/N)? " -n 1 -r REPLY && echo
+    [[ $REPLY =~ ^[Yy]$ ]] && (sudo apt install -y $CMD) || { echo "$CMD not installed. Exiting."; exit 1; }
+fi
+
+# Help message
+show_help() {
+    echo "
+Usage: size [options] [path]
+
+  Without arguments, shows the size of the current directory using apparent file sizes
+  (excluding other mounted filesystems).
+
+Options:
+  -c          Also count the number of files and directories.
+  -a, --all-filesystems
+              Traverse all filesystems. By default, stays on the same filesystem
+              as the path being processed.
+  -d, --disk-usage
+              Use actual disk usage (allocated blocks) instead of apparent file sizes.
+              (This is the default behavior of the 'du' command itself).
+  -t N, --top N
+              Show the top N largest files/directories immediately under the path.
+              (e.g., -t 5)
+  -h, --help  Show this help message.
+
+Examples:
+  size              → Show apparent size of current directory
+  size -d /var      → Show disk usage of /var
+  size -c /mnt      → Show apparent size + counts of /mnt
+  size -a /         → Show apparent size of / including all mounted filesystems
+  size -t 5 /var    → Show apparent size of /var and the 5 largest items in it
+"
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -c)
+            count=true
+            shift
+            ;;
+        -a|--all-filesystems)
+            xdev_enabled=false
+            shift
+            ;;
+        -d|--disk-usage)
+            use_apparent_size_default=false # User wants disk usage
+            shift
+            ;;
+        -t|--top)
+            if [[ -n "$2" && "$2" =~ ^[0-9]+$ && "$2" -gt 0 ]]; then
+                top_n_count="$2"
+                shift 2
+            else
+                echo "Error: --top (-t) requires a positive integer argument." >&2
+                exit 1
+            fi
+            ;;
+        -*)
+            echo "Invalid option: $1" >&2
+            show_help
+            exit 1
+            ;;
+        *)
+            if [[ "$path_arg" == "." ]]; then
+                path_arg="$1"
+                shift
+            else
+                echo "Error: Multiple paths provided. Please specify only one directory." >&2
+                exit 1
+            fi
+            ;;
+    esac
+done
+
+
+# Resolve absolute path, stripping any trailing slash for consistency
+path=$(realpath -s "$path_arg")
+start_time=$(date +%s.%N)
+
+# --- Helper function to build du options ---
+build_du_options() {
+    local type="$1" # "summarize", "top_n", or "file"
+    local opts=("-h") # Always human-readable
+
+    if [[ "$type" == "summarize" ]]; then
+        opts+=("-s")
+    elif [[ "$type" == "top_n" ]]; then
+        opts+=("--max-depth=1")
+    fi # For "file", no extra structure option needed, just -h
+
+    if [ "$xdev_enabled" = true ]; then
+        opts+=("-x")
+    fi
+
+    if [ "$use_apparent_size_default" = true ]; then
+        opts+=("--apparent-size")
+    fi
+    echo "${opts[@]}" # Return as space-separated string for `read -ra`
+}
+
+
+# Validate path
+if [[ ! -e "$path" ]]; then
+    echo "size: Error: '$path' does not exist." >&2
+    exit 1
+fi
+
+size_info=""
+is_directory=false
+is_file=false
+
+if [[ -d "$path" ]]; then
+    is_directory=true
+    read -ra current_du_opts <<< "$(build_du_options "summarize")"
+    size_info=$(du "${current_du_opts[@]}" "$path" 2>/dev/null | awk '{print $1}')
+elif [[ -f "$path" ]]; then
+    is_file=true
+    read -ra current_du_opts <<< "$(build_du_options "file")"
+    size_info=$(du "${current_du_opts[@]}" "$path" 2>/dev/null | awk '{print $1}')
+else # Not a regular file or directory (e.g. broken symlink after realpath, special file)
+    echo "size: Error: '$path' is not a regular file or directory." >&2
+    # Attempt to get size if possible, may fail
+    read -ra current_du_opts <<< "$(build_du_options "file")" # Treat as file for size attempt
+    size_info_attempt=$(du "${current_du_opts[@]}" "$path" 2>/dev/null | awk '{print $1}')
+    if [[ -n "$size_info_attempt" ]]; then
+        size_info="$size_info_attempt (Note: '$path' is not a regular file or directory)"
+    else
+        echo "size: Error: Cannot determine size for '$path'." >&2
+        exit 1
+    fi
+fi
+
+
+if [[ -z "$size_info" && "$is_directory" = true || -z "$size_info" && "$is_file" = true ]]; then
+    size_info="Permission denied or inaccessible"
+fi
+
+# Disk usage from df
+df_path_target="$path"
+# If it's a file, df on its parent directory
+if [[ "$is_file" = true ]]; then
+    df_path_target=$(dirname "$path")
+fi
+
+df_output=$(df -hP "$df_path_target" 2>/dev/null | tail -n 1)
+device=$(echo "$df_output" | awk '{print $1}')
+total_size=$(echo "$df_output" | awk '{print $2}')
+used=$(echo "$df_output" | awk '{print $3}')
+available=$(echo "$df_output" | awk '{print $4}')
+use_percent=$(echo "$df_output" | awk '{print $5}')
+
+
+# Output main info
+if [[ "$is_directory" = true ]]; then
+    if [ "$count" = true ]; then
+        find_opts_arr=()
+        if [ "$xdev_enabled" = true ]; then find_opts_arr+=("-xdev"); fi
+        dir_count=$(find "$path" "${find_opts_arr[@]}" -type d 2>/dev/null | wc -l | awk '{printf "%'\''d\n", $1}')
+        file_count=$(find "$path" "${find_opts_arr[@]}" -type f 2>/dev/null | wc -l | awk '{printf "%'\''d\n", $1}')
+        echo "$path is ${size_info} (with $file_count files, $dir_count directories)"
+    else
+        echo "$path is ${size_info}"
+    fi
+elif [[ "$is_file" = true ]]; then
+    if [ "$count" = true ]; then # For a file, count is 1 file, 0 dirs
+        echo "$path is ${size_info} (1 file, 0 directories)"
+    else
+        echo "$path is ${size_info}"
+    fi
+else # Path was not a regular file or directory but size_info might have a note
+    echo "$path is ${size_info}"
+fi
+
+echo "Located on $device, $use_percent used ($used of $total_size, $available available)"
+
+
+# Top N largest items
+if [[ "$top_n_count" -gt 0 && "$is_directory" = true ]]; then
+    echo ""
+    echo "Top $top_n_count largest items in $path:"
+    path_escaped_for_grep=$(printf '%s\n' "$path" | sed 's:[][\/.^$*]:\\&:g')
+    
+    read -ra current_du_opts_top_n <<< "$(build_du_options "top_n")"
+    top_items_output=$(du "${current_du_opts_top_n[@]}" "$path" 2>/dev/null |
+        grep -Ev "^\S+\s+${path_escaped_for_grep}$" |
+        sort -rh |
+        head -n "$top_n_count")
+
+    if [[ -n "$top_items_output" ]]; then
+        echo "$top_items_output"
+    else
+        echo "  (No items found or items are inaccessible)"
+    fi
+fi
+
+# Time taken
+end_time=$(date +%s.%N)
+elapsed_time_raw=$(echo "$end_time - $start_time" | bc)
+elapsed_time_formatted=$(LC_NUMERIC=C printf "%.1f" "$elapsed_time_raw")
+
+if [[ "$elapsed_time_formatted" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    if (( $(echo "$elapsed_time_formatted >= 10" | bc -l) )); then
+        echo "(Script ran for ${elapsed_time_formatted}s)"
+    fi
+else
+    echo "(Could not calculate script run time accurately)"
+fi
+
+exit 0

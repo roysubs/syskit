@@ -1,0 +1,263 @@
+# docker-monitoring.yaml
+# Docker Compose file for a suite of monitoring tools.
+#
+# Notes on paths:
+# - Uses '${HOME}/.config/monitoring/...' for host volumes.
+# - Ensure your user has permissions to create/write to these directories,
+#   or create them beforehand. The accompanying shell script will attempt to
+#   create them.
+#
+# Default Timezone:
+# - Most services are set to TZ: "Europe/Oslo". Change if needed.
+#
+# Initial Configuration:
+# - For services like Prometheus, Alertmanager, Loki, and Promtail, you MUST
+#   create their respective configuration files (e.g., prometheus.yml) in the
+#   host directories specified in the 'volumes' section (e.g., ${HOME}/.config/monitoring/prometheus-config/).
+#   The script only creates the directories, not the content of these specific config files.
+#
+# Passwords & Secrets:
+# - Graylog: Set GRAYLOG_ROOT_PASSWORD_SHA2. Generate with: echo -n "your_password" | sha256sum | awk '{print $1}'
+# - Webmin: Set WEBMIN_INIT_ROOT_PASS.
+# - Grafana: Default admin/admin, change on first login.
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - "${HOME}/.config/monitoring/prometheus-config:/etc/prometheus"
+      - "${HOME}/.config/monitoring/prometheus-data:/prometheus"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    environment:
+      TZ: "Europe/Oslo"
+    networks:
+      - docker-monitoring-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - "${HOME}/.config/monitoring/grafana-data:/var/lib/grafana"
+    environment:
+      TZ: "Europe/Oslo"
+      # GF_SECURITY_ADMIN_USER: admin # Default is admin
+      # GF_SECURITY_ADMIN_PASSWORD: admin # Default is admin, change on first login
+    networks:
+      - docker-monitoring-net
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    volumes:
+      - "${HOME}/.config/monitoring/alertmanager-config:/etc/alertmanager"
+      - "${HOME}/.config/monitoring/alertmanager-data:/alertmanager"
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    environment:
+      TZ: "Europe/Oslo"
+    networks:
+      - docker-monitoring-net
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - "${HOME}/.config/monitoring/loki-config:/etc/loki"
+      - "${HOME}/.config/monitoring/loki-data:/loki"
+    command: -config.file=/etc/loki/loki-config.yaml
+    environment:
+      TZ: "Europe/Oslo"
+    networks:
+      - docker-monitoring-net
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    restart: unless-stopped
+    volumes:
+      - "${HOME}/.config/monitoring/promtail-config:/etc/promtail"
+      - "/var/log:/var/log:ro" # Access host logs
+      - "/var/run/docker.sock:/var/run/docker.sock:ro" # Access Docker logs
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    environment:
+      TZ: "Europe/Oslo"
+    networks:
+      - docker-monitoring-net
+
+  graylog:
+    image: graylog/graylog:5.2 # Using a specific recent version, latest can be used
+    container_name: graylog
+    restart: unless-stopped
+    ports:
+      - "9001:9000"      # Graylog UI & API
+      - "5044:5044/tcp"  # Beats input (optional)
+      - "12201:12201/udp" # GELF input
+      - "1514:1514/udp" # Syslog input (use a port > 1024 if not running as root, e.g. 5140:5140/udp)
+                         # Changed from 5140 to 1514 to avoid conflict with potential host syslog
+    volumes:
+      - "${HOME}/.config/monitoring/graylog-journal:/usr/share/graylog/data/journal"
+      - "${HOME}/.config/monitoring/graylog-config:/usr/share/graylog/data/config" # For Graylog's own config, not the main server.conf
+    environment:
+      TZ: "Europe/Oslo"
+      # IMPORTANT: Set this password! Generate with: echo -n "your_very_secure_password" | sha256sum | awk '{print $1}'
+      GRAYLOG_ROOT_PASSWORD_SHA2: "YOUR_SHA256_PASSWORD_HASH_HERE" # Replace this!
+      GRAYLOG_HTTP_EXTERNAL_URI: "http://$(hostname -I | awk '{print $1}'):9001/"
+      # For bundled Elasticsearch, these are typical defaults.
+      # GRAYLOG_ELASTICSEARCH_HOSTS: "http://elasticsearch:9200" # If using separate ES
+      # GRAYLOG_MONGODB_URI: "mongodb://mongo:27017/graylog" # If using separate Mongo
+    networks:
+      - docker-monitoring-net
+
+  netdata:
+    image: netdata/netdata:latest
+    container_name: netdata
+    restart: unless-stopped
+    ports:
+      - "19999:19999"
+    cap_add:
+      - SYS_PTRACE # Required for process monitoring
+      - SYS_ADMIN  # For certain eBPF and other plugins
+    security_opt:
+      - apparmor:unconfined # Often needed for full functionality
+    volumes:
+      - "/proc:/host/proc:ro"
+      - "/sys:/host/sys:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "${HOME}/.config/monitoring/netdata-lib:/var/lib/netdata"     # For alarms, db, etc.
+      - "${HOME}/.config/monitoring/netdata-cache:/var/cache/netdata" # For caching
+      - "${HOME}/.config/monitoring/netdata-config:/etc/netdata"      # For custom configurations
+    environment:
+      TZ: "Europe/Oslo"
+    networks:
+      - docker-monitoring-net
+
+  webmin:
+    image: sameersbn/webmin:latest # A popular choice
+    container_name: webmin
+    restart: unless-stopped
+    ports:
+      - "10000:10000"
+    volumes:
+      - "${HOME}/.config/monitoring/webmin-data:/etc/webmin"
+    environment:
+      TZ: "Europe/Oslo"
+      WEBMIN_INIT_SSL_ENABLED: "false" # Set to true and map port 10000 for HTTPS if you have certs
+      WEBMIN_INIT_ROOT_USER: "admin"   # Change if desired
+      # IMPORTANT: Set a strong password here!
+      WEBMIN_INIT_ROOT_PASS: "your_strong_password_here" # Replace this!
+      # Add other WEBMIN_... variables as needed
+    networks:
+      - docker-monitoring-net
+
+  cockpit: # Using linuxserver.io image for easier Docker deployment
+    image: ghcr.io/linuxserver/cockpit:latest
+    container_name: cockpit
+    restart: unless-stopped
+    ports:
+      - "9091:9090"
+    privileged: true # Cockpit often needs higher privileges to manage the system.
+                     # Consider security implications. Alternatively, map specific devices/sockets.
+    volumes:
+      - "/:/host" # Gives access to the host system. Be very careful with this.
+                  # For a more restricted setup, you might map specific paths like:
+                  # - /var/run/dbus:/var/run/dbus
+                  # - /var/run/systemd:/var/run/systemd
+                  # - /run/udev/data:/run/udev/data:ro
+      - "${HOME}/.config/monitoring/cockpit-config:/config" # Config for cockpit itself, if any by this image
+    environment:
+      TZ: "Europe/Oslo"
+      PUID: "1000" # Your user's PUID
+      PGID: "1000" # Your user's PGID
+    networks:
+      - docker-monitoring-net
+
+  healthchecks: # Using linuxserver.io image
+    image: linuxserver/healthchecks:latest
+    container_name: healthchecks
+    restart: unless-stopped
+    ports:
+      - "8002:8000"
+    volumes:
+      - "${HOME}/.config/monitoring/healthchecks-data:/config"
+    environment:
+      TZ: "Europe/Oslo"
+      PUID: "1000"
+      PGID: "1000"
+      SITE_ROOT: "http://$(hostname -I | awk '{print $1}'):8002"
+      # Add EMAIL_... variables for notifications if needed
+      # DEFAULT_FROM_EMAIL: "healthchecks@example.com"
+      # EMAIL_HOST: "smtp.example.com"
+      # EMAIL_PORT: "587"
+      # EMAIL_HOST_USER: "user"
+      # EMAIL_HOST_PASSWORD: "password"
+      # EMAIL_USE_TLS: "True"
+    networks:
+      - docker-monitoring-net
+
+  uptimekuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptimekuma
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - "${HOME}/.config/monitoring/uptimekuma-data:/app/data"
+    environment:
+      TZ: "Europe/Oslo"
+    networks:
+      - docker-monitoring-net
+
+  statping_ng:
+    image: adamboutcher/statping-ng:latest # Or statping/statping-ng
+    container_name: statping_ng
+    restart: unless-stopped
+    ports:
+      - "8083:8080"
+    volumes:
+      - "${HOME}/.config/monitoring/statping-ng-data:/app"
+    environment:
+      TZ: "Europe/Oslo"
+      # DB_TYPE: sqlite # Default, other options: postgres, mysql
+    networks:
+      - docker-monitoring-net
+
+  speedtest_tracker: # Using linuxserver.io image
+    image: linuxserver/speedtest-tracker:latest
+    container_name: speedtest_tracker
+    restart: unless-stopped
+    ports:
+      - "8084:80"   # HTTP UI
+      - "8443:443"  # HTTPS UI (if you configure SSL)
+    volumes:
+      - "${HOME}/.config/monitoring/speedtest-tracker-data:/config"
+    environment:
+      TZ: "Europe/Oslo"
+      PUID: "1000"
+      PGID: "1000"
+      # OOKLA_EULA_GDPR: "true" # Required to accept Ookla EULA if using their tester
+    networks:
+      - docker-monitoring-net
+
+networks:
+  docker-monitoring-net:
+    driver: bridge
+    name: docker-monitoring-net
+

@@ -1,0 +1,46 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Vim Split and Window Quick Notes
+=================================
+
+- **Split Windows**:
+    - Horizontal split: `:split` or `:sp`
+    - Vertical split: `:vsplit` or `:vsp`
+    - Open file in split: `:split filename` or `:vsp filename`
+    - Resize split (horizontal): `Ctrl+w, =` (equalize), `Ctrl+w, >` (increase), `Ctrl+w, <` (decrease)
+    - Resize split (vertical): `Ctrl+w, +` (increase), `Ctrl+w, -` (decrease)
+
+- **Navigate Between Splits**:
+    - Move to the next split: `Ctrl+w, w`
+    - Move to the previous split: `Ctrl+w, W`
+    - Move to the split above: `Ctrl+w, k`
+    - Move to the split below: `Ctrl+w, j`
+    - Move to the split left: `Ctrl+w, h`
+    - Move to the split right: `Ctrl+w, l`
+
+- **Close Splits**:
+    - Close current split: `:q` or `Ctrl+w, c`
+    - Close all splits: `:qa`
+    - Close other splits: `:only`
+
+- **Maximize Split**:
+    - Maximize current split: `Ctrl+w, _` (horizontal), `Ctrl+w, |` (vertical)
+    - Return to normal splits: `Ctrl+w, =`
+
+- **Switch Between Windows**:
+    - Cycle through windows: `Ctrl+w, w`
+    - Switch to window by number: `Ctrl+w, {1-9}`
+    - Close the current window: `:q` or `Ctrl+w, c`
+    - Split and switch to new window: `Ctrl+w, s`
+
+- **Tab Pages (Multiple windows in tabs)**:
+    - New tab page: `:tabnew`
+    - Switch tab page: `:tabn` (next), `:tabp` (previous)
+    - Close current tab: `:tabc`
+
+EOF
+) | less -R

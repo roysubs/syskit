@@ -1,0 +1,180 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+
+# Troubleshooting and Fixing Git Credential Manager (GCM) Issues
+
+This document provides step-by-step instructions to diagnose and resolve issues with Git Credential Manager (GCM) when it fails to save credentials or prompts for the Personal Access Token (PAT) repeatedly.
+
+---
+
+## 1. Verify Credential Manager Configuration
+
+Run the following command to check the current credential helper configuration:
+
+```bash
+git config --global credential.helper
+```
+
+- **Expected Output:** `manager` or `manager-core`
+- If the output is not as expected (or has multiple entries), set GCM explicitly:
+
+```bash
+git config --global credential.helper manager-core
+```
+
+---
+
+## 2. Check If Credentials Are Saved
+
+After entering your PAT, verify that it has been saved:
+
+```bash
+git credential-manager-core list
+```
+
+Look for an entry related to `github.com`. If no entry exists, the credentials were not saved.
+
+---
+
+## 3. Inspect the Git Remote URL
+
+Ensure the Git remote URL is correct:
+
+```bash
+git remote -v
+```
+
+The URL should look like:
+
+```
+https://github.com/<username>/<repo>.git
+```
+
+### Switch to SSH (Optional):
+
+If you prefer SSH over HTTPS:
+
+```bash
+git remote set-url origin git@github.com:<username>/<repo>.git
+```
+
+Set up an SSH key if not already done.
+
+---
+
+## 4. Clear and Re-enter Credentials
+
+If credentials are not being saved or there is a conflict, clear existing credentials:
+
+```bash
+git credential-manager-core erase
+```
+
+Then, try pushing again. GCM should prompt for credentials and save them.
+
+---
+
+## 5. Resolve "Multiple Values" Configuration Error
+
+If you encounter the error:
+
+```
+warning: credential.helper has multiple values
+error: cannot overwrite multiple values with a single value
+```
+
+### Steps to Fix:
+
+1. Inspect the current configuration:
+
+   ```bash
+   git config --global --get-all credential.helper
+   ```
+
+   Example output:
+   ```
+   /usr/local/bin/git-credential-manager
+   manager-core
+   ```
+
+2. Remove all existing values:
+
+   ```bash
+   git config --global --unset-all credential.helper
+   ```
+   Or remove a specific redundant entry if that does not fully work:
+   ```bash
+   git config --global --unset credential.helper /usr/local/bin/git-credential-manager
+   ```
+
+3. Set the correct helper:
+
+   ```bash
+   git config --global credential.helper manager-core
+   ```
+
+4. Verify the change:
+
+   ```bash
+   git config --global credential.helper
+   ```
+
+   **Expected Output:** `manager-core`
+
+---
+
+## 6. Reinstall or Update Git Credential Manager
+
+Ensure that GCM is installed and up to date:
+
+```bash
+sudo apt-get install git-credential-manager-core
+```
+
+---
+
+## 7. Use an Alternative Credential Helper (Optional)
+
+If GCM continues to fail, use the `store` helper (less secure, as credentials are saved in plain text):
+
+```bash
+git config --global credential.helper store
+```
+
+The next time you enter your PAT, it will be saved in `~/.git-credentials`.
+
+---
+
+## 8. Enable Debug Logs for GCM
+
+Enable debug logs to diagnose GCM issues:
+
+```bash
+GIT_TRACE=1 GIT_CURL_VERBOSE=1 git push
+```
+
+Review the logs to identify why GCM is not saving credentials.
+
+---
+
+## Summary of Commands
+
+| Task                                  | Command                                    |
+|---------------------------------------|--------------------------------------------|
+| Check credential helper               | `git config --global credential.helper`    |
+| Set GCM explicitly                    | `git config --global credential.helper manager-core` |
+| Verify credentials are saved          | `git credential-manager-core list`         |
+| Inspect remote URL                    | `git remote -v`                            |
+| Clear credentials                     | `git credential-manager-core erase`        |
+| Unset all credential helpers          | `git config --global --unset-all credential.helper` |
+| Install/update GCM                    | `sudo apt-get install git-credential-manager-core` |
+| Debug logs                            | `GIT_TRACE=1 GIT_CURL_VERBOSE=1 git push`  |
+
+Follow these steps to troubleshoot and resolve GCM issues. Let me know if you encounter further problems!
+
+EOF
+) | less -R

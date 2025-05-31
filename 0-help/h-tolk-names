@@ -1,0 +1,58 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Tolkien Character Index
+=======================
+
+### The Silmarillion
+- **Eru Ilúvatar**: The supreme deity, creator of the universe.
+- **Melkor (Morgoth)**: The first Dark Lord, corrupter of Arda.
+- **Manwë**: King of the Valar, ruler of the skies.
+- **Ulmo**: Lord of the Waters, one of the mightiest Valar.
+- **Aulë**: Smith of the Valar, creator of the Dwarves.
+- **Yavanna**: Queen of the Earth, creator of the Two Trees of Valinor.
+- **Varda (Elbereth)**: Lady of the Stars, revered by the Elves.
+- **Fëanor (b. 1169 - d. 1497 YT)**: Creator of the Silmarils, greatest of the Noldor craftsmen.
+- **Maedhros (b. 1250 - d. 587 FA)**: Eldest son of Fëanor, lost a hand in Morgoth's captivity.
+- **Maglor**: Second son of Fëanor, a great singer and bard.
+- **Celegorm**: Third son of Fëanor, ally of Curufin.
+- **Caranthir**: Fourth son of Fëanor, known for his harsh temper.
+- **Curufin**: Fifth son of Fëanor, most like his father in skill and mind.
+- **Amrod and Amras**: The twin sons of Fëanor, perished in the Kinslaying.
+- **Beren (b. 432 - d. 466 FA)**: Mortal hero who won a Silmaril from Morgoth.
+- **Lúthien (b. 1200 - d. 503 FA)**: Elf-maiden who loved Beren and defied Morgoth.
+- **Thingol (b. c. 1050 - d. 502 FA)**: King of Doriath, ruler of the Sindar.
+- **Melian**: Maia, wife of Thingol, mother of Lúthien.
+- **Túrin Turambar (b. 464 - d. 499 FA)**: Tragic hero cursed by Morgoth.
+- **Niënor Níniel (b. 473 - d. 499 FA)**: Túrin's sister, unaware of her identity.
+- **Eärendil (b. 503 - d. Unknown)**: Mariner who carried a Silmaril to the Valar, father of Elrond and Elros.
+- **Elrond (b. 532 FA)**: Lord of Rivendell, father of Arwen.
+- **Elros (b. 532 - d. 442 SA)**: First King of Númenor, brother of Elrond.
+
+### The Lord of the Rings
+- **Frodo Baggins (b. 2968 - d. Left Middle-earth 3021 TA)**: Bearer of the One Ring, tasked with its destruction.
+- **Samwise Gamgee (b. 2980 - d. Left Middle-earth 61 FA)**: Loyal companion to Frodo, gardener turned hero.
+- **Meriadoc Brandybuck (b. 2982 - d. 63 FA)**: Hobbit of the Shire, key figure in the War of the Ring.
+- **Peregrin Took (b. 2990 - d. 65 FA)**: Youngest of the Fellowship, later Thain of the Shire.
+- **Gandalf (Olórin, Maia, Age Unknown)**: Wizard and member of the Istari, key figure in Middle-earth's history.
+- **Aragorn (b. 2931 - d. 120 FA)**: Heir of Isildur, rightful King of Gondor.
+- **Legolas (b. Unknown, Immortal)**: Elven prince of Mirkwood, skilled archer.
+- **Gimli (b. 2879 - d. Left Middle-earth c. 120 FA)**: Dwarven warrior and friend of Legolas.
+- **Boromir (b. 2978 - d. 3019 TA)**: Son of Denethor, tempted by the One Ring.
+- **Faramir (b. 2983 - d. c. 83 FA)**: Brother of Boromir, steward of Gondor.
+- **Éowyn (b. 2995 - d. Unknown)**: Shieldmaiden of Rohan who slew the Witch-king.
+- **Éomer (b. 2991 - d. 63 FA)**: King of Rohan, brother of Éowyn.
+- **Theoden (b. 2948 - d. 3019 TA)**: King of Rohan, fell at Pelennor Fields.
+- **Denethor (b. 2930 - d. 3019 TA)**: Steward of Gondor, driven to despair.
+- **Galadriel (b. Before FA - d. Left Middle-earth 3021 TA)**: Lady of Lothlórien, one of the mightiest Elves in Middle-earth.
+- **Celeborn (b. Before FA - d. Unknown)**: Lord of Lothlórien, husband of Galadriel.
+- **Saruman (b. Before TA - d. 3019 TA)**: Corrupt wizard who sought power through the One Ring.
+- **Sauron (b. Before Time - d. 3019 TA)**: Dark Lord, creator of the One Ring.
+- **Gollum (Sméagol, b. c. 2430 - d. 3019 TA)**: Former Ring-bearer, consumed by its power.
+- **Bilbo Baggins (b. 2890 - d. Left Middle-earth 3021 TA)**: Finder of the One Ring, uncle of Frodo.
+
+EOF
+) | less -R

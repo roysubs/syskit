@@ -1,0 +1,164 @@
+Adding the docker run -v $HOST_DIR as a Syncthing share
+=====
+
+The Docker script mounts HOST_DIR (/mnt/sdc1/Downloads/0-torrents-complete) into the container at /sync/0-torrents-complete with the -v flag. This does not create a syncthing share though and so only "Default Folder" (/var/syncthing/Sync) is shown in the Syncthing GUI.
+
+To make the custom mount /mnt/sdc1/Downloads/0-torrents-complete (mounted at /sync/0-torrents-complete) a shared folder in Syncthing:
+- In the Syncthing Web GUI, click the "Add Folder" button (you can see it in your screenshot below the "Default Folder").
+- Folder ID: Give it a unique ID (e.g., torrents-complete). This ID is used internally by Syncthing.
+- Folder Path: This is the crucial part, and is the where the directory is mounted inside the container (/sync/0-torrents-complete).
+- Give it a Folder Label (e.g., "Completed Torrents") so you can easily identify it.
+- Configure the Folder Type (Send & Receive, Send Only, or Receive Only) and other settings as needed for your syncing setup.
+- Click "Save".
+After saving, Syncthing will add this new folder to its configuration, scan it, and you will then be able to share it with other Syncthing devices.
+It is also fine to remove /var/syncthing/Sync as a shared folder as that probably won't be useful.
+The Docker script correctly provides access to the directory for the container, but you must tell Syncthing itself to manage and share that directory.
+
+
+How to remove the two warnings that appear on first run of the web client
+=====
+
+Go to Actions (top right) > Settings > GUI
+
+1. Setting a GUI Authentication User and Password
+- "Danger! The Syncthing admin interface is configured to allow remote access without a password. This can easily give hackers access to read and change any files on your computer. Please set a GUI Authentication User and Password in the Settings dialogue."
+
+Find the fields for "GUI Authentication User" and "GUI Authentication Password".
+Enter your desired username in the "GUI Authentication User" field.
+Enter a strong password in the "GUI Authentication Password" field and confirm it if prompted.
+Scroll down and click the "Save" button at the bottom of the settings dialog.
+After saving, Syncthing will likely restart its GUI, and you should be prompted to enter the username and password you just set the next time you access the Web GUI.
+
+2. Addressing the Warning about Local Access
+- "GUI Authentication: Set User and Password... If you want to prevent other users on this computer from accessing Syncthing and through it your files, consider setting up authentication," relates to the address Syncthing's GUI is listening on.   
+
+If the GUI is listening on 127.0.0.1 or localhost: This means the GUI is only accessible from the same computer where Syncthing is running. While this is more secure than being accessible from other machines on your network, the warning still advises setting a password. This is because other users logged into the same computer, or even certain malicious processes running on the computer, could potentially access the Syncthing GUI if it's unsecured. Setting a password adds an extra layer of protection against these local threats.
+If the GUI is listening on a different IP address (e.g., 0.0.0.0 or your local network IP): This means the GUI is accessible from other devices on your network. In this case, setting a username and password is crucial to prevent anyone on your network from accessing and controlling your Syncthing instance and potentially accessing your files.
+By following the steps in section 1 and setting a GUI Authentication User and Password, you will address both of these warnings and significantly improve the security of your Syncthing installation.
+
+3. The GUI section warning:
+- "The GUI address is overridden by startup options. Changes here will not take effect while the override is in place,"
+
+You can't change the GUI address directly within the Web GUI settings interface because this has been setup by the command that started Syncthing, as command-line arguments override whatever is set in config.xml. This ensures that the GUI is always available at a predictable address, regardless of any changes made through the Web GUI.
+
+If the startup option sets the GUI address to listen on 0.0.0.0 or your local network IP address, Syncthing is accessible from other devices, triggering the "allow remote access without a password" warning.
+Even if it's set to 127.0.0.1 (localhost), the second warning about other local users/processes can still apply.
+Setting the GUI Password (Still Possible!): The good news is that the message about the address being overridden does not prevent you from setting the GUI authentication user and password. The password setting is separate from the address setting, even though they are on the same "GUI" tab in the settings. Therefore, to set the password, simply ignore the message about the address override. After saving a new password, the GUI should restart, and you will be prompted for the username and password you just set when you next access it. This will resolve the security warnings about the GUI being unprotected.
+
+Common places to check for configuration files or startup scripts include:
+
+/etc/systemd/system/syncthing@.service or similar paths on Linux using systemd.
+/etc/init.d/syncthing or similar on Linux using init.d.
+The Syncthing service properties in the Windows Services console.
+Syncthing's own documentation for your specific operating system and installation method.
+Understanding where the address is set in the startup options can be helpful for advanced configuration, but it is not necessary to set the GUI password and address the security warnings. Setting the password via the GUI settings as described above is the standard way to secure the Web GUI itself.
+
+
+
+If the container is destroyed, will the same configuration persist when I recreate a new container (will my shares still be there)?
+=====
+
+Yes, the Syncthing configuration is persistent even between destroying the container due to:
+DOCKER_CMD+=" -v \"$ST_HOST_CONFIG_DIR:/var/syncthing/config\""
+
+This creates a volume mount at $HOME/.config/syncthing-docker, ensuring that the configuration for Syncthing is outside of the container, so destroying and recreating the container will immediately re-establish all previous settings (i.e., it will not wipe the configuration and create a blank setup). This line creates a volume mount. Syncthing stores its primary configuration file (config.xml), keys, and other essential data within its configuration directory, which by default is /var/syncthing/config in the official Docker image. Because you are mapping this directory to a location on your host filesystem, the config.xml file and all your Syncthing settings (including your device ID, connected devices, and defined shared folders) are stored outside the Docker container.
+
+Therefore, if you stop and remove the Syncthing container and then recreate a new one using the same script, the new container will mount the existing configuration directory from your host machine. This means your shares, device pairings, and all other settings will be preserved. This setup ensures that your Syncthing configuration is persistent and survives the lifecycle of the Docker container itself.
+
+The container will just pick up where you left off, and no synced data will be lost.
+
+The actual files being synced on your host are stored in a directory that is mounted into the container via the -v "$TORRENTS_HOST_DIR:/sync/0-torrents-complete" line. This means the data lives on your host machine's filesystem, outside of the ephemeral container layer. When you remove the container (docker rm), you are only deleting the container instance, not the data volumes on your host.
+
+If you then recreate the container, it will just pick up where it left off with sync partners.
+
+
+
+How do I add additional volume mounts to share?
+=====
+
+Volume mounts can only be added during the *creation* of a container (cannot be added dynamically, except by a direct mount, or bind mount), but this is simple to do: stop and rm the container, then alter the startup script to include the additional volume mount, then create/start the new container (which will pick up all configuration, and so will be the same as the previous container) and go into the GUI and add the new volume mount as a Syncthing share, OR, to add shared locations WITHOUT destroying the container, simply create a 'bind mount' within the existing share.
+
+
+
+If I run this one script on 3 different computers, all in remote locations, just by adding the shares and establishing the connections (all in the web GUI) I can setup a 3-way sync mesh easily?
+=====
+
+Yes, that is exactly how you would set up a 3-way sync mesh with Syncthing using that Docker script on multiple machines in remote locations.
+
+Independent Syncthing Instances: Running that script on three different computers will create three separate Syncthing instances, each running in its own Docker container. Crucially, because the script mounts the configuration directory ($HOME/.config/syncthing-docker) locally on each host machine, each Syncthing instance will generate its own unique Device ID and maintain its own independent configuration. This is exactly what you want for a decentralized sync setup.
+
+Setting up the Sync Mesh via the GUI: Once the containers are running on all three machines and you've set up GUI passwords (as we discussed earlier for security), you would use the Syncthing Web GUI on each instance to build the mesh:
+
+Add Folders: On each machine, add the local directories you want to sync as shared folders in the Syncthing GUI, using the container paths (e.g., /sync/0-torrents-complete). Make sure the Folder ID is the same for the same logical folder across all three machines (e.g., always use torrents-complete for your torrents folder).
+Connect Devices: On each Syncthing instance's GUI, click "Add Remote Device". You will need the Device ID of the other two machines. You can find a device's ID in the "This Device" section on its GUI. Add the Device IDs of the other two computers to each instance.
+Share Folders with Devices: Once the devices are connected (they should show up as "Remote Devices"), go back to the settings for each shared folder. Under the "Sharing" tab for the folder, select which of your connected remote devices you want to share that specific folder with. For a 3-way mesh for a single folder, you would select the other two devices for that folder on each machine.
+Once you've performed these steps on all three machines, Syncthing will handle the discovery, connection, and synchronization of the shared folders across the three devices, forming a 3-way sync mesh. The host networking mode used in your script helps with local discovery, but for remote machines, Syncthing's global discovery and relaying will help them find each other over the internet.
+
+So, yes, running the script and then configuring the shares and connections via the Web GUI on each instance is the correct and easy way to establish your 3-way sync mesh.
+
+Here's the working model for how Syncthing connects your computers:
+
+Device IDs are Key: Instead of usernames or passwords for initial connection, Syncthing uses unique Device IDs. When you first install Syncthing on each computer, it generates a long, unique identifier for that specific installation. This is what you'll use to tell one Syncthing instance about another you want to connect to. Think of it like a unique serial number for each Syncthing on your network. You will need to share these Device IDs between your machines to link them.
+
+Discovery: Once you've added a remote device using its Device ID, your Syncthing instance needs to figure out how to reach it.
+
+Local Discovery: If the devices were on the same local network (which yours aren't in this case), Syncthing would use local broadcasts to find them.
+Global Discovery: For devices in different locations behind different routers, Syncthing uses global discovery servers on the internet. Your Syncthing instance reports its Device ID and external IP address to these servers. When you add a remote device by its ID, your Syncthing asks the global discovery network for the IP address associated with that ID.
+Connection Attempts (Direct Connection vs. Relaying): After discovering the potential IP address of the remote device, your Syncthing will attempt to establish a direct connection.
+
+Direct Connection: This is the ideal scenario for speed. If the routers and firewalls between your computers allow it, Syncthing will try to connect directly using its sync protocol port (default is 22000 TCP and UDP). This is where port forwarding can come into play.
+NAT Traversal: Syncthing attempts techniques like NAT hole punching to establish a direct connection even if a strict port forward isn't explicitly set up. However, the success of this depends on the specific router configurations.
+Relaying: If a direct connection cannot be established (often due to strict firewalls or complex NAT), Syncthing will automatically try to connect through a relay server. Relay servers are community- Contributed servers that simply forward the encrypted data between your devices. This allows your devices to sync even without any special router configuration, but it will generally be slower than a direct connection. Syncthing's data is end-to-end encrypted, so the relay server cannot read your files.
+Addressing Your Questions Directly:
+
+
+
+Do I need to pass tokens between the machines?
+=====
+
+Yes, you need to pass the Device IDs between the machines. When you add a remote device in the Syncthing web interface, you will enter the Device ID of the other computer. This is how you "introduce" the machines to each other and grant them permission to connect and sync shared folders. These Device IDs are often referred to in a similar context to how some systems might use tokens for initial pairing.
+
+
+
+Do I need to open ports on the routers?
+=====
+
+Not necessarily required for the devices to talk at all, but highly recommended for better performance.
+Syncthing can often connect using relaying without any port forwarding.
+To achieve a faster, direct connection, you ideally want to configure port forwarding on your routers. The default port Syncthing uses for syncing is 22000 (TCP and UDP). Forwarding this port from your router's external IP to the internal IP of the computer running Syncthing in each location will significantly increase the chances of a direct connection.
+Syncthing also uses port 21027 (UDP) for local and global discovery. While not strictly necessary for connection if global discovery works via port 22000, allowing this port can help with device discovery.
+Many routers support UPnP (Universal Plug and Play), which Syncthing can often use to automatically configure port forwards. Check your router's settings and enable UPnP if you're comfortable with it (be aware of the potential security implications of UPnP). If not, you'll need to set up port forwarding manually in your router's administration interface.
+In Summary:
+
+You'll install Syncthing on each of the three computers. On one computer, you'll get its Device ID. On another computer, you'll add a remote device using that first computer's Device ID. You'll repeat this process until all three computers have each other added as remote devices. You'll also need to share folders and link them between the devices.
+
+Syncthing will then use global discovery to find the IP addresses and attempt to connect. If direct connections (potentially aided by manual port forwarding of port 22000 TCP/UDP or UPnP) are possible, it will use those for faster sync. If not, it will fall back to using relay servers, allowing syncing to happen but at a potentially slower speed.
+
+For a beginner, the easiest way to start is to install Syncthing on all three, add the Device IDs, and let Syncthing try to connect using its default settings (which include global discovery and relaying). If you find the sync speeds are slow, you can then investigate setting up port forwarding on your routers for port 22000.
+
+
+
+How to show the Syncthing Device ID?
+==========
+
+You can get your Syncthing Device ID in a couple of ways:
+
+1. Using the Syncthing Web GUI (Most Common and Easiest):
+
+This is the standard and most user-friendly way to find your Device ID.
+
+Open your web browser and go to the Syncthing web interface. By default, this is usually at http://localhost:8384. If you're accessing it from another computer, you might need to use the IP address of the computer running Syncthing.
+In the top right corner of the Syncthing web interface, you'll see an "Actions" button. Click on it.
+From the dropdown menu, select "Show ID".
+A window will pop up displaying your device's long, unique Device ID. You can easily copy it from there.
+2. Using the Command Line:
+
+If you're comfortable with the command line, you can also retrieve the Device ID this way.
+
+Open your terminal or command prompt.
+Navigate to the directory where the Syncthing executable is located, if it's not in your system's PATH.
+Run the command: syncthing --device-id
+This command will print the Device ID to your console.
+
+The Device ID is a long string of characters, usually grouped with hyphens for readability (e.g., ABCD123-EFGH456-IJKL789-...). You'll need to copy and paste this ID into the "Add Remote Device" section of Syncthing on your other computers to link them.
+

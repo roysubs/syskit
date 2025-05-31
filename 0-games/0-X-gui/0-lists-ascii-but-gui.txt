@@ -1,0 +1,19 @@
+https://standardcombo.itch.io/pyramid-builder
+
+Pyramid Builder
+Guide workers through Farming, Unloading cargo and Pushing gigantic stones to build a mighty Pyramid, in pure ASCII delight!
+
+Pyramid Builder is a God simulation game where you grow a civilization, strengthen your delivery fleet and bask in the awesomeness of an innovative art style.
+
+Can you complete the Pyramid in less than 30 days?
+
+More information
+Status	Released
+Platforms	Windows, macOS, Linux
+Rating	
+Rated 4.4 out of 5 stars
+(89total ratings)
+Author	standardcombo
+Genre	Simulation
+Tags	2D, ascii, City Builder, god, Idle, Isometric, Ludum Dare 36, Minimalist, Retro, Text based
+Links	Ludum Dare

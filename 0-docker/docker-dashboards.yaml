@@ -1,0 +1,100 @@
+services:
+
+  heimdall:
+    image: linuxserver/heimdall:latest
+    container_name: heimdall
+    restart: unless-stopped
+    ports:
+      - "8091:80"  # HTTP access
+      - "8443:443" # HTTPS access
+    volumes:
+      - ~/.config/heimdall-docker:/config
+    environment:
+      - PUID=1000 # Your user ID
+      - PGID=1000 # Your group ID
+      - TZ=Etc/UTC # Set your timezone, e.g., Europe/Oslo
+    # Notes:
+    # - Change PUID/PGID to match your user.
+    # - Default credentials might be prompted on first visit or check Heimdall docs.
+
+  homer:
+    image: b4bz/homer:latest
+    container_name: homer
+    restart: unless-stopped
+    ports:
+      - "8092:8080" # Homer runs on 8080 in container
+    volumes:
+      - ~/.config/homer-docker/assets:/app/assets
+    # Notes:
+    # - You MUST create your own 'config.yml' inside '~/.config/homer-docker/assets/'.
+    # - Refer to Homer documentation for config.yml examples.
+
+  homarr:
+    image: ghcr.io/ajnart/homarr:latest
+    container_name: homarr
+    restart: unless-stopped
+    ports:
+      - "7575:7575"
+    volumes:
+      - ~/.config/homarr-docker/configs:/app/data/configs
+      - ~/.config/homarr-docker/icons:/app/data/icons
+      - /var/run/docker.sock:/var/run/docker.sock:ro # Optional: For Docker integration widget
+    # Notes:
+    # - Initial setup is done via the web UI on first visit.
+    # - Docker socket mount is read-only and optional.
+
+  dashy:
+    image: lissy93/dashy:latest
+    container_name: dashy
+    restart: unless-stopped
+    ports:
+      - "8093:8080" # Dashy's internal port is 8080
+    volumes:
+      - ~/.config/dashy-docker/user-data:/app/user-data # For conf.yml, icons, themes etc.
+    # environment: # Optional, Dashy usually picks these up well
+    #   - NODE_ENV=production
+    #   - UID=1000 # Your user ID - if you face permission issues with volume
+    #   - GID=1000 # Your group ID - if you face permission issues with volume
+    # Notes:
+    # - Create your 'conf.yml' in '~/.config/dashy-docker/user-data/' or configure via UI.
+    # - If 'conf.yml' is missing, Dashy provides a default and UI editor.
+
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    ports:
+      - "8094:3000"
+    volumes:
+      - ~/.config/homepage-docker:/app/config # For all configuration files
+      - /var/run/docker.sock:/var/run/docker.sock:ro # Required for Docker widgets
+    # Notes:
+    # - You MUST create your configuration files (e.g., services.yaml, widgets.yaml, docker.yaml, settings.yaml)
+    #   inside '~/.config/homepage-docker/'.
+    # - Refer to Homepage documentation for configuration examples.
+    # - Docker socket is read-only.
+
+  flame:
+    image: pawelmalak/flame:latest
+    container_name: flame
+    restart: unless-stopped
+    ports:
+      - "5005:5005"
+    volumes:
+      - ~/.config/flame-docker/data:/app/data
+    # environment: # Optional
+    #   - PASSWORD=your_secure_password # Set a password for Flame's GUI if desired
+    # Notes:
+    # - Initial setup and application/bookmark adding is done via the web UI.
+    # - If PASSWORD is set, you'll need it to log in and make changes.
+
+# General Notes for all services:
+# 1. Host Ports: Ensure the host ports (e.g., 8080, 8081, 7575, 4001, 3001, 5005) are not already in use.
+#    Change the first part of 'HOST_PORT:CONTAINER_PORT' if needed.
+# 2. Persistent Data: The script will create the host directories if they don't exist.
+#    Paths like '~/.config/...' will be expanded to '/home/your_user/.config/...'.
+# 3. Docker Socket: Services like Homarr and Homepage can use the Docker socket to display container information.
+#    This is mounted read-only (':ro') for security.
+# 4. PUID/PGID: For linuxserver/heimdall, PUID/PGID are recommended. For others, they are often optional
+#    but can be useful if you encounter file permission issues with the mounted volumes.
+#    Find your PUID/PGID by running 'id $USER' in your terminal.

@@ -1,0 +1,90 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Webmin Overview
+=================
+
+### What is Webmin?
+- **Webmin** is a web-based interface for system administration on Unix-based systems. It allows administrators to manage servers remotely through a web browser.
+- It supports a wide range of modules that allow you to control various system functions like user management, DNS, firewall settings, Apache, and MySQL.
+
+### Features:
+- **User Management**: Create, modify, and delete user accounts.
+- **Service Management**: Start/stop/restart system services (e.g., Apache, MySQL).
+- **System Monitoring**: View system resources, memory, disk usage, and more.
+- **Software Package Management**: Install/remove software packages on your server.
+- **Security**: Configure firewall, user permissions, and SSH settings.
+
+### Installation on Debian-based systems:
+
+1. **Install Webmin**:
+    ```bash
+    sudo apt update
+    sudo apt install software-properties-common apt-transport-https
+    sudo add-apt-repository "deb https://download.webmin.com/download/repository sarge contrib"
+    curl https://download.webmin.com/jcameron-key.asc | sudo apt-key add
+    sudo apt update
+    sudo apt install webmin
+    ```
+
+2. **Access Webmin**:
+    - Open a web browser and navigate to `https://<your-server-ip>:10000`.
+    - Log in with your root credentials (or any other authorized user with sudo privileges).
+
+3. **Start/Stop Webmin**:
+    ```bash
+    sudo systemctl start webmin
+    sudo systemctl stop webmin
+    sudo systemctl restart webmin
+    ```
+
+### Webmin Modules:
+Webmin includes many modules that extend its functionality. Some popular ones include:
+- **Apache Webserver**: Configure and monitor Apache.
+- **MySQL Database Server**: Manage MySQL databases and users.
+- **SSH Server**: Set up and manage SSH configuration.
+- **System Logs**: View and search logs from system services.
+
+### Useful Commands:
+- **Start Webmin service**:
+    ```bash
+    sudo systemctl start webmin
+    ```
+- **Enable Webmin to start on boot**:
+    ```bash
+    sudo systemctl enable webmin
+    ```
+- **Check Webmin service status**:
+    ```bash
+    sudo systemctl status webmin
+    ```
+- **Install modules**:
+    - Webmin modules can be installed from the Webmin UI under **Webmin → Webmin Configuration → Webmin Modules**.
+
+### Troubleshooting:
+- **Check Webmin logs**:
+    ```bash
+    sudo tail -f /var/webmin/miniserv.log
+    ```
+- **Restart Webmin if it fails**:
+    ```bash
+    sudo systemctl restart webmin
+    ```
+
+### Webmin Security:
+- **Change default Webmin port**: You can change the default port (10000) by editing the Webmin configuration file:
+    ```bash
+    sudo nano /etc/webmin/miniserv.conf
+    ```
+    Find the line `port=10000` and change it to your desired port.
+- **SSL/TLS Encryption**: Webmin supports SSL out-of-the-box. Ensure you configure it properly for encrypted communication by setting up a valid certificate.
+- **Configure firewall**: If you use a firewall, open port 10000 (or your configured port) for Webmin access:
+    ```bash
+    sudo ufw allow 10000/tcp
+    ```
+
+EOF
+) | less -R

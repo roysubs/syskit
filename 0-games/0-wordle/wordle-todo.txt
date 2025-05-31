@@ -1,0 +1,6 @@
+https://github.com/0xquark/wordle.sh
+https://github.com/edkalrio/wordle.sh
+https://github.com/jpcanovas/WordleBash
+https://github.com/AyahRamahi/BashWordle
+https://github.com/mongodb-developer/bash-wordle
+https://github.com/pforret/shwordle

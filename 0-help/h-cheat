@@ -1,0 +1,126 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Cheat Quick Notes
+
+## Basics
+
+cheat is a console app that comes with a very set of plain text cheatseats for frequently used commands. It also allows users to create, view, and manage these and their own additions to these. Its purpose is to provide quick access to reminders and examples of command syntax and options directly from the terminal, saving you from having to remember complex man pages or search online documentation repeatedly.
+
+### Installation
+
+Installation:
+```bash
+cd /tmp
+wget https://github.com/cheat/cheat/releases/download/4.4.0/cheat-linux-amd64.gz
+gunzip cheat-linux-amd64.gz
+chmod +x cheat-linux-amd64
+sudo mv cheat-linux-amd64 /usr/local/bin/cheat
+```
+
+### Updating Cheat Sheets
+Update all available cheat sheets:
+```bash
+cheat -u
+```
+
+### Custom Cheat Sheets
+- To create your own cheat sheets that won't be overwritten when updating:
+  1. Create a custom folder for your cheat sheets, e.g., `~/.cheat`:
+     ```bash
+     mkdir -p ~/.cheat
+     ```
+  2. Add your custom folder to the `CHEAT_PATHS` environment variable in your shell config (e.g., `~/.bashrc`):
+     ```bash
+     export CHEAT_PATHS="~/.cheat:/path/to/default/cheats"
+     ```
+  3. Reload your shell configuration:
+     ```bash
+     source ~/.bashrc
+     ```
+
+### Color Support
+Cheat supports colorized output. To enable it, set the `CHEAT_COLORS` environment variable:
+```bash
+export CHEAT_COLORS=true
+```
+Add the above line to your shell configuration for persistent settings.
+
+---
+
+## Usage Examples
+
+### View a Cheat Sheet
+```bash
+cheat <topic>
+```
+
+### Search for a Cheat Sheet
+```bash
+cheat -s <keyword>
+```
+
+### Add a New Cheat Sheet
+```bash
+cheat -e <topic>
+```
+
+### Edit an Existing Cheat Sheet
+```bash
+cheat -e <topic>
+```
+
+---
+
+## Advanced Configuration
+
+### Config File
+Customize cheat settings in `~/.config/cheat/conf.yml`. Example:
+```yaml
+default_editor: vim
+syntax_highlighting: true
+```
+
+### Adding Remote Cheat Repositories
+Add additional cheat repositories:
+```bash
+cheat -a https://github.com/username/repository.git
+```
+
+### Viewing Cheat Sheet Sources
+To list all cheat sheet sources:
+```bash
+cheat -l
+```
+
+---
+
+## Tips and Tricks
+
+- **Offline Mode**:
+  - Cheat works offline as all sheets are stored locally.
+
+- **Preview Markdown**:
+  - Use `glow` to preview Markdown files:
+    ```bash
+    glow <file>
+    ```
+
+- **Default Editor**:
+  - Set a default editor for creating or editing cheat sheets by defining the `EDITOR` variable in your shell config:
+    ```bash
+    export EDITOR=nano
+    ```
+
+---
+
+## Resources
+
+- Official Documentation: [https://github.com/cheat/cheat](https://github.com/cheat/cheat)
+- Community Cheat Sheets: [https://github.com/cheat/cheatsheets](https://github.com/cheat/cheatsheets)
+
+EOF
+) | less -R

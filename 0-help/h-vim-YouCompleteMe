@@ -1,0 +1,130 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+
+# YouCompleteMe for Vim
+
+This is a guide to up the **YouCompleteMe** programming autocompletion plugin for **Vim** with installation steps, usage instructions, and how to disable or uninstall the plugin if needed.
+
+## Step 1: Install vim-plug
+
+First, install the `vim-plug` plugin manager if you haven't already. Run the following command in your terminal:
+
+```bash
+curl -fLo ~/.vim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+```
+
+## Step 2: Update .vimrc
+
+Once `vim-plug` is installed, edit your `.vimrc` file to include the following configuration for `YouCompleteMe`:
+
+```vim
+" Initialize vim-plug
+call plug#begin('~/.vim/plugged')
+
+" Install YouCompleteMe
+Plug 'ycm-core/YouCompleteMe'
+
+" End plugin section
+call plug#end()
+```
+
+Save the `.vimrc` file.
+
+## Step 3: Install the Plugin
+
+After updating your `.vimrc`, open Vim and run the following command to install the plugin:
+
+```vim
+:PlugInstall
+```
+
+## Step 4: Install Dependencies
+
+YouCompleteMe requires some additional dependencies to work. Install the following packages:
+
+```bash
+sudo apt install build-essential cmake python3-dev
+```
+
+Then, navigate to the plugin directory and compile YouCompleteMe:
+
+```bash
+cd ~/.vim/plugged/YouCompleteMe
+python3 install.py --all --no-go
+```
+
+This installs without 'go' support. If that is wanted, go must be installed (~250 MB)
+
+```bash
+sudo apt install golang-go
+mkdir ~/go-modules
+cd ~/go-modules
+go mod init example.com/gocode
+go install github.com/nsf/gocode@latest
+export PATH=$PATH:~/go/bin
+# source ~/.bashrc  # If adding to PATH in .bashrc or ~/.zshrc, remember to source afterwards
+gocode -h
+cd ~/.vim/plugged/YouCompleteMe
+python3 install.py --all
+```
+
+## Step 5: Restart Vim
+
+After the installation is complete, restart Vim. You should now have autocompletion with YouCompleteMe!
+
+## Using YouCompleteMe
+
+- **Completion**: As you type, YouCompleteMe will suggest completions. Press `Tab` to cycle through the suggestions.
+- **Manual Trigger**: You can trigger completion manually by pressing `Ctrl-Space`.
+
+## Disabling or Uninstalling YouCompleteMe
+
+If you no longer need the plugin, you can disable or uninstall it as follows:
+
+### 1. Disable YouCompleteMe Temporarily
+
+To temporarily disable the plugin without removing it completely, you can comment out the `Plug` line in your `.vimrc`:
+
+```vim
+" Plug 'ycm-core/YouCompleteMe'
+```
+
+Then, restart Vim.
+
+### 2. Uninstall YouCompleteMe
+
+To fully uninstall the plugin, follow these steps:
+
+1. Open `.vimrc` and remove or comment out the line that includes `YouCompleteMe`:
+   ```vim
+   " Plug 'ycm-core/YouCompleteMe'
+   ```
+
+2. Run the following command in Vim to remove the plugin:
+   ```vim
+   :PlugClean
+   ```
+
+3. Optionally, remove the YouCompleteMe directory from `~/.vim/plugged`:
+   ```bash
+   rm -rf ~/.vim/plugged/YouCompleteMe
+   ```
+
+### 3. Clean Up Dependencies
+
+If you no longer need the dependencies installed for YouCompleteMe, you can remove them using:
+
+```bash
+sudo apt remove build-essential cmake python3-dev
+```
+
+## Conclusion
+
+You've now successfully set up, used, and learned how to uninstall the YouCompleteMe plugin in Vim. If you need to re-enable it, simply follow the steps to add it back into your `.vimrc` and run `:PlugInstall` again.
+
+EOF
+) | less -R

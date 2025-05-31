@@ -1,0 +1,20 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+
+# Python with venv (virtual environment)
+`sudo apt install python3-venv pipx`
+
+'pipx run' runs Python apps temporarily without installing them permanently into your system. This is useful when you want to quickly run a Python tool or script without adding it to your PATH or permanently installing it. It opens a Python application once from a package, installing it in an isolated environment just for that run. After it's done, the package is removed (unless explicitly installed with pipx install). It's more for one-time usage of a package.
+
+'pipx install' installs a package into a persistent virtual environment and makes it available for regular use, typically by adding it to the PATH (e.g., by creating a symlink in ~/.local/bin).
+
+e.g., To install topydo, use 'pipx install topydo' and it is installed permanently in an isolated environment, but the 'topydo' command is available without needing to use 'pipx run'.
+
+'pipx run topydo' would only be useful if you wanted to try out Topydo temporarily without installing it permanently (or to run a specific version of Topydo without permanently adding it to your system).
+
+EOF
+) | less -R

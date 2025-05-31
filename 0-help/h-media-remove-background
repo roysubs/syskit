@@ -1,0 +1,118 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Remove the Background from an Image on Linux
+
+Using Python makes image editing easy on Linux.  
+
+By **Don Watkins**  
+*April 10, 2023 | 3 Comments | 3 min read*  
+
+---
+
+You have a great picture of yourself and want to use it for your social media profile, but the background is distracting. Another picture has the perfect background for your profile picture. How do you combine the two? Many smartphone apps can handle this, but they're often expensive, riddled with adware, or not open source. Enter **Rembg**!
+
+## What is Rembg?
+
+Rembg is an open-source tool written in Python that can easily remove the background from images. It supports Python versions between 3.7 and 3.11.  
+
+### Check Your Python Version
+
+First, verify your Python version: `python3 --version`
+If you have Python 3.7 or later installed, you're good to go.
+
+---
+
+## Install Rembg on Linux
+
+1. **Create a Python Virtual Environment:**  
+
+   ```bash
+   $ python3 -m venv /home/your-username/PythonCoding
+   ```
+
+2. **Activate the Virtual Environment:**  
+
+   ```bash
+   $ source /home/your-username/PythonCoding/bin/activate
+   ```
+
+3. **Install Rembg Using `pip`:**  
+
+   ```bash
+   $ python3 -m pip install rembg
+   ```
+
+---
+
+## Remove the Background from an Image
+
+Once installed, you can use Rembg to remove an image background. For example:
+
+```bash
+$ rembg i input_image.jpg output_image.png
+```
+
+The first time you run Rembg, it downloads the U-2-Net pattern recognition model (~100 MB).
+The model is stored in `~/.u2net/u2net.onnx`.
+
+---
+
+## Example: Removing a Background
+
+Suppose you have an image named `dgw_ato.jpeg`. Run the following command to create a new version without the background:
+
+```bash
+$ rembg i dgw_ato.jpeg dgw_noback.jpg
+```
+
+On a Ryzen 7 with 16 GB of RAM, this process takes about 10 seconds.
+
+---
+
+## Add a New Background
+
+To add a new background to your image, you can use tools like **GIMP** or **Krita**.  
+
+### Steps with GIMP:
+
+1. Open the image without the background in GIMP.
+2. Go to `File > Open as Layers` and select the background image.
+3. In the layers panel, drag the background layer below your main image.
+4. Adjust and save the final image.
+
+---
+
+## Explore Rembg Features
+
+Rembg provides three primary subcommands, accessible via `--help`:
+
+```bash
+$ rembg --help
+```
+
+- **`rembg i`**: Process individual files.
+- **`rembg p`**: Process folders.
+- **`rembg s`**: Run an HTTP server for image processing.
+
+---
+
+## Why Use Rembg?
+
+Rembg is faster and more effective than traditional tools like GIMP for removing backgrounds. Plus, it's open source and released under the MIT license.
+
+---
+
+## Additional Resources
+
+- [Linux Commands Cheat Sheet](https://opensource.com/article/21/7/linux-commands)
+- [Advanced Linux Commands Cheat Sheet](https://opensource.com/article/21/7/advanced-linux-commands)
+- [SELinux Cheat Sheet](https://opensource.com/article/21/7/selinux-commands)
+
+Try Rembg for your next image-editing project!
+
+EOF
+) | less -R

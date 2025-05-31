@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Define the file path
+FILE="/tmp/awesome-useful-projects-repos.md"
+URL="https://raw.githubusercontent.com/Furthir/awesome-useful-projects/main/repos.md"
+INTRO="# Intro
+A list of over 500 (and counting) open source projects. These are projects useful for any person from tech-illiterate to head developer (except for the 'Other' section, which is just for fun). This list does **NOT** include projects related to development such as APIs, libraries, and frameworks."
+
+# Check if the file already exists
+if [[ -f "$FILE" ]]; then
+    echo "File already exists. Update from github.com? (y/n)"
+    read -r response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        curl -s -o "$FILE" "$URL"
+        echo -e "$INTRO\n\n$(cat "$FILE")" > "$FILE"
+        echo "File updated."
+    else
+        echo "Using the existing file."
+    fi
+else
+    # Fetch the file from GitHub
+    echo "Downloading file..."
+    curl -s -o "$FILE" "$URL"
+    echo -e "$INTRO\n\n$(cat "$FILE")" > "$FILE"
+    echo "File downloaded and prepared."
+fi
+
+# Display the file using glow
+# glow -p -w $(( $(tput cols) - 6 )) "$FILE"
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat "$FILE") | less -R
+

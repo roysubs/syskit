@@ -1,0 +1,218 @@
+#!/bin/bash
+# Pacman User Interface (pacui) Script
+# Provides utilities for pacman package management with history and detailed info.
+
+# Define colors
+RED='\e[31m'
+GREEN='\e[32m'
+NC='\e[0m' # No Color
+
+# Function to show usage help
+show_help() {
+    echo "Pacman Tool. Usage:  [option] <package(s)/search_term(s)>"
+    echo "Options:"
+    echo "  i <package(s)>     Install the specified package(s) (uses sudo pacman -S)"
+    echo "  h                  History: show install/remove/upgrade history from pacman.log"
+    echo "  r <package(s)>     Remove the specified package(s) recursively (uses sudo pacman -Rs)"
+    echo "  s <package(s)>     Search for packages in repos (name & description) (pacman -Ss)"
+    echo "  sno <regex>        Search repo package names only using regex (pacman -Ssq)"
+    echo "  sl <package(s)>    Search locally installed packages (pacman -Qs)"
+    echo "  sbin <pattern>     Search for filenames matching pattern in bin paths (needs 'pacui Fy' first, uses pacman -Fx)"
+    echo "  sx <pkg_pattern>   Show executable files in packages found by pkg_pattern (needs 'pacui Fy' for repo pkgs)"
+    echo "  up                 Update repos & upgrade all packages (sudo pacman -Syu)"
+    echo "  u                  Update repos, upgrade all, then autoremove orphans (sudo pacman -Syu then -Rns \$(pacman -Qdtq))"
+    echo "  ar                 Autoremove orphaned packages (sudo pacman -Rns \$(pacman -Qdtq))"
+    echo "  v <package>        View info: version, deps, contents (installed first, then repo)"
+    echo "  d <package>        Depends: Packages required by the specified package (pactree)"
+    echo "  dr <package>       Reverse Depends: Packages that depend on the specified package (pactree -r)"
+    echo "  Fy                 Force sync package file lists (sudo pacman -Fy, needed for sbin/sx on repo pkgs)"
+    echo "  o <file_path>      Owner: find which package owns the specified file (pacman -Qo or pacman -F)"
+    echo
+}
+
+# Function to print a command in green and execute it
+run_command() {
+    local full_cmd_string="$1"
+    echo -e "# ${GREEN}${full_cmd_string}${NC}"
+    bash -c "$full_cmd_string"
+    return $?
+}
+
+# Show help if no arguments are provided
+if [ $# -eq 0 ]; then
+    show_help
+    exit 0
+fi
+
+option=$1
+shift # Shift to access package arguments
+
+# Check if pacman-contrib is installed for pactree
+check_pactree() {
+    if ! command -v pactree &> /dev/null; then
+        echo -e "${RED}pactree command not found. It's part of 'pacman-contrib'.${NC}"
+        echo "Please install it with: sudo pacman -S pacman-contrib"
+        return 1
+    fi
+    return 0
+}
+
+case "$option" in
+    i)
+        run_command "sudo pacman -S $@"
+        ;;
+    h)
+        PACMAN_LOG="/var/log/pacman.log"
+        echo "Reading Pacman history from $PACMAN_LOG"
+        echo "Filtering for installed, removed, upgraded actions..."
+        if [[ -f "$PACMAN_LOG" ]]; then
+            grep -E 'Running '"'"'pacman.* (-S|QS|R|U) |(installed|removed|upgraded) [^ ]+ \(|reinstalled' "$PACMAN_LOG" | tail -n 100
+        else
+            echo -e "${RED}Log file $PACMAN_LOG not found.${NC}"
+        fi
+        if command -v cowsay &>/dev/null; then cowsay "'pacman' history processed. Moo."; fi
+        ;;
+    r)
+        run_command "sudo pacman -Rs $@"
+        ;;
+    s)
+        run_command "pacman -Ss $@"
+        ;;
+    sno)
+        echo "Searching repository package names matching regex '$@':"
+        run_command "pacman -Ssq $@"
+        ;;
+    sl)
+        run_command "pacman -Qs $@"
+        ;;
+    sbin)
+        echo "Searching for files in /bin, /usr/bin, /sbin, /usr/sbin matching pattern '$@'."
+        echo "This uses 'pacman -Fx' and requires file lists to be synced ('pacui Fy')."
+        # Regex to find paths like /usr/bin/something<pattern>something_else
+        # The pattern can be part of the filename.
+        # We construct a regex that looks for the pattern within a filename, inside common bin directories.
+        local search_pattern="$1"
+        local final_regex="/(s?bin|games)/[^/]*${search_pattern}[^/]*$"
+        run_command "pacman -Fx -- \"${final_regex}\""
+        ;;
+    sx)
+        pkg_pattern="$1"
+        echo "Finding packages matching pattern '$pkg_pattern', then listing their executables."
+        echo "For uninstalled packages, this requires file lists ('pacui Fy')."
+        # Find packages matching the pattern (names or descriptions)
+        # -Ssq gives only names, perfect for scripting
+        PACKAGES=$(pacman -Ssq "$pkg_pattern")
+        if [ -z "$PACKAGES" ]; then
+            echo "No packages found matching '$pkg_pattern'."
+        else
+            echo "Found packages: $PACKAGES"
+            for pkg_name in $PACKAGES; do
+                echo -e "${GREEN}--- Potential executables in package: $pkg_name ---${NC}"
+                if pacman -Q "$pkg_name" &>/dev/null; then
+                    # Installed package
+                    run_command "pacman -Ql '$pkg_name' | grep -E '/(s?bin|games)/[^/]+$|/opt/[^/]+/bin/[^/]+$' | sed 's/^[^ ]* //'"
+                else
+                    # Repository package (needs -Fy)
+                    echo "(Checking repository files for $pkg_name, ensure 'pacui Fy' was run)"
+                    run_command "pacman -Fl '$pkg_name' | grep -E '/(s?bin|games)/[^/]+$|/opt/[^/]+/bin/[^/]+$' | sed 's/^[^ ]* //'"
+                fi
+            done
+        fi
+        ;;
+    up)
+        run_command "sudo pacman -Syu"
+        ;;
+    u)
+        if run_command "sudo pacman -Syu"; then
+            echo "System upgraded. Now checking for orphaned packages..."
+            ORPHANS=$(pacman -Qdtq)
+            if [ -n "$ORPHANS" ]; then
+                echo -e "Orphaned packages found:\n$ORPHANS"
+                read -r -p "Do you want to remove them? (y/N): " confirm
+                if [[ "$confirm" =~ ^[yY](es)?$ ]]; then
+                    run_command "sudo pacman -Rns $ORPHANS"
+                else
+                    echo "Orphan removal skipped."
+                fi
+            else
+                echo "No orphaned packages to remove."
+            fi
+        fi
+        ;;
+    ar)
+        ORPHANS=$(pacman -Qdtq)
+        if [ -n "$ORPHANS" ]; then
+            echo -e "Orphaned packages found:\n$ORPHANS"
+            run_command "sudo pacman -Rns $ORPHANS"
+        else
+            echo "No orphaned packages to remove."
+        fi
+        ;;
+    v)
+        package="$1"
+        echo "Information for '$package':"
+        if pacman -Qi "$package" &>/dev/null; then
+            echo "--- Information for INSTALLED package '$package' (pacman -Qi) ---"
+            run_command "pacman -Qi '$package'"
+            echo
+            read -n 1 -s -r -p "Press any key to show package contents (pacman -Ql), or 's' to skip..." keypress
+            echo
+            if [[ "$keypress" != "s" && "$keypress" != "S" ]]; then
+                run_command "pacman -Ql '$package'"
+            fi
+        elif pacman -Si "$package" &>/dev/null; then
+            echo "--- Information for REPOSITORY package '$package' (pacman -Si) ---"
+            echo "(Package is not installed locally)"
+            run_command "pacman -Si '$package'"
+            echo
+            read -n 1 -s -r -p "Press any key to show package contents (pacman -Fl, needs 'pacui Fy'), or 's' to skip..." keypress
+            echo
+            if [[ "$keypress" != "s" && "$keypress" != "S" ]]; then
+                echo "(Ensure 'pacui Fy' was run for up-to-date file lists)"
+                run_command "pacman -Fl '$package'"
+            fi
+        else
+            echo -e "${RED}Package '$package' not found in installed packages or repositories.${NC}"
+        fi
+        ;;
+    d)
+        if ! check_pactree; then exit 1; fi
+        for package in "$@"; do
+            echo "Dependencies for '$package' (pactree):"
+            run_command "pactree '$package'"
+            # Alternative: pacman -Si $package | grep 'Depends On'
+            echo
+        done
+        ;;
+    dr)
+        if ! check_pactree; then exit 1; fi
+        for package in "$@"; do
+            echo "Reverse dependencies for '$package' (pactree -r):"
+            run_command "pactree -r '$package'"
+            # Alternative: pacman -Sii $package | grep 'Required By'
+            echo
+        done
+        ;;
+    Fy)
+        run_command "sudo pacman -Fy"
+        ;;
+    o)
+        filepath="$1"
+        echo "Checking owner of file '$filepath':"
+        # Try locally first
+        if pacman -Qo "$filepath" &>/dev/null; then
+            run_command "pacman -Qo '$filepath'"
+        else
+            echo "Not owned by any installed package or file not found locally. Checking repositories (needs 'pacui Fy')..."
+            echo "(Ensure 'pacui Fy' was run for up-to-date file lists)"
+            run_command "pacman -F '$filepath'"
+        fi
+        ;;
+    *)
+        echo -e "${RED}Unknown option: $1${NC}\n"
+        show_help
+        exit 1
+        ;;
+esac
+
+exit 0

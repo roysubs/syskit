@@ -1,0 +1,149 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+NFS Quick Notes
+===============
+
+- **NFS Overview**:
+    - NFS (Network File System) is a protocol to share directories and files with others over a network.
+
+- **Installing NFS**:
+    - nfs-kernel-server is for server for sharing, and nfs-common is client to connect to shares
+      ```bash
+      sudo apt install nfs-kernel-server
+      sudo apt install nfs-common
+      ```
+
+- **Configuring the NFS Server**:
+    - Configure shared directories in `/etc/exports`:  `sudo vi /etc/exports`
+    - Example entry for exporting `/srv/nfs` to all clients:
+      ```
+      /srv/nfs *(rw,sync,no_subtree_check)
+      ```
+      - `rw`: Read and write access.
+      - `sync`: Ensure data is written to disk before the server responds.
+      - `no_subtree_check`: Disable subtree checking, improving performance.
+    
+    - Apply the new exports configuration: `sudo exportfs -ra`
+
+    - Restart NFS server to apply changes: `sudo systemctl restart nfs-kernel-server`
+
+- **Configuring the NFS Client**:
+    - Mount a remote NFS share on the client machine: `sudo mount -t nfs server_ip:/srv/nfs /mnt`
+      - Replace `server_ip` with the IP address of the NFS server.
+      - Replace `/srv/nfs` with the NFS directory exported by the server.
+      - Replace `/mnt` with the local mount point.
+
+    - To automatically mount NFS shares on boot, add an entry to `/etc/fstab`:
+      ```
+      server_ip:/srv/nfs /mnt nfs defaults 0 0
+      ```
+
+- **Checking NFS Exports**:
+    - List current NFS exports on the server: `sudo showmount -e`
+
+- **NFS Server Configuration Options**:
+    - **Access Control**: Define who can access the shared directories in `/etc/exports`:
+      - Allow access to a specific IP or subnet:
+        ```
+        /srv/nfs 192.168.1.0/24(rw,sync,no_subtree_check)
+        ```
+
+    - **Mounting Options**: Common options for mounting NFS shares:
+      - `rw`: Read and write access.
+      - `ro`: Read-only access.
+      - `hard`: The client will retry indefinitely if the server goes down.
+      - `soft`: The client will fail after a specified number of retries if the server is down.
+      - `timeo=n`: Set timeout for requests (in tenths of a second).
+      - `intr`: Allow interruption of NFS requests.
+
+- **Managing NFS Services**:
+    - Check NFS server status:
+      ```bash
+      sudo systemctl status nfs-kernel-server
+      ```
+
+    - Start the NFS server:
+      ```bash
+      sudo systemctl start nfs-kernel-server
+      ```
+
+    - Enable the NFS server to start at boot:
+      ```bash
+      sudo systemctl enable nfs-kernel-server
+      ```
+
+    - Stop the NFS server:
+      ```bash
+      sudo systemctl stop nfs-kernel-server
+      ```
+
+    - Restart the NFS server:
+      ```bash
+      sudo systemctl restart nfs-kernel-server
+      ```
+
+- **Unmounting NFS Shares**:
+    - Unmount an NFS share:
+      ```bash
+      sudo umount /mnt
+      ```
+
+    - If the share is busy, force unmount:
+      ```bash
+      sudo umount -f /mnt
+      ```
+
+- **Troubleshooting NFS**:
+    - Test NFS client access:
+      ```bash
+      sudo mount -t nfs server_ip:/srv/nfs /mnt
+      ```
+
+    - Verify NFS server is exporting directories correctly:
+      ```bash
+      sudo exportfs -v
+      ```
+
+    - Check if NFS service is running on the server:
+      ```bash
+      sudo systemctl status nfs-kernel-server
+      ```
+
+    - Check logs for errors:
+      ```bash
+      sudo journalctl -u nfs-kernel-server
+      ```
+
+- **NFSv4 Specifics**:
+    - NFSv4 is a newer version of the protocol that includes improvements in security and performance.
+    - To configure NFSv4, ensure that the server's exports file is set up for NFSv4:
+      ```
+      /srv/nfs *(rw,sync,no_subtree_check,fsid=0,crossmnt)
+      ```
+
+    - Enable NFSv4 on the client by specifying the version:
+      ```bash
+      sudo mount -t nfs4 server_ip:/srv/nfs /mnt
+      ```
+
+- **Securing NFS**:
+    - You can use firewalls to restrict NFS access to specific clients or networks.
+    - Example: Allow only a specific subnet to access NFS shares using `iptables`:
+      ```bash
+      sudo iptables -A INPUT -p tcp --dport 2049 -s 192.168.1.0/24 -j ACCEPT
+      ```
+
+    - Use Kerberos for authentication:
+      - Install Kerberos on the server and client.
+      - Configure `/etc/exports` with Kerberos authentication (`sec=krb5`).
+      - Mount with Kerberos:
+        ```bash
+        sudo mount -t nfs -o sec=krb5 server_ip:/srv/nfs /mnt
+        ```
+
+EOF
+) | less -R

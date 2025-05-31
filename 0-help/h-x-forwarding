@@ -1,0 +1,173 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+
+# X Forwarding
+
+## Basic Setup for X forwarding from Linux to Windows
+- Install Xming (or 
+- Make sure that Xming is running on Windows
+- Check the Xming log (right-click on Xming app in system tray > View Log
+winMultiWindowXMsgProc - DISPLAY=127.0.0.1:0.0
+winProcEstablishConnection - Hello
+winInitClipboard ()
+winProcEstablishConnection - winInitClipboard returned.
+winClipboardProc - Hello
+winMultiWindowXMsgProc - XOpenDisplay () returned and successfully opened the display.
+DetectUnicodeSupport - Windows Vista
+winClipboardProc - DISPLAY=127.0.0.1:0.0
+- Note here DISPLAY is set to 0.0, so it is listening on :0 display by default
+- Most default guides suggest 
+- Connect to the Linux host using -X or -Y
+ssh -X boss@hp2
+
+
+Here's the fix:
+Update the $DISPLAY variable on your SSH session: Instead of localhost:10.0, use localhost:0.0, which corresponds to the display that Xming is actually using (127.0.0.1:0.0).
+
+bash
+Copy
+Edit
+export DISPLAY=localhost:0.0
+Verify Xming settings: Xming is configured to use localhost:0.0 by default, and this matches the DISPLAY output shown in Xming's logs (DISPLAY=127.0.0.1:0.0).
+
+Run the command again: After setting the $DISPLAY variable correctly, try running xclock again:
+
+bash
+Copy
+Edit
+xclock
+This should now correctly display the clock window using Xming on your Windows machine.
+
+If this doesn't work:
+Double-check the firewall settings on your Windows machine to ensure that Xming is not being blocked.
+
+Confirm that Xming is running when you initiate the SSH session and that it hasn't been closed or minimized in the system tray.
+
+Let me know if it works!
+
+## Overview
+If Git keeps prompting for your Personal Access Token (PAT) even though you're using Git Credential Manager (GCM), it may indicate that GCM is not properly saving your credentials. Follow these steps to resolve the issue.
+
+---
+
+## 1. **Check Credential Manager Configuration**
+Ensure that GCM is set up as the credential helper for Git.
+
+Run the following command:
+```bash
+git config --global credential.helper
+Expected Output: manager-core or manager.
+If the output is not manager-core, set it explicitly:
+bash
+Copy code
+git config --global credential.helper manager-core
+2. Verify the Token Is Saved
+After entering your PAT during a git push, ensure that it was saved by GCM.
+
+Run:
+
+bash
+Copy code
+git credential-manager-core list
+Expected Output: An entry for github.com should appear.
+If no entry exists, GCM has not saved your credentials.
+3. Inspect the Git Configuration
+Verify that the URL for your GitHub repository is correct.
+
+Run:
+
+bash
+Copy code
+git remote -v
+Expected Output:
+php
+Copy code
+https://github.com/<username>/<repo>.git
+If the remote URL looks correct and you're still having issues, consider switching to SSH for better authentication management:
+bash
+Copy code
+git remote set-url origin git@github.com:<username>/<repo>.git
+You'll need to set up an SSH key if you haven't already.
+4. Clear and Re-enter Credentials
+If your credentials are not being saved properly, you might need to clear them and re-enter them.
+
+Clear existing credentials:
+
+bash
+Copy code
+git credential-manager-core erase
+Then, try pushing again. GCM should prompt you to enter your credentials, which will be saved.
+
+5. Check GCM Installation
+Ensure that GCM is properly installed.
+
+Run:
+
+bash
+Copy code
+sudo apt-get install git-credential-manager-core
+If GCM is already installed, this will confirm that the latest version is present.
+6. Use an Alternative Credential Helper (Optional)
+If GCM continues to fail, you can use a simpler credential helper like store. This stores credentials in plain text (less secure but simple).
+
+Set the credential helper to store:
+
+bash
+Copy code
+git config --global credential.helper store
+The next time you enter the PAT, it will be saved in ~/.git-credentials.
+7. Enable Debug Logs
+To better understand why GCM isn't saving your credentials, enable debug logging.
+
+Run:
+
+bash
+Copy code
+GIT_TRACE=1 GIT_CURL_VERBOSE=1 git push
+Review the logs to determine where GCM fails to save or load the credentials.
+8. Fix Multiple Values for credential.helper
+If you've encountered an error like this:
+
+bash
+Copy code
+error: cannot overwrite multiple values with a single value
+It means you have multiple values set for credential.helper.
+
+Step-by-Step Fix:
+Inspect Current Configuration: Run:
+
+bash
+Copy code
+git config --global --get-all credential.helper
+Expected Output: Multiple helpers may be listed, e.g.:
+bash
+Copy code
+/usr/local/bin/git-credential-manager
+manager-core
+Remove Existing Values: Run:
+
+bash
+Copy code
+git config --global --unset-all credential.helper
+Set the Correct Helper: After clearing all existing values, set the correct credential helper:
+
+bash
+Copy code
+git config --global credential.helper manager-core
+Verify the Change: Confirm that only one value is set:
+
+bash
+Copy code
+git config --global credential.helper
+Expected Output: manager-core
+Conclusion
+Following these steps should resolve issues with GCM prompting for your PAT repeatedly. If the problem persists, ensure that your GitHub credentials are correct and that GCM is properly installed and configured.
+
+Feel free to reach out for further assistance if the issue is still unresolved!
+
+EOF
+) | less -R

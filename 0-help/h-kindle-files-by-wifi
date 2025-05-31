@@ -1,0 +1,82 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Kindle File Management via WiFi
+
+This guide is for managing files on a Kindle when USB port is still damaged, still charging, but data transfer is broken.
+This will allow copying a `.mobi` file to the Kindle or to delete files from it over WiFi.
+
+## Prerequisites
+- Your Kindle and computer are on the same WiFi network.
+- Access to your Kindle's email address (used for "Send to Kindle").
+- An email account approved in your Kindle's settings.
+- A basic understanding of Kindle's file management via email.
+
+---
+
+## 1. **Setting Up Email for "Send to Kindle"**
+
+1. **Find Your Kindle Email Address**:
+   - On the Kindle, go to **Settings** > **Device Options** > **Personalize Your Kindle** > **Send-to-Kindle Email**.
+   - Note down the email address (e.g., `yourname@kindle.com`).
+
+2. **Add an Approved Email Address**:
+   - Visit [Amazon's Manage Your Content and Devices](https://www.amazon.com/mycd).
+   - Navigate to **Preferences** > **Personal Document Settings**.
+   - Under **Approved Personal Document E-mail List**, add your email address.
+
+---
+
+## 2. **Sending a `.mobi` File to Your Kindle**
+
+1. Open your email client.
+2. Compose a new email:
+   - **To**: Your Kindle email address.
+   - **Subject**: Leave blank or type anything (it doesn’t matter).
+   - **Attachment**: Attach the `.mobi` file.
+3. Send the email.
+
+4. On your Kindle:
+   - Ensure it is connected to WiFi.
+   - Sync your Kindle by tapping **Settings** > **Sync Your Kindle**.
+   - The `.mobi` file should appear in your library.
+
+---
+
+## 3. **Deleting a File from Your Kindle**
+
+If you cannot access your Kindle over USB, use these methods to delete files:
+
+### A. Delete from Kindle Directly:
+1. Open your Kindle library.
+2. Long-press the file you want to delete.
+3. Select **Remove Download** (if synced with Amazon) or **Delete This Book** (if sideloaded).
+
+### B. Remove Files via Amazon Account:
+1. Go to [Manage Your Content and Devices](https://www.amazon.com/mycd).
+2. Locate the file under **Your Content**.
+3. Select it and click **Delete**.
+
+---
+
+## 4. **Troubleshooting**
+
+### File Doesn't Appear:
+- Ensure the file format is supported by Kindle (`.mobi`, `.azw3`, etc.).
+- Verify your Kindle is synced and connected to WiFi.
+
+### File Can't Be Deleted:
+- Restart your Kindle and try again.
+- If the file remains, it may be corrupted—resetting the Kindle may help (back up files first).
+
+---
+
+## Conclusion
+
+Using the "Send to Kindle" feature via email is a reliable alternative to USB file transfer. For file deletions, the Kindle interface or Amazon’s management tools provide viable solutions.
+
+EOF
+) | less -R

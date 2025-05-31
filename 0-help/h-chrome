@@ -1,0 +1,43 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+
+# Google Chrome Keyboard Shortcuts and Tech Tricks
+
+## Keyboard Shortcuts
+
+- **Navigation**: Back: `Alt + Left Arrow` | Forward: `Alt + Right Arrow` | Reload: `Ctrl + R` or `F5` | Home: `Alt + Home`
+- **Tabs**: New Tab: `Ctrl + T` | Close Tab: `Ctrl + W` | Reopen Closed Tab: `Ctrl + Shift + T` | Next/Previous Tab: `Ctrl + Tab` / `Ctrl + Shift + Tab`
+- **Windows**: New Window: `Ctrl + N` | Incognito Window: `Ctrl + Shift + N` | Close Window: `Ctrl + Shift + W`
+- **Search**: Focus Search Bar: `Ctrl + L` or `Alt + D` | Search in Page: `Ctrl + F` | Next Result: `Enter` | Previous Result: `Shift + Enter`
+- **Zoom**: Zoom In/Out: `Ctrl + +` / `Ctrl + -` | Reset Zoom: `Ctrl + 0`
+- **Bookmarks**: Bookmark Page: `Ctrl + D` | Open Bookmarks Manager: `Ctrl + Shift + O`
+- **Developer Tools**: Toggle DevTools: `F12` or `Ctrl + Shift + I` | Inspect Element: `Ctrl + Shift + C` | Console: `Ctrl + Shift + J`
+- **Miscellaneous**: Fullscreen: `F11` | Open Downloads: `Ctrl + J` | Print: `Ctrl + P` | History: `Ctrl + H`
+
+## Tech Tricks
+
+- **Profile Management**: Create/manage profiles via profile icon in top-right or `chrome://settings/people`.
+- **Extensions**: Install/manage at `chrome://extensions`. Recommended: `uBlock Origin` for ad-blocking, `LastPass` for password management.
+- **Performance Optimization**: Disable unused extensions, clear cache (`Ctrl + Shift + Delete` > Clear cached images and files).
+- **Pin Tabs**: Right-click tab > "Pin" to lock it in place.
+- **Restore Session**: Enable "Continue where you left off" in `chrome://settings/onStartup`.
+- **Picture-in-Picture (PiP)**: Right-click video twice > "Picture in Picture".
+- **Custom Search Engines**: Manage search engines at `chrome://settings/searchEngines`.
+- **Dark Mode**: Force dark mode via `chrome://flags` > Enable "Force Dark Mode for Web Contents".
+- **Keyboard Shortcut Legend**: Full list of shortcuts available at `chrome://settings/shortcuts`.
+
+## Troubleshooting Tips
+
+- **Clear Cache and Cookies**: `Ctrl + Shift + Delete` > Choose data to clear > Clear Now.
+- **Reset Settings**: Restore defaults via `chrome://settings/reset` > Restore settings to their original defaults.
+- **Hardware Acceleration**: Toggle in `chrome://settings/system` > "Use hardware acceleration when available".
+- **Safe Mode Equivalent**: Open in incognito: `Ctrl + Shift + N`. For extensions issues, disable them temporarily in `chrome://extensions`.
+- **Crash Recovery**: Reopen recently closed tabs with `Ctrl + Shift + T`.
+- **DNS Issues**: Flush DNS: `chrome://net-internals/#dns` > Clear host cache.
+
+EOF
+) | less -R

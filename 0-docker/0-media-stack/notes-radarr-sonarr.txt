@@ -1,0 +1,48 @@
+For both Sonarr and Radarr:
+
+Access the Web UIs
+http://your_server_ip:7878 for Radarr
+http://your_server_ip:8989 for Sonarr
+
+Configure Download Client:
+Go to Settings -> Download Clients.
+Add a new download client (qBittorrent).
+Host: Since Sonarr/Radarr and qBittorrent are on the same Docker network (network_mode: service:gluetun), they can reach each other using their service names. The host should be qbittorrent.
+Port: This is qBittorrent's internal Web UI port, which is 8080 based on your YAML and standard qBittorrent configuration.
+URL Path: Leave empty unless you configured one in qBittorrent.
+Use SSL: Usually off unless you specifically configured SSL for qBittorrent's Web UI (unlikely in this setup).
+Username & Password/API Key: You'll need to get the Web UI username and password or API key from your qBittorrent settings (usually found in the Web UI under Tools -> Options -> Web UI). The default username is often admin and the initial password was printed to the qBittorrent logs during its first startup, as your script attempts to show you at the end.
+Click "Test" to ensure Sonarr/Radarr can connect to qBittorrent.
+
+Configure Root Folders (Library Locations):
+Go to Settings -> Media Management -> Root Folders.
+Click Add Folder.
+Crucially, the path needs to be the path inside the container. Based on your docker-compose.yaml mapping (/mnt/media:/mnt/media), the root of your media is /mnt/media from Sonarr/Radarr's perspective.
+Add /mnt/media/movies as a root folder in Radarr.
+Add /mnt/media/tv as a root folder in Sonarr.
+Scan the folder to see existing items.
+
+Configure Remote Path Mappings (VERY IMPORTANT for Importing):
+Go to Settings -> Download Clients -> Remote Path Mappings.
+Click Add Mapping. This is where you tell Sonarr/Radarr how to translate the path reported by qBittorrent into a path they can access.
+Host: qbittorrent (the download client service name).
+Remote Path: This is the path inside the qBittorrent container where downloads land. Based on your YAML (/mnt/media/downloads:/downloads), this path is /downloads.
+Local Path: This is the corresponding path inside the Sonarr/Radarr container where they can find those same files. Based on your YAML (/mnt/media:/mnt/media), the path is /mnt/media/downloads.
+So, the mapping should be:
+Host: qbittorrent
+Remote Path: /downloads
+Local Path: /mnt/media/downloads
+This mapping tells Sonarr/Radarr: "When qBittorrent tells me a file is at /downloads/..., I know that corresponds to /mnt/media/downloads/... on my end, and I should look there to import it."
+For the Files You've Already Placed Manually:
+
+Sonarr and Radarr won't automatically import files just sitting in the download directory unless they were placed there by the download client and linked to a monitored item.
+You'll need to use their manual import features:
+Sonarr: Go to Activity -> Queue. If items from qBittorrent show up here but aren't importing, check the logs within Sonarr (System -> Logs). You can also use Manual Import to browse the /mnt/media/downloads folder and manually import recognised episodes.
+Radarr: Go to Activity -> Queue. Similar to Sonarr, check logs or use Manual Import to browse /mnt/media/downloads/movies and manually import movies it recognizes.
+
+In Summary:
+Your docker-compose.yaml sets up the access correctly. The next step is the internal configuration within the Sonarr and Radarr Web UIs, focusing on:
+Adding qBittorrent as a download client.
+Adding /mnt/media/tv and /mnt/media/movies as Root Folders.
+Setting up the crucial Remote Path Mapping to translate qBittorrent's /downloads path to Sonarr/Radarr's /mnt/media/downloads path.
+Once those are configured, new downloads should be automatically processed. For the files already there, use the manual import features.

@@ -1,0 +1,61 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Accessing Samba Shares: Linux and Windows
+=========================================
+
+## Install Samba Client on Linux
+To access Samba shares from Linux:
+`sudo apt install samba-client samba-common -y`
+
+Check Available Shares with smbclient:
+`smbclient -U <username> -L <server-ip>`
+
+Mount Samba Share on Linux
+First Create a mount point:
+`sudo mkdir /mnt/<share-name>`
+Mount the share:
+`sudo mount -t cifs -o username=<username> //<server-ip>/<share-name> /mnt/<share-name>`
+Verify the mount:
+`df -h`
+Persistent Mount on Linux (persist across reboots):
+`vi /etc/fstab`:
+`//<server-ip>/<share-name> /mnt/<share-name> cifs username=<username>,password=<password>,_netdev 0 0`
+
+Or use a credentials file for security:
+`//<server-ip>/<share-name> /mnt/<share-name> cifs credentials=/home/<user>/.cred,_netdev 0 0`
+
+Create the credentials file `/home/<user>/.cred`:
+```bash
+username=<username>
+password=<password>
+```
+
+Secure the file:
+`chmod 600 /home/<user>/.cred`
+
+Apply changes:
+`sudo mount -a`
+
+Access the Samba Share from a Windows host
+Create a local user matching the Samba user:
+```powershell
+$password = Read-Host -AsSecureString
+New-LocalUser -Name "<username>" -Password $password
+```
+
+Access the share:
+File Explorer: `\\<server-ip>\<share-name>`
+Map a drive: `NET USE M: \\<server-ip>\<share-name>`
+
+# Summary
+Install samba-client for Linux.
+Use smbclient to discover shares.
+Mount shares using mount or persist via /etc/fstab.
+On Windows, map shares or use File Explorer for access. EOF
+
+EOF
+) | less -R

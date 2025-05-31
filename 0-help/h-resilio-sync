@@ -1,0 +1,58 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Using Resilio Sync to backup Photos from an Android phone to a Windows PC to free up space:
+
+## Keep Your Phone Awake:
+- To prevent the phone from sleeping during the transfer, especially when plugged in:
+- Enable Developer Options (Go to Settings > About phone, tap "Build number" multiple times).
+- Go to Settings > System > Developer options.
+- Enable "Stay awake" or "Keep screen on while charging".
+- Alternatively, adjust the Display settings (Settings > Display > Screen timeout) to the longest duration.
+- Third-party apps can also keep the screen awake.
+
+## Understand File Transfer Protocols (MTP vs. PTP):
+
+- PTP (Picture Transfer Protocol): Primarily for transferring images, limited to photo folders (like DCIM).
+- MTP (Media Transfer Protocol): An extension of PTP, supports transferring a wider range of media files (photos, audio, video) and offers more advanced features. Generally recommended for broader media backup.
+
+## Transferring Photos with Resilio Sync (Recommended for Reliable Transfer):
+
+Resilio Sync is a reliable and free third-party application that can handle large transfers and resume if the connection is interrupted.
+
+- Prerequisites: Install Resilio Sync on both your Windows PC and your phone.
+- On your Windows PC, define the folder where you want to save the backed-up files.
+- On your phone, open the Resilio Sync app.
+- Go to the "Folders" page and tap the "+" button.
+- Under the "SYNCHRONIZE" section, tap "Add backup".
+- Choose the folder you want to back up (e.g., "Camera backup" which typically corresponds to the DCIM folder). Ensure you are in MTP mode on your phone if you need to select folders outside of the default photo directories.
+- Resilio Sync will generate a token authorization link. Share this link with yourself (e.g., via email).
+- On your Windows PC, open the authorization link.
+- Return to your phone. You may need to navigate back to the main page of the Resilio Sync app.
+- Look for a notification in the top right (often a lightning bolt icon) and select it to approve the connection handshake.
+- The backup should begin automatically on the Windows side.
+- You can view the progress, speed, etc., by tapping the lightning bolt icon in the bottom right of the Resilio Sync app on your phone.
+
+## Troubleshooting Connectivity Issues:
+
+Check USB Connection Mode: Always verify the phone is set to "File transfer" or "MTP" mode via the USB notification shade.
+Restart Devices: A simple restart of both your phone and PC can resolve many connectivity problems.
+Enable USB Debugging (Advanced): If you are comfortable with developer options, enabling USB debugging (Settings > System > Developer options > USB debugging) can sometimes help with connectivity, but is not typically required for MTP/PTP transfer.
+USB Cable and Drivers: Ensure you are using a reliable USB cable and that your computer has the necessary drivers for your phone (Windows usually handles this automatically when you connect the device in MTP mode).
+
+
+
+## Direct USB Connection (Using Windows Explorer or Photos App):
+#### --- This is generally a bad method!! ---
+Connect your phone to your PC using a USB cable.
+On your phone, swipe down from the top to access notifications.
+Tap the USB notification (e.g., "USB charging this device").
+Select "File transfer" or "MTP" mode. (You can also set a default in Settings > System > Developer options > Default USB configuration). PTP will limit visibility to photo folders; MTP allows access to more.
+Your PC should recognize the phone as a media device.
+Caution: Using Windows File Explorer or the Windows Photo app to copy files directly often fails with large transfers as the connection can drop. It's difficult to determine which files successfully copied. This method is not recommended for large backups.
+
+EOF
+) | less -R

@@ -1,0 +1,307 @@
+#!/bin/bash
+# Systemd Service Control Script
+# Provides a concise way to manage systemd services using systemctl.
+
+# Define colors
+RED='\e[31m'
+GREEN='\e[32m'
+NC='\e[0m' # No Color
+
+# Define a regex pattern for valid explicit options
+# Used to distinguish options from a service name when no option is given
+# Ensure all shorthands and full names from the case statement are included here
+VALID_OPTIONS_REGEX="^(status|st|start|sp|stop|e|enable|d|disable|r|restart|rl|reload|rrr|reload-or-restart|is-a|is-active|is-e|is-enabled|l|list|lu|list-units|ls|list-services|lf|list-files|list-failed|deps|list-dependencies|cat|show|mask|unmask|daemon-reload|reload-daemon|reboot|poweroff|suspend|hibernate|common)$"
+
+# --- Argument parsing for --sudo ---
+declare -a SCRIPT_ARGS=() # Holds arguments other than --sudo
+SUDO_COMMAND_TO_PREFIX=""   # Will be "sudo" if --sudo is found, otherwise empty
+
+for arg in "$@"; do
+    if [[ "$arg" == "--sudo" ]]; then
+        SUDO_COMMAND_TO_PREFIX="sudo"
+    else
+        SCRIPT_ARGS+=("$arg")
+    fi
+done
+# --- End Argument parsing for --sudo ---
+
+# Function to show usage help
+show_help() {
+    local script_name
+    script_name=$(basename "${BASH_SOURCE[0]}")
+    echo "Systemd Service Control. Usage: $script_name [--sudo] [<option> [<service(s)> | <target>] | <service(s)>]"
+    echo "If no option is specified, 'status' is assumed."
+    echo "The --sudo switch can be placed anywhere in the arguments."
+    echo
+    echo "Options:"
+    echo "  --sudo                 Execute the systemctl command with sudo privileges."
+    echo "  status <service(s)>    Default status action, e.g., '$script_name cron' will show status)"
+    echo "  st|start <service(s)>  Start the specified service(s)"
+    echo "  sp|stop <service(s)>   Stop the specified service(s)"
+    echo "  e|enable <service(s)>  Enable the specified service(s) (start on boot)"
+    echo "  d|disable <service(s)> Disable the specified service(s) (don't start on boot)"
+    echo "  r|restart <service(s)> Restart the specified service(s)"
+    echo "  rl|reload <service(s)> Reload the configuration of the specified service(s)"
+    echo "  rrr <service(s)>       Reload if possible, otherwise Restart the service(s)"
+    echo "  is-a|is-active <service(s)> Check if the specified service(s) are active"
+    echo "  is-e|is-enabled <service(s)> Check if the specified service(s) are enabled"
+    echo "  l|list|lu|list-units   List all currently active units (e.g., add --all for all units)"
+    echo "  ls|list-services       List all loaded service units (e.g., add --all for all services)"
+    echo "  lf|list-files          List all installed unit files and their states"
+    echo "  list-failed            List all units that are in a failed state"
+    echo "  deps|list-dependencies <unit> List the dependencies of a specified unit"
+    echo "  cat <unit>             Display the content of a unit file"
+    echo "  show <unit>            Show properties of a unit"
+    echo "  mask <unit(s)>         Mask a unit (prevent starting manually or on boot)"
+    echo "  unmask <unit(s)>       Unmask a unit (allow starting again)"
+    echo "  daemon-reload|reload-daemon Reload the systemd manager configuration"
+    echo "  reboot                 Reboot the system"
+    echo "  poweroff               Power off the system"
+    echo "  suspend                Suspend the system"
+    echo "  hibernate              Hibernate the system"
+    echo "  common                 List common Linux services with descriptions"
+    echo
+    echo "Note: Use the full service name (e.g., sshd.service), though systemctl often infers '.service'."
+    echo "      Commands run without sudo by default. Use the --sudo switch (e.g., '$script_name --sudo start apache2')"
+    echo "      to execute the systemctl command with root privileges."
+}
+
+# Declare associative array for common service descriptions
+declare -A COMMON_SERVICE_DESCRIPTIONS
+
+# Populate the associative array with common service names and descriptions
+COMMON_SERVICE_DESCRIPTIONS=(
+    [sshd.service]="OpenSSH server daemon (secure remote access)"
+    [network.service]="Manages network configuration (SysVinit style, depends on distro)"
+    [NetworkManager.service]="Manages network connections (common GUI/desktop environments)"
+    [systemd-networkd.service]="Manages network configuration (native systemd, often on servers)"
+    [firewalld.service]="Dynamic firewall daemon"
+    [ufw.service]="Uncomplicated Firewall (simpler firewall interface)"
+    [cron.service]="Daemon for scheduling command execution (standard cron)"
+    [anacron.service]="Runs commands scheduled by cron that were missed when the system was off"
+    [rsyslog.service]="System logging daemon (common syslog implementation)"
+    [syslog-ng.service]="Next-generation system logging daemon (alternative syslog)"
+    [journald.service]="Systemd journal logging daemon"
+    [systemd-journald.service]="Alias for journald.service"
+    [dbus.service]="D-Bus message bus daemon (inter-process communication)"
+    [atd.service]="Daemon for scheduling commands to be executed once at a later time"
+    [systemd-resolved.service]="Network name resolution via systemd"
+    [systemd-logind.service]="Manages user logins, seats, and sessions"
+    [systemd-udevd.service]="Device manager daemon"
+    [polkitd.service]="PolicyKit daemon for controlling system-wide privileges"
+    [postfix.service]="Mail Transfer Agent (MTA) for email routing"
+    [sendmail.service]="Mail Transfer Agent (MTA), older alternative to Postfix"
+    [apache2.service]="Apache HTTP Server"
+    [httpd.service]="Apache HTTP Server (often used on RHEL/CentOS/Fedora)"
+    [nginx.service]="Nginx HTTP and reverse proxy server"
+    [mysql.service]="MySQL database server"
+    [mariadb.service]="MariaDB database server (community fork of MySQL)"
+    [postgresql.service]="PostgreSQL database server"
+    [docker.service]="Docker container runtime"
+    [containerd.service]="Containerd container runtime"
+    [ntpd.service]="Network Time Protocol daemon (older NTP service)"
+    [chronyd.service]="Chronyd NTP client/server (more modern NTP service)"
+    [quotaon.service]="Service to enable disk quotas"
+    [fstrim.service]="Service to discard unused blocks on mounted filesystems (for SSDs)"
+    [systemd-tmpfiles-clean.timer]="Timer unit for cleaning up temporary files"
+    [systemd-timesyncd.service]="Systemd simple network time synchronization client"
+    [tuned.service]="Dynamic adaptive system tuning daemon"
+    [auditd.service]="Linux Audit Daemon"
+    [wpa_supplicant.service]="Service for WPA/WPA2/IEEE 802.1X supplicant"
+    [multi-user.target]="Target for a multi-user system with network services (CLI)"
+    [graphical.target]="Target for a multi-user system with a graphical interface"
+)
+
+# Function to print a command in green and execute it
+run_command() {
+    local systemctl_and_args=("$@") # These are the args for systemctl (e.g., status, service1)
+    local final_command_array=()
+    local command_string_for_echo=""
+    local exit_status
+
+    # Prepend sudo if SUDO_COMMAND_TO_PREFIX is set
+    if [ -n "$SUDO_COMMAND_TO_PREFIX" ]; then
+        final_command_array+=("$SUDO_COMMAND_TO_PREFIX")
+    fi
+    final_command_array+=("${systemctl_and_args[@]}")
+
+    # Reconstruct the command string for echoing, properly quoting arguments
+    printf -v command_string_for_echo "%q " "${final_command_array[@]}"
+    command_string_for_echo=${command_string_for_echo% } # Remove trailing space
+
+    echo -e "# ${GREEN}${command_string_for_echo}${NC}"
+    "${final_command_array[@]}" # Execute the assembled command
+    exit_status=$?
+    
+    return $exit_status
+}
+
+# Function to check if a service name is required and provided (operates on effective args)
+check_service_arg() {
+    if [ $# -eq 0 ]; then
+        local script_name
+        script_name=$(basename "${BASH_SOURCE[0]}")
+        echo >&2 -e "${RED}Error: This command requires a service or unit name.${NC}\n"
+        show_help # Show help on error
+        exit 1 # Indicate error
+    fi
+}
+
+# Show help if no effective arguments (after removing --sudo) are provided
+if [ ${#SCRIPT_ARGS[@]} -eq 0 ]; then
+    show_help
+    exit 0
+fi
+
+# --- Determine the action and arguments based on SCRIPT_ARGS (which excludes --sudo) ---
+option=""
+first_effective_arg=""
+if [ ${#SCRIPT_ARGS[@]} -gt 0 ]; then
+    first_effective_arg="${SCRIPT_ARGS[0]}"
+fi
+
+# service_args are derived from SCRIPT_ARGS
+declare -a service_args_for_systemctl=()
+
+
+if [[ -n "$first_effective_arg" && "$first_effective_arg" =~ ^${VALID_OPTIONS_REGEX}$ ]]; then
+    option="$first_effective_arg"
+    # Slice SCRIPT_ARGS to get remaining args for systemctl
+    if [ ${#SCRIPT_ARGS[@]} -gt 1 ]; then
+        service_args_for_systemctl=("${SCRIPT_ARGS[@]:1}")
+    fi
+else
+    option="status"
+    service_args_for_systemctl=("${SCRIPT_ARGS[@]}") # All effective args are service names/targets
+fi
+# --- End Determine the action and arguments ---
+
+
+case "$option" in
+    status)
+        check_service_arg "${service_args_for_systemctl[@]}"
+        run_command systemctl status "${service_args_for_systemctl[@]}"
+        ;;
+    st|start)
+        check_service_arg "${service_args_for_systemctl[@]}"
+        run_command systemctl start "${service_args_for_systemctl[@]}"
+        ;;
+    sp|stop)
+        check_service_arg "${service_args_for_systemctl[@]}"
+        run_command systemctl stop "${service_args_for_systemctl[@]}"
+        ;;
+    e|enable)
+        check_service_arg "${service_args_for_systemctl[@]}"
+        run_command systemctl enable "${service_args_for_systemctl[@]}"
+        ;;
+    d|disable)
+        check_service_arg "${service_args_for_systemctl[@]}"
+        run_command systemctl disable "${service_args_for_systemctl[@]}"
+        ;;
+    r|restart)
+        check_service_arg "${service_args_for_systemctl[@]}"
+        run_command systemctl restart "${service_args_for_systemctl[@]}"
+        ;;
+    rl|reload)
+        check_service_arg "${service_args_for_systemctl[@]}"
+        run_command systemctl reload "${service_args_for_systemctl[@]}"
+        ;;
+    rrr|reload-or-restart)
+        check_service_arg "${service_args_for_systemctl[@]}"
+        run_command systemctl reload-or-restart "${service_args_for_systemctl[@]}"
+        ;;
+    is-a|is-active)
+        check_service_arg "${service_args_for_systemctl[@]}"
+        run_command systemctl is-active "${service_args_for_systemctl[@]}"
+        ;;
+    is-e|is-enabled)
+        check_service_arg "${service_args_for_systemctl[@]}"
+        run_command systemctl is-enabled "${service_args_for_systemctl[@]}"
+        ;;
+    l|list|lu|list-units)
+        run_command systemctl list-units "${service_args_for_systemctl[@]}"
+        ;;
+    ls|list-services)
+        run_command systemctl list-units --type=service "${service_args_for_systemctl[@]}"
+        ;;
+    lf|list-files)
+        run_command systemctl list-unit-files "${service_args_for_systemctl[@]}"
+        ;;
+    list-failed)
+        run_command systemctl --failed "${service_args_for_systemctl[@]}"
+        ;;
+    deps|list-dependencies)
+        check_service_arg "${service_args_for_systemctl[@]}"
+        run_command systemctl list-dependencies "${service_args_for_systemctl[@]}"
+        ;;
+    cat)
+        check_service_arg "${service_args_for_systemctl[@]}"
+        run_command systemctl cat "${service_args_for_systemctl[@]}"
+        ;;
+    show)
+        check_service_arg "${service_args_for_systemctl[@]}"
+        run_command systemctl show "${service_args_for_systemctl[@]}"
+        ;;
+    mask)
+        check_service_arg "${service_args_for_systemctl[@]}"
+        run_command systemctl mask "${service_args_for_systemctl[@]}"
+        ;;
+    unmask)
+        check_service_arg "${service_args_for_systemctl[@]}"
+        run_command systemctl unmask "${service_args_for_systemctl[@]}"
+        ;;
+    daemon-reload|reload-daemon)
+        if [ ${#service_args_for_systemctl[@]} -gt 0 ]; then
+            echo >&2 -e "${RED}Warning: '${option}' command does not expect arguments, ignoring '${service_args_for_systemctl[*]}'${NC}"
+        fi
+        run_command systemctl daemon-reload
+        ;;
+    reboot)
+        if [ ${#service_args_for_systemctl[@]} -gt 0 ]; then
+            echo >&2 -e "${RED}Warning: '${option}' command does not expect arguments, ignoring '${service_args_for_systemctl[*]}'${NC}"
+        fi
+        run_command systemctl reboot
+        ;;
+    poweroff)
+        if [ ${#service_args_for_systemctl[@]} -gt 0 ]; then
+            echo >&2 -e "${RED}Warning: '${option}' command does not expect arguments, ignoring '${service_args_for_systemctl[*]}'${NC}"
+        fi
+        run_command systemctl poweroff
+        ;;
+    suspend)
+        if [ ${#service_args_for_systemctl[@]} -gt 0 ]; then
+            echo >&2 -e "${RED}Warning: '${option}' command does not expect arguments, ignoring '${service_args_for_systemctl[*]}'${NC}"
+        fi
+        run_command systemctl suspend
+        ;;
+    hibernate)
+        if [ ${#service_args_for_systemctl[@]} -gt 0 ]; then
+            echo >&2 -e "${RED}Warning: '${option}' command does not expect arguments, ignoring '${service_args_for_systemctl[*]}'${NC}"
+        fi
+        run_command systemctl hibernate
+        ;;
+    common)
+        if [ ${#service_args_for_systemctl[@]} -gt 0 ]; then
+            echo >&2 -e "${RED}Warning: '${option}' command does not expect arguments, ignoring '${service_args_for_systemctl[*]}'${NC}"
+        fi
+        echo "Common Systemd Services:"
+        max_len=0
+        for service_name in "${!COMMON_SERVICE_DESCRIPTIONS[@]}"; do
+            if (( ${#service_name} > max_len )); then
+                max_len=${#service_name}
+            fi
+        done
+        for service_name in $(echo "${!COMMON_SERVICE_DESCRIPTIONS[@]}" | tr ' ' '\n' | sort); do
+            description="${COMMON_SERVICE_DESCRIPTIONS[$service_name]}"
+            printf "  %-*s - %s\n" "$max_len" "$service_name" "$description"
+        done
+        ;;
+    *)
+        echo >&2 -e "${RED}Internal Error: Unhandled option '$option'. Effective args: '${SCRIPT_ARGS[*]}'.${NC}\n"
+        show_help
+        exit 1
+        ;;
+esac
+
+exit_status=$?
+exit $exit_status

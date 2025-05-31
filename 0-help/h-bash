@@ -1,0 +1,194 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Bash Quick Notes
+
+- **Bash Login Shells and Startup Files**:
+    1. **/etc/profile**: System-wide settings for all users.
+    2. **~/.bash_profile**: User-specific settings (only read by login shells).
+    3. **~/.bash_login**: Read if .bash_profile is not found.
+    4. **~/.profile**: Read if neither .bash_profile nor .bash_login exists.
+    5. **~/.bashrc**: Used for non-login interactive shells. Often sourced by ~/.bash_profile.
+    6. **/etc/bash.bashrc**: System-wide settings for interactive shells.
+    7. **Order of reading for interactive non-login shells**:
+       - System-wide /etc/bash.bashrc, then user's ~/.bashrc.
+
+- Manually reapply (or 'source') .bashrc settings: `source ~/.bashrc`   or   `. ~/.bashrc`
+- To list available shells: `cat /etc/shells`
+- Change Default Shell: `chsh -s /bin/bash`
+
+- **Special Characters and Usage**:
+    - `#`: Comment.
+    - `\`: Escape character.
+    - `~`: Home directory shortcut.
+    - `$`: Denotes a variable (e.g., `$HOME`, `$PATH`).
+    - Command substitution (backticks) `` ` `` (e.g., ``result=`ls` ``).
+    - `$()` is preferred over backticks for readability (e.g., `result=$(ls)`).
+
+- **Environment Variables**:
+    - Set a variable: `MY_VAR="value"`
+    - Export to child processes: `export MY_VAR`
+    - View all variables: `env`
+    - Unset a variable: `unset MY_VAR`
+
+- **Conditional Statements**:
+    ```bash
+    if [ condition ]; then
+        # Commands
+    elif [ condition ]; then
+        # Commands
+    else
+        # Commands
+    fi
+    ```
+    - Examples:
+      ```bash
+      if [ -f "file.txt" ]; then
+          echo "File exists."
+      fi
+      ```
+
+- **Loops**:
+    - `for` loop:
+      ```bash
+      for i in {1..5}; do
+          echo "Number: $i"
+      done
+      ```
+    - `while` loop:
+      ```bash
+      while [ condition ]; do
+          # Commands
+      done
+      ```
+    - `until` loop:
+      ```bash
+      until [ condition ]; do
+          # Commands
+      done
+      ```
+
+- **Redirection and Pipes**:
+    - Redirect standard output:
+      ```bash
+      command > file
+      ```
+    - Redirect standard error:
+      ```bash
+      command 2> file
+      ```
+    - Redirect both output and error:
+      ```bash
+      command > file 2>&1
+      ```
+    - Pipe output to another command:
+      ```bash
+      command1 | command2
+      ```
+
+- **Job Control**:
+    - Suspend a job:
+      ```bash
+      Ctrl+Z
+      ```
+    - List jobs:
+      ```bash
+      jobs
+      ```
+    - Bring a job to the foreground:
+      ```bash
+      fg %job_number
+      ```
+    - Send a job to the background:
+      ```bash
+      bg %job_number
+      ```
+
+- **Command History**:
+    - View history:
+      ```bash
+      history
+      ```
+    - Rerun a command:
+      ```bash
+      !command_number
+      ```
+    - Search command history:
+      ```bash
+      Ctrl+R
+      ```
+
+- **Functions**:
+    ```bash
+    my_function() {
+        echo "Hello, $1!"
+    }
+    my_function "World"
+    ```
+
+- **Scripting Basics**:
+    - Use `#!/bin/bash` as the shebang.
+    - Make a script executable:
+      ```bash
+      chmod +x script.sh
+      ```
+    - Run a script:
+      ```bash
+      ./script.sh
+      ```
+
+- **Bash Arrays**:
+    ```bash
+    my_array=("value1" "value2" "value3")
+    echo ${my_array[0]}  # Access first element
+    echo ${my_array[@]}  # Access all elements
+    ```
+
+- **Debugging Bash Scripts**:
+    - Run with debugging:
+      ```bash
+      bash -x script.sh
+      ```
+    - Add debugging inside scripts:
+      ```bash
+      set -x  # Enable debugging
+      set +x  # Disable debugging
+      ```
+
+- **Process Substitution**:
+    ```bash
+    diff <(ls dir1) <(ls dir2)
+    ```
+
+- **Common Test Conditions**:
+    - File tests:
+      ```bash
+      -f "file"   # Is a regular file
+      -d "dir"    # Is a directory
+      -e "file"   # Exists
+      ```
+    - String tests:
+      ```bash
+      -z "str"   # Is empty
+      -n "str"   # Is not empty
+      ```
+- `set -e`: Exit immediately if any command exits with a non-zero status.
+- `set -u`: Exit if an undefined variable is used.
+- `set -x`: Print each command with expanded arguments before execution.
+- `set -v`: Print each command before execution (no argument expansion).
+- `set -o pipefail`: Make pipelines fail if any command in the pipeline fails.
+- `set -f`: Disable filename expansion (globbing).
+- `set +e`: Disable `set -e`, allowing commands to fail without exiting.
+- `set +x`: Disable `set -x`, stopping the command trace output.
+- `trap`: Execute a command when the script exits or receives a signal.
+- `readonly`: Make variables read-only, preventing modification after assignment.
+- `return`: Exit from a function with a specific exit status (not the whole script).
+
+Bash caches the paths to executables for faster lookups. This is stored in Bash's hash table, which remembers the location of previously executed commands. When you move an executable or script, Bash may still attempt to run it from its old location. To clear Bash's cached paths and force it to look up from $PATH:
+`hash -r`
+
+EOF
+) | less -R

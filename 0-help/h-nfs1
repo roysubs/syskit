@@ -1,0 +1,185 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Linux NFS Configuration Cheatsheet
+
+## Introduction
+NFS (Network File System) allows a system to share directories and files with others over a network.
+This document explains how to configure NFS shares step by step, including customization of `/etc/exports` and common management tasks.
+
+---
+
+## Steps to Configure NFS
+
+### 1. Install NFS Utilities
+```bash
+sudo apt update
+sudo apt install nfs-kernel-server
+```
+
+### 2. Identify Mounted Partitions
+To list mounted partitions:
+```bash
+lsblk -ln -o NAME,MOUNTPOINT | awk '$2 ~ /^\// {print "/dev/"$1" "$2}'
+```
+This will display device paths and their mount points.
+
+### 3. Configure NFS Shares in `/etc/exports`
+Entries in `/etc/exports` define what directories are shared and with what permissions.
+Format of an entry:
+```
+<path> <client>(<options>)
+```
+Example:
+```bash
+/mnt/data *(rw,sync,no_subtree_check)
+```
+Explanation:
+- `<path>`: The directory to share (e.g., `/mnt/data`).
+- `<client>`: Specifies the client system(s) allowed access. Use `*` to allow all.
+- `<options>`:
+  - `rw`: Read/write access.
+  - `sync`: Writes are committed to disk before the operation completes.
+  - `no_subtree_check`: Disables subtree checking, improving performance.
+
+Additional options:
+- `ro`: Read-only access.
+- `root_squash`: Maps root user on client to `nobody` user on server.
+- `no_root_squash`: Allows root user on client to have root privileges.
+- `anonuid`/`anongid`: Maps anonymous users to a specific UID/GID.
+
+### 4. Apply Changes
+After modifying `/etc/exports`, apply changes with:
+```bash
+sudo exportfs -ra
+```
+Restart the NFS service:
+```bash
+sudo systemctl restart nfs-server
+```
+
+---
+
+## Verify and Manage NFS Shares
+
+### View Active NFS Shares
+To display current exports:
+```bash
+sudo exportfs -v
+```
+
+### Remove a Share
+1. Edit `/etc/exports` and delete the corresponding entry.
+2. Apply changes with:
+   ```bash
+   sudo exportfs -ra
+   ```
+
+---
+
+## Example `/etc/exports`
+```bash
+/mnt/shared *(rw,sync,no_subtree_check)
+/home/user/data 192.168.1.0/24(ro,root_squash)
+/opt/files 10.0.0.10(rw,async,anonuid=1000,anongid=1000)
+```
+
+### Explanation of Example:
+1. `/mnt/shared`: Shared with all clients with read/write access.
+2. `/home/user/data`: Read-only access limited to subnet `192.168.1.0/24`.
+3. `/opt/files`: Shared with specific client `10.0.0.10` using custom UID/GID for anonymous users.
+
+---
+
+## Troubleshooting
+1. **Ensure NFS Service is Running**
+   ```bash
+   sudo systemctl status nfs-server
+   ```
+2. **Check Client Connectivity**
+   On the client, use:
+   ```bash
+   showmount -e <server-ip>
+   ```
+3. **Verify Firewall Rules**
+   Allow NFS ports (default: 2049) through the firewall.
+   ```bash
+   sudo ufw allow from <client-ip> to any port nfs
+   ```
+4. **Permissions Issues**
+   Ensure the NFS directory has correct permissions for the user/group.
+
+---
+
+The line /mnt/sdb1 *(rw,sync,no_subtree_check) in the NFS exports configuration file (/etc/exports) specifies how the directory /mnt/sdb1 should be shared over NFS. Here's what each component means:
+
+Breakdown of /mnt/sdb1 *(rw,sync,no_subtree_check):
+/mnt/sdb1:
+
+This is the directory being shared via NFS. It is the absolute path to the directory on the host machine.
+*:
+
+This specifies the clients that are allowed to access the share. The asterisk * means "all clients," so any system can attempt to connect to this share.
+Instead of *, you can specify:
+A specific hostname (e.g., client.example.com).
+An IP address (e.g., 192.168.1.100).
+A subnet (e.g., 192.168.1.0/24).
+rw:
+
+Stands for "read-write." Clients are allowed to both read from and write to the shared directory.
+You could use ro (read-only) if you want clients to only be able to read the data.
+sync:
+
+Ensures that all changes to the shared directory are written to disk before the NFS server responds to the client. This provides data integrity but might reduce performance.
+Alternative: async allows the server to respond before changes are committed to disk, improving performance but risking data loss in case of a crash.
+no_subtree_check:
+
+Disables subtree checking. By default, NFS checks if the requested file is within the shared subtree. This option improves performance but should be used with caution if the exported directory is part of a larger filesystem.
+Alternative: subtree_check enables this check for added security when exporting subdirectories.
+Additional Options You Could Use:
+all_squash:
+
+Maps all user and group IDs on the client to the anonymous user on the server (usually nobody).
+Useful for public shares where you don’t want clients to have privileges based on their UID/GID.
+no_root_squash:
+
+Allows the root user on the client machine to have root privileges on the NFS server. This is typically avoided for security reasons.
+anonuid and anongid:
+
+Sets the user ID (anonuid) and group ID (anongid) for anonymous users (used with all_squash).
+secure:
+
+Ensures that connections only come from ports lower than 1024. These ports are reserved for privileged users on UNIX systems.
+insecure:
+
+Allows connections from ports above 1024. Useful if clients cannot use reserved ports.
+nohide:
+
+Allows nested NFS exports to be visible to the client. For example, if you export /mnt and /mnt/subdir separately, nohide makes both accessible seamlessly.
+crossmnt:
+
+Allows clients to traverse mounts within the exported filesystem.
+fsid:
+
+Assigns a file system ID. This is useful when exporting a directory structure from multiple servers to avoid conflicts.
+Example Customization:
+plaintext
+Copy code
+/mnt/sdb1 192.168.1.0/24(rw,sync,no_subtree_check,all_squash,anonuid=1000,anongid=1000)
+This example:
+Restricts access to clients in the 192.168.1.0/24 subnet.
+Enables read-write access.
+Synchronizes changes.
+Disables subtree checks.
+Maps all client users to a specific UID/GID (1000).
+To Learn More:
+man exports: Detailed manual on the /etc/exports configuration.
+NFS Server Configuration Guide: Debian-specific guidance on NFS setup.
+
+https://www.atlantic.net/dedicated-server-hosting/how-to-install-and-configure-nfs-server-on-debian/#:~:text=How%20to%20Install%20and%20Configure%20NFS%20Server%20on,5%20%E2%80%93%20Install%20and%20Configure%20NFS%20Client%20
+
+EOF
+) | less -R

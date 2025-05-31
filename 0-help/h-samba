@@ -1,0 +1,69 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Samba Quick Notes
+===============
+
+- **Install and check Samba**:
+    - For Debian-based systems (includes Ubuntu, Mint, etc):
+      `sudo apt install samba samba-client samba-common`
+    - For Red Hat-based systems (e.g., Fedora):
+      `sudo dnf install samba samba-client samba-common`
+    - Check Samba Version:
+      `samba --version`
+
+- **Configure Samba**:
+    - Edit the Samba configuration file: `sudo nano /etc/samba/smb.conf`
+    - Example share configuration:
+      ```ini
+      [ShareName]
+      path = /path/to/directory
+      read only = no
+      guest ok = yes
+      ```
+    - Save and close the file.
+
+- **Set Samba User**:
+    - Add a user to Samba: `sudo smbpasswd -a username`
+    - Enable the user: `sudo smbpasswd -e username`
+
+- **Restart Samba**:
+    - Restart Samba service to apply changes:
+      `sudo systemctl restart smbd`
+
+- **Allow Samba Through Firewall**:
+    - For UFW (Uncomplicated Firewall):
+      `sudo ufw allow samba`
+    - For Firewalld (Fedora/CentOS):
+      `sudo firewall-cmd --permanent --add-service=samba`
+      `sudo firewall-cmd --reload`
+
+- **Access Samba Shares**:
+    - **From Linux**: Use the `smb://` URL:
+      e.g. `nautilus smb://server-ip/share-name`
+    - **From Windows**: Open File Explorer and type:
+      `\\server-ip\share-name`
+    - **Always check Windows status**
+      If there are open shares, may need to remove them:
+      `net view 192.168.0.100`
+      `net use`
+      If there are open shares:
+      `net use x: /d`
+      If these are not removed, new connections after a configuration change on the Linux system may not connect.
+
+- **Mount Samba Share on Linux**:
+    - Mount the share manually:
+      `sudo mount -t cifs //server-ip/share-name /mnt/point -o user=username`
+
+- **Check Samba Shares**:
+    - List shares on a server: `smbclient -L server-ip -U username`
+
+- **Samba Troubleshooting**:
+    - Check Samba service status: `sudo systemctl status smbd`
+    - Check Samba logs: `sudo tail -f /var/log/samba/log.smbd`
+
+EOF
+) | less -R

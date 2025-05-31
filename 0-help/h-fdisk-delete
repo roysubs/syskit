@@ -1,0 +1,113 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Storage Breakdown and Partition Removal
+=======================================
+
+### 1. Identify Files That Are Safe to Delete
+---------------------------------------------------
+
+- **Log files**: Check `/var/log` and delete old logs (consider rotating logs).
+    - `sudo rm -rf /var/log/*.gz /var/log/*.1`
+    - **Important**: Do not delete active logs like `/var/log/syslog`, `/var/log/auth.log`.
+
+- **Temporary files**: Check `/tmp` for unnecessary files:
+    - `sudo rm -rf /tmp/*`
+  
+- **Cache files**: Clear package cache and browser cache.
+    - Clear apt cache: `sudo apt clean`
+    - Clear thumbnail cache: `rm -rf ~/.cache/thumbnails/*`
+
+- **Unused dependencies**: Remove unused packages and dependencies:
+    - `sudo apt autoremove`
+
+- **Old backups**: Delete old backup files and images in `/root` or `/home` (ensure they’re not needed).
+
+### 2. Remove Filesystems from `fstab`
+----------------------------------------------------
+
+Before deleting a partition, remove its references from `/etc/fstab` to avoid boot errors.
+
+- **Edit fstab**: 
+    - Open `/etc/fstab` with your editor: `sudo nano /etc/fstab`
+    - Comment out (or remove) the lines related to the partition(s) you want to remove.
+    - Example: 
+        ```
+        # /dev/sdb1 /mnt/data ext4 defaults 0 2
+        ```
+
+### 3. Unmount NFS and Samba Shares
+------------------------------------------------------
+
+If you're using NFS or Samba to mount network shares, unmount them before removing partitions.
+
+- **Identify NFS Mounts**:
+    - `mount | grep nfs`
+    - `mount | grep '/dev/sda1' | grep nfs`
+    - `showmount -a`
+
+- **Identify Samba (SMB) Shares**:
+    - `mount | grep cifs`
+    - `mount | grep '/dev/sda1' | grep cifs`
+    - `showmount -a`
+
+- **Unmount NFS Mounts**: 
+    - `sudo umount /mnt/nfs_share`
+    - Remove entry from `/etc/fstab` if persistent.
+
+- **Unmount Samba Share**: 
+    - `sudo umount /mnt/samba_share`
+    - Remove entry from `/etc/fstab` if persistent.
+
+- **Verify mounts**: 
+    - `mount` to see currently mounted filesystems.
+    - Ensure the partition is no longer listed.
+
+### 4. Destroying the Partition
+------------------------------------------------------
+
+Once you're sure you've unmounted the filesystem and removed its entry from `fstab`, you can destroy the partition safely.
+
+- **List partitions**: 
+    - `lsblk` or `fdisk -l` to list all partitions.
+
+- **Check partition details**: 
+    - `sudo fdisk /dev/sda` (replace `/dev/sda` with your disk)
+    - Type `p` to print partition table and verify the partition you want to delete.
+
+- **Delete partition**: 
+    - `sudo fdisk /dev/sda` (replace with the appropriate disk)
+    - Type `d` to delete the partition, then select the partition number.
+
+- **Write changes**: 
+    - After deleting, type `w` to write the changes and exit.
+
+- **Confirm deletion**:
+    - Check the partition table again with `lsblk` to ensure the partition is removed.
+
+- **Remove filesystem label**: 
+    - `sudo wipefs -a /dev/sda1` (replace `/dev/sda1` with your partition)
+
+### 5. Remove Filesystem (Optional)
+-----------------------------------------------------
+
+If you want to overwrite the partition data for security or if the partition still shows up as part of the filesystem:
+
+- **Overwrite with random data**:
+    - `sudo dd if=/dev/urandom of=/dev/sda1 bs=1M status=progress`
+    - (Warning: This will make the data irrecoverable, so proceed with caution.)
+
+- **Reformat partition (optional)**:
+    - `sudo mkfs.ext4 /dev/sda1` (reformat to ext4, change filesystem type as needed).
+
+### 6. Reboot
+------------------------------------------------------
+
+After making all the changes, reboot your system to ensure everything is correctly applied.
+
+- `sudo reboot`
+EOF
+) | less -R

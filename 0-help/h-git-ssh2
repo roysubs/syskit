@@ -1,0 +1,89 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# SSH Authentication with Git Cheatsheet
+
+## 1. **Setting Up SSH Keys for Git**
+
+### Generate SSH Key Pair
+- Generate an SSH key with Ed25519 (RSA is also an option):  
+  `ssh-keygen -t ed25519 -C "roysubs@hotmail.com"`
+- Leave the passphrase blank for convenience, or set one for extra security.
+
+### Start SSH Agent
+- Start the SSH agent:  
+  `eval "$(ssh-agent -s)"`
+
+### Add SSH Key to SSH Agent
+- Add the private key to the agent to store it securely:  
+  `ssh-add ~/.ssh/id_ed25519`
+
+### Configure SSH Client to Use the Key
+- Edit the SSH config file (`~/.ssh/config`):  
+Host * AddKeysToAgent yes IdentityFile ~/.ssh/id_ed25519
+
+- Optional (if using a passphrase): Add this line to store the passphrase securely (MacOS-specific, not required on Linux/Windows):  
+`UseKeychain yes`
+
+### Add SSH Key to Git Hosting Service (GitHub, GitLab, etc.)
+- Copy the public key to your clipboard:  
+`cat ~/.ssh/id_ed25519.pub`
+- Go to your Git hosting service (GitHub, GitLab, etc.) and paste the key into the **SSH Keys** section under **Settings**.  
+(For GitHub: `Settings` -> `SSH and GPG keys` -> `New SSH key` -> Paste the key).
+
+## 2. **Testing SSH Connection**
+
+### Authenticate SSH Key
+- Test the connection to GitHub (or other service):  
+`ssh -T git@github.com`
+- Expected output:  
+  `Hi roysubs! You've successfully authenticated, but GitHub does not provide shell access.`
+
+## 3. **Cloning a Repository Using SSH**
+
+### Clone Repository via SSH
+- Go to the repository you want to clone, and select the **SSH** option under the **Code** button.  
+Example SSH URL: `git@github.com:roysubs/syskit.git`
+- Clone the repository:  
+`git clone git@github.com:roysubs/syskit.git`
+
+### Verify Remote URL
+- Check the remote URL for the cloned repository:  
+`cd syskit`  
+`git remote -v`
+
+## 4. **Using SSH with Git for Push/Pull**
+
+After SSH authentication is set up, Git commands like `git push`, `git pull`, and `git fetch` will work normally with the SSH key.
+
+## 5. **Common SSH Authentication Issues**
+
+### Permission Denied (publickey)
+- Ensure the correct SSH key is added to the agent and associated with the Git hosting service.
+- Check your `~/.ssh/config` file if you're using multiple keys.
+- Confirm the key permissions are correct:  
+`chmod 600 ~/.ssh/id_ed25519`
+
+### Key Not Recognized by SSH Agent
+- If the key is not loaded automatically, manually add it to the agent:  
+`ssh-add ~/.ssh/id_ed25519`
+
+### Debugging SSH Authentication
+- For debugging, use verbose output:  
+`ssh -vT git@github.com`
+- This will show the authentication process and any issues with the key.
+
+## 6. **Removing SSH Keys**
+
+### Remove SSH Key from SSH Agent
+- Remove the SSH key from the agent:  
+`ssh-add -d ~/.ssh/id_ed25519`
+
+### Remove SSH Key from Git Hosting Service
+- Go to your Git hosting service's SSH key settings and remove the key.
+
+EOF
+) | less -R
