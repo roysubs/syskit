@@ -1,0 +1,10 @@
+Just save some quick notes on git, try to collate at some point.
+
+
+If you have commited a file that you don't want (such as containing a secret/api-key),
+purge it from the history with:
+
+git rm --cached path/to/your/file
+git commit   # make sure to commit the removal
+
+

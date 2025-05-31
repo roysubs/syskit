@@ -1,0 +1,99 @@
+#!/bin/bash
+if ! command -v mdcat >/dev/null 2>&1; then echo "Install mdcat to render markdown."; fi
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(($(tput cols) - 5)); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Searching GitHub and GitLab
+
+<any interesting and useful projects on platforms like GitHub and GitLab might not always rank highly or even appear in general Google searches, especially for niche topics or newer projects. This is because search engines prioritize widely linked and high-traffic sites. To effectively find these hidden gems, you need to leverage the powerful built-in search capabilities of GitHub and GitLab.
+
+Here are some techniques to search GitHub and GitLab effectively:
+
+1. Utilize the Platform's Primary Search Bar
+
+Both GitHub and GitLab have prominent search bars at the top of their interfaces. This is your starting point. Simply typing keywords related to the project you're looking for will yield results within the platform.
+
+2. Master Advanced Search Syntax and Operators
+
+This is where you gain significant power beyond simple keyword searches. Both platforms support a range of operators to refine your results.
+
+## GitHub Advanced Search Operators:
+
+GitHub's search syntax is quite extensive and allows you to search various aspects of repositories, code, commits, users, and more. Here are some key operators for finding projects:   
+
+- keyword: Searches for the keyword across the repository.
+- "exact phrase": Searches for an exact phrase.
+- OR: Combines search terms with an OR logic (e.g., python OR ruby).   
+- NOT: Excludes a term (e.g., python NOT django).   
+- stars:>number: Filters repositories with more than a specified number of stars (e.g., stars:>100). Stars are a good indicator of project popularity and potential usefulness.   
+- forks:>number: Filters repositories with more than a specified number of forks. Forks indicate how many people have copied the repository to work on it.
+- language:language_name: Filters by programming language (e.g., language:java).   
+- topic:topic_name: Filters by topics associated with the repository. Project maintainers often tag their repositories with relevant topics.
+- in:name: Searches only within the repository name.
+- in:description: Searches only within the repository description.
+- in:readme: Searches only within the repository's README file.
+- user:username: Searches within repositories owned by a specific user.
+- org:organizationname: Searches within repositories owned by a specific organization.
+- size:>number: Filters repositories larger than a specified size in kilobytes.
+- pushed:>YYYY-MM-DD: Filters repositories that have been pushed to since a specific date. This helps find recently active projects.
+- created:>YYYY-MM-DD: Filters repositories created since a specific date.
+- license:license_name: Filters by the project's license (e.g., license:mit).   
+
+You can combine these operators to create highly specific queries. For example, to find Python projects related to machine learning with more than 500 stars created after 2023:
+machine learning language:python stars:>500 created:>2023-01-01
+
+## GitLab Advanced Search Operators:
+
+GitLab also provides advanced search capabilities, particularly with its Advanced Search powered by Elasticsearch (availability might depend on your GitLab instance's tier). Key operators and filters include:   
+
+- keyword: Basic keyword search.
+- "exact phrase": Searches for an exact phrase.
+- -term: Excludes a term (equivalent to NOT).
+- |: OR operator (e.g., python | ruby).
+- +: AND operator (e.g., display +banner).
+- *: Wildcard for partial matching (e.g., bug error 50*).
+- filename:filename: Filters by filename (e.g., filename:Gemfile.lock). You can use * for fuzzy matching (e.g., filename:search*).   
+- path:path/to/directory: Filters by path (e.g., path:docs/).
+- extension:extension: Filters by file extension (e.g., extension:rb).
+- blob:commit_id: Filters by Git object ID.
+- GitLab's advanced search is powerful for searching code within projects. For project-level filtering, you often use the search bar in conjunction with the filtering options available on the search results page (e.g., filtering by language, stars, etc.).
+
+3. Explore Trending and Topics Sections
+
+Both platforms offer "Explore" or "Trending" sections that highlight popular and recently active repositories. This is an excellent way to discover interesting projects you might not have searched for directly.
+
+GitHub Explore: (github.com/explore) - Features trending repositories, topics, and collections curated by the GitHub community. You can filter trending repositories by time period (daily, weekly, monthly) and by language.
+GitLab Explore: (gitlab.com/explore) - Allows you to explore projects, groups, and topics. You can filter projects by "Most starred," "Trending," "Active," etc., and also by language.
+
+4. Search within Specific Groups or Users (GitLab)
+
+GitLab's structure with groups allows for targeted searching within a collection of related projects. If you know a particular group or user is likely to have the type of project you're looking for, navigate to their page and use the search bar there to narrow down the results to their scope.
+
+5. Look at Project Dependencies and Reverse Dependencies
+
+If you find one interesting project, look at its dependencies (what libraries/frameworks it uses) and reverse dependencies (what projects use this project). This can lead you to related projects or projects built on similar technologies.
+
+6. Check "Used By" or "Dependent Repositories" (GitHub)
+
+GitHub shows a "Used by" section on repository pages, listing other public repositories that depend on it. This is a great way to find real-world examples and related projects.   
+
+7. Utilize Code Search
+
+If you're looking for projects that implement a specific algorithm, use a particular library in a certain way, or contain a specific piece of text in their code, the code search feature is invaluable. You can search across all public repositories (or within specific ones) for exact code snippets or patterns.
+
+8. Filter by Creation or Update Date
+
+If you're looking for fresh projects or projects that are actively maintained, use the date filters (created:, pushed: on GitHub, similar filtering on GitLab's explore page).
+
+9. Browse Topics (GitHub & GitLab)
+
+Both platforms allow projects to be tagged with topics. Browse topics related to your area of interest is an excellent way to discover relevant projects, even if you don't have specific keywords in mind.
+
+10. Leverage External Tools (with Caution)
+
+While you want to go beyond basic Google search, there are some third-party tools built on top of the GitHub/GitLab APIs that offer enhanced searching or analysis. Use these with caution and be aware of their limitations.
+
+By combining these techniques, you can move beyond basic keyword searches and effectively navigate the vast landscapes of GitHub and GitLab to uncover projects that perfectly match your interests and needs. Remember that the best approach often involves starting broad and then using filters and advanced operators to narrow down your results.
+
+EOF
+) | less -R

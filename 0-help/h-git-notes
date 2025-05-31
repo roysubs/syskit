@@ -1,0 +1,141 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Git Practical Tips Cheatsheet
+
+## 1. **Recovering a Deleted File**
+
+### Recover the Last Version of a Deleted File from Remote
+- If you accidentally delete a file (e.g., `g-git-notes`), you can recover it from the latest commit on the remote repository by running:  
+`git checkout origin/main -- h-git-notes`   # Retrieve from git.com
+- `origin/main` refers to the main branch of the remote repository.
+- `-- README.md` specifies the file to recover from the latest commit on the `origin/main` branch.
+`git checkout HEAD -- ./0-help/0-ls`        # Retrieves from latest commit (could be local)
+
+### Check Which Branch You're On
+- If you're unsure about the branch you're currently on, use: `git branch`
+- This shows all branches, with an asterisk `*` next to the current branch.
+
+### Recovering a Deleted File from a Previous Commit
+- If you need to restore a file from a previous commit (not necessarily the latest one), you can use: `git checkout <commit_hash> -- README.md`  
+- Replace `<commit_hash>` with the commit hash you want to recover from. Use `git log` to find the commit hash.  
+
+### Recover a Deleted File from the Staging Area
+- If you’ve accidentally staged a delete (but not yet committed it), use: `git restore --staged README.md`  
+
+## 2. **Undoing Changes and Commits**
+
+### Undo Changes in Working Directory
+- If you've made changes to a file but haven't committed them yet and want to discard the changes: `git restore README.md`  
+
+### Undo a Commit (Local Only)
+- If you made a commit that you want to undo and it's not pushed yet, use:  
+`git reset --soft HEAD~1`
+- This will undo the last commit, keeping changes in your working directory and staging area.
+
+### Undo a Commit and Discard Changes
+- If you want to completely discard the commit and its changes, use:  
+`git reset --hard HEAD~1`
+
+### Amend the Last Commit
+- If you need to modify the last commit (e.g., to add a missed file or change the commit message), use:  
+git commit --amend
+
+### Revert a Pushed Commit
+- If you need to undo a commit that has already been pushed to the remote, use `git revert`: `git revert <commit_hash>`
+This will create a new commit that undoes the changes of the specified commit.
+
+## 3. **Working with Remote Repositories**
+
+### Fetch and Merge Changes from Remote
+- To fetch changes from the remote repository and merge them with your local branch: `git fetch origin git merge origin/main`  
+
+### Pull Changes from Remote Repository
+- To fetch and automatically merge changes from the remote repository into your current branch: `git pull origin main`
+
+### Push Changes to Remote Repository
+- To push your local commits to the remote repository: `git push origin main`  
+
+### List Remote Repositories
+- To list the remote repositories associated with your project: `git remote -v`
+
+### Remove a Remote Repository
+- To remove a remote from your project: `git remote remove <remote_name>`
+
+### Add a New Remote Repository
+- To add a new remote repository: `git remote add <remote_name> <url>`  
+
+## 4. **Branch Management**
+
+### Create a New Branch
+- To create a new branch and switch to it immediately: `git checkout -b new-branch`
+
+### Switch to an Existing Branch
+- To switch to an existing branch: `git checkout existing-branch`
+
+### List All Branches
+- To list all local branches: `git branch`
+
+- To list both local and remote branches: `git branch -a`
+
+### Delete a Local Branch
+- To delete a local branch (only if it’s already merged): `git branch -d branch-name`
+
+- To force delete a local branch (even if it’s not merged): `git branch -D branch-name`
+
+### Delete a Remote Branch
+- To delete a branch from the remote repository: `git push origin --delete branch-name`
+
+## 5. **Stashing Changes**
+
+### Stash Uncommitted Changes
+- If you need to save changes temporarily and work on something else: `git stash`
+
+### List Stashes
+- To view a list of your stashed changes: `git stash list`
+
+### Apply Stashed Changes
+- To apply the most recent stash: `git stash apply`
+- To apply a specific stash: `git stash apply stash@{n}`
+
+### Drop a Stash
+- To delete a specific stash: `git stash drop stash@{n}`
+
+### Clear All Stashes
+- To delete all stashes: `git stash clear`
+
+## 6. **Viewing Commit History**
+
+### View Commit Log
+- To view the commit history of the repository: `git log`
+
+### View Commit History with One Line per Commit
+- To view the commit history in a compact format (one line per commit): `git log --oneline`
+
+### View Commit Log for a Specific File
+- To see the commit history of a specific file: `git log -- <file_name>`
+
+### View a Specific Commit
+- To view details of a specific commit: `git show <commit_hash>`
+
+## 7. **Tagging**
+
+### Create a New Tag
+- To create a new tag: `git tag -a v1.0 -m "Initial release"`
+
+### List Tags
+- To list all tags in the repository: `git tag`
+
+### Push Tags to Remote
+- To push a specific tag to the remote repository: `git push origin v1.0`
+
+### Delete a Tag
+- To delete a local tag: `git tag -d v1.0`
+
+- To delete a remote tag: `git push origin --delete tag v1.0`
+
+EOF
+) | less -R

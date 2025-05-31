@@ -1,0 +1,96 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Cockpit Admin Tool Overview
+=============================
+
+### What is Cockpit?
+- Cockpit is a **web-based server management tool** for Linux, offering a user-friendly interface to manage systems remotely.
+- It provides real-time monitoring, configuration, and management of system services like **disk usage, network interfaces, firewall settings, and system logs**.
+
+### Features:
+- **Dashboard Overview**: Visualizes key system metrics.
+- **Logs**: View and search logs in real time.
+- **Storage Management**: Easily mount/unmount partitions, configure storage.
+- **Network**: View and configure active network interfaces.
+- **System Control**: Start/stop/restart services.
+- **Firewall**: Manage firewall settings through GUI.
+- **Docker**: Provides a graphical interface to manage containers.
+
+### Installation:
+
+1. **Install Cockpit on Debian-based systems**:
+    ```bash
+    sudo apt install cockpit
+    sudo systemctl enable --now cockpit.socket
+    ```
+
+2. **Access Cockpit**:
+    - Open a web browser and go to `https://<your-server-ip>:9090`.
+    - Log in using your system credentials.
+
+3. **Install Cockpit on RHEL/CentOS**:
+    ```bash
+    sudo yum install cockpit
+    sudo systemctl start cockpit
+    sudo systemctl enable cockpit
+    ```
+
+4. **Install Cockpit on Fedora**:
+    ```bash
+    sudo dnf install cockpit
+    sudo systemctl start cockpit
+    sudo systemctl enable cockpit
+    ```
+
+### Basic Commands:
+- **Start Cockpit**: 
+    ```bash
+    sudo systemctl start cockpit
+    ```
+- **Enable Cockpit to start on boot**: 
+    ```bash
+    sudo systemctl enable cockpit
+    ```
+- **Check Cockpit status**:
+    ```bash
+    sudo systemctl status cockpit
+    ```
+- **Open Cockpit ports in the firewall** (if applicable):
+    ```bash
+    sudo ufw allow 9090
+    ```
+
+### Useful Configuration Options:
+- **Customize Cockpit Port**: Edit the `/etc/cockpit/cockpit.conf` file to change the listening port.
+- **Enable/Disable Cockpit modules**: Modify `/etc/cockpit/cockpit.conf` for modules like **Docker**, **NetworkManager**, etc.
+
+### Troubleshooting:
+- **Check Cockpit logs**:
+    ```bash
+    sudo journalctl -u cockpit
+    ```
+- **Restart Cockpit if stuck**:
+    ```bash
+    sudo systemctl restart cockpit
+    ```
+
+### Cockpit Plugins:
+1. **Cockpit-docker**: Allows managing Docker containers.
+    ```bash
+    sudo apt install cockpit-docker
+    ```
+2. **Cockpit-machines**: Provides a graphical interface to manage virtual machines.
+    ```bash
+    sudo apt install cockpit-machines
+    ```
+
+### Security Considerations:
+- Cockpit uses **HTTPS** for secure communication. Make sure your server's firewall and SSL certificates are correctly configured.
+- **User Access Control**: Use **sudo** permissions to control which users can access and manage system settings through Cockpit.
+
+EOF
+) | less -R

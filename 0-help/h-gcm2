@@ -1,0 +1,87 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Git Credential Manager (GCM) Cheatsheet
+
+## 1. **Setting Up Git Credential Manager (GCM)**
+
+### Install Git Credential Manager
+- **On Windows:**  
+  GCM is included with Git for Windows (version 2.29 and above).  
+  If not installed, download from: [Git Credential Manager for Windows](https://github.com/GitCredentialManager/git-credential-manager/releases).
+  
+- **On macOS/Linux:**  
+  Install via Homebrew (recommended for macOS and Linux users):  
+  `brew install --cask git-credential-manager`
+
+  Alternatively, on Linux, you can use:
+curl -fsSL https://aka.ms/gcm/linux-install | bash
+
+### Verify Installation
+- Check if GCM is installed:  
+`git-credential-manager --version`
+
+## 2. **Configuring Git Credential Manager**
+
+### Configure GCM as the Credential Helper
+- Set GCM as the default credential helper for Git:  
+`git config --global credential.helper manager`
+
+### Store Credentials Securely (macOS, Windows, Linux)
+- GCM will securely store credentials using the system's keychain, such as **Windows Credential Store**, **macOS Keychain**, or **Gnome Keyring** on Linux.
+
+## 3. **Using Git Credential Manager**
+
+### First Time Authentication
+- On first use, when you access a repository (clone, pull, push), GCM will prompt you to authenticate.
+- GCM supports **OAuth** for services like **GitHub**, **GitLab**, and **Bitbucket**, providing a secure authentication flow.
+
+### Credentials Caching and Storage
+- GCM stores your credentials in the system's secure credential manager, allowing Git to authenticate without prompting each time.
+- You can also use a specific Git repository's credentials by setting up individual configuration:  
+`git config credential.helper manager-core`  
+This is particularly useful for multiple Git hosting services with different authentication methods.
+
+## 4. **Managing Credentials**
+
+### View Stored Credentials
+- To view credentials stored by GCM, use:  
+`git credential-manager-core list`
+
+### Remove Stored Credentials
+- To remove stored credentials for a specific repository or all repositories:  
+`git credential-manager-core erase https://github.com`
+This will remove GitHub credentials, for example.
+
+### Clear All Stored Credentials
+- To clear all credentials managed by GCM:  
+`git credential-manager-core erase`
+
+## 5. **Troubleshooting and Debugging**
+
+### Debug Authentication Issues
+- Enable GCM debug logging to help diagnose issues:  
+`export GIT_CREDENTIAL_MANAGER_TRACE=true`
+This enables detailed logging that can help identify problems with authentication or credential storage.
+
+### Reset GCM Credentials
+- If you want to reset stored credentials (clear any stored tokens, etc.):  
+`git credential-manager-core erase`
+
+### GCM on Windows Troubleshooting
+- On Windows, if GCM isn’t working as expected, ensure that **Git for Windows** and GCM are up-to-date.  
+You can update Git from [git-scm.com](https://git-scm.com) or using the Git for Windows installer.
+
+## 6. **Updating Git Credential Manager**
+- GCM should update automatically if you use a package manager like Homebrew or the Git for Windows auto-updater.  
+Alternatively, to update manually:
+- **On macOS/Linux:**  
+  `brew upgrade git-credential-manager`
+- **On Windows:**  
+  Download the latest version from the [GCM Releases Page](https://github.com/GitCredentialManager/git-credential-manager/releases).
+
+EOF
+) | less -R

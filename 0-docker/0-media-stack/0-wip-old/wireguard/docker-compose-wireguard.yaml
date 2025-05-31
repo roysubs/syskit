@@ -1,0 +1,151 @@
+# This Docker Compose file defines a media stack using WireGuard for VPN access.
+# All services that handle torrents or need their traffic routed through the VPN
+# are configured to use WireGuard's network stack (`network_mode: service:wireguard`).
+# Ports for accessing the Web UIs of these services from the host (or local network)
+# are mapped *on the WireGuard service itself*.
+
+# WireGuard: VPN client that routes traffic for all of the below.
+# qBittorrent: Torrent client, Web UI 8080
+# Radarr: Movie management, Web UI 7878
+# Sonarr: TV Series management, Web UI 8989
+# Jackett: Torrent indexer proxy, Web UI 9117
+# Filebrowser: Web-based file browser, Web UI (e.g., 8081 mapped to 80 internally)
+
+services:
+  wireguard:
+    image: lscr.io/linuxserver/wireguard:latest
+    container_name: wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE  # May be needed if host kernel doesn't auto-load wireguard module
+    environment:
+      - PUID=${PUID}  # Defined in .env by start-media-stack.sh
+      - PGID=${PGID}  # Defined in .env by start-media-stack.sh
+      - TZ=${TZ}      # Defined in .env by start-media-stack.sh
+      - LAN_NETWORK=192.168.1.0/24,100.64.0.0/10
+      # The linuxserver/wireguard image typically auto-detects .conf files
+      # in the /config directory. The start-media-stack.sh script will place
+      # your WireGuard config (renamed to wg0.conf) into ${CONFIG_ROOT}/wireguard
+      # on the host, which is mounted to /config inside this container.
+      #
+      # LAN access (split tunneling) for WireGuard is typically configured within
+      # the wg0.conf file itself by adjusting the AllowedIPs for the [Peer] section.
+      # For example, if your VPN peer's AllowedIPs is 0.0.0.0/0, all traffic goes
+      # through the VPN. To exclude your LAN (e.g., 192.168.1.0/24), you would
+      # need more specific routes, or ensure your wg0.conf's [Interface] Address
+      # doesn't conflict and that AllowedIPs for the [Peer] doesn't try to route
+      # your local LAN traffic to the VPN.
+    volumes:
+      # The start-media-stack.sh script will create ${CONFIG_ROOT}/wireguard
+      # and copy your .conf file into it as wg0.conf.
+      - ${CONFIG_ROOT}/wireguard:/config
+      # Recommended for kernel module access if WireGuard module isn't built into host kernel or auto-loaded.
+      - /lib/modules:/lib/modules:ro
+      - ${CONFIG_ROOT}/wireguard/add-nat.sh:/etc/cont-init.d/99-add-nat.sh
+    ports:
+      # These ports are exposed on the WireGuard container, and traffic is routed to the
+      # respective services that use `network_mode: service:wireguard`.
+      # Format: HostPort:ContainerInternalPort (which is the port the actual service listens on)
+      # qBittorrent Web UI
+      - 8080:8080
+      # Jackett Web UI
+      - 9117:9117
+      # Sonarr Web UI
+      - 8989:8989
+      # Radarr Web UI
+      - 7878:7878
+      # Filebrowser Web UI (if you re-enable it and its internal port is 80)
+      # - 8081:80
+      # qBittorrent torrenting ports (ensure these match qBittorrent's internal settings)
+      - 6881:6881/tcp
+      - 6881:6881/udp
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      # Add the following if you use IPv6 through WireGuard and have it enabled on your host:
+      # - net.ipv6.conf.all.disable_ipv6=0
+    restart: unless-stopped
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent # Using LinuxServer.io image
+    container_name: qbittorrent
+    network_mode: "service:wireguard" # All internet bound traffic via WireGuard
+    depends_on:
+      - wireguard                   # Ensures WireGuard starts before qBittorrent
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - WEBUI_PORT=8080             # Internal port for qBittorrent Web UI
+    volumes:
+      - ${CONFIG_ROOT}/qbittorrent:/config
+      - /mnt/media/downloads:/downloads
+    restart: unless-stopped
+
+  radarr:    # FILM MANAGER
+    image: lscr.io/linuxserver/radarr # Using LinuxServer.io image
+    container_name: radarr
+    network_mode: "service:wireguard" # All internet bound traffic via WireGuard
+    depends_on:
+      - wireguard
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/radarr:/config
+      - /mnt/media:/mnt/media         # Radarr needs to see the whole media structure
+    restart: unless-stopped
+
+  sonarr:    # TV MANAGER
+    image: lscr.io/linuxserver/sonarr # Using LinuxServer.io image
+    container_name: sonarr
+    network_mode: "service:wireguard" # All internet bound traffic via WireGuard
+    depends_on:
+      - wireguard
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/sonarr:/config
+      - /mnt/media:/mnt/media         # Sonarr needs to see the whole media structure
+    restart: unless-stopped
+
+  jackett:    # INDEX MANAGER
+    image: lscr.io/linuxserver/jackett # Using LinuxServer.io image
+    container_name: jackett
+    network_mode: "service:wireguard" # All internet bound traffic via WireGuard
+    depends_on:
+      - wireguard
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/jackett:/config
+    restart: unless-stopped
+
+# filebrowser:
+#   image: filebrowser/filebrowser
+#   container_name: filebrowser
+#   network_mode: "service:wireguard" # Route via WireGuard if desired
+#   depends_on:
+#     - wireguard
+#   user: "${PUID}:${PGID}" # Run as the specified user
+#   volumes:
+#     - ${CONFIG_ROOT}/filebrowser:/config # For Filebrowser's database
+#     - /mnt/media:/srv                # Directory Filebrowser will serve
+#   environment:
+#     - PUID=${PUID}
+#     - PGID=${PGID}
+#     - TZ=${TZ}
+#     - FB_DATABASE=/config/database.db # Tells Filebrowser where to store its database
+#     # Filebrowser listens on port 80 inside the container by default.
+#     # If you want to access it on host port 8081, ensure '8081:80' is in wireguard's ports section.
+#   # command: ["--port", "80", "--database", "/config/database.db"] # Explicitly set internal port if needed
+#   restart: unless-stopped
+
+# Optional: Define networks if you need custom ones (not strictly needed with network_mode: service:)
+# networks:
+#   default:
+#     enable_ipv6: false # Example: Disable IPv6 on the default bridge if it causes issues

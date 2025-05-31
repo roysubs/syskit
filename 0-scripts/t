@@ -1,0 +1,609 @@
+#!/bin/bash
+# TMUX Tool Script ("t")
+# Unified wrapper for commonly used tmux commands with colorful output and aliases.
+
+# --- Script Colors & Helper Functions ---
+BLUE='\033[1;34m'
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+CYAN='\033[1;36m'
+NC='\033[0m' # No Color
+
+print_line() {
+    echo -e "${BLUE}=====${NC}"
+}
+
+color_echo() {
+    echo -e "${GREEN}$1${NC}"
+}
+
+# Check if we're in a tmux session and exit with error if not
+require_tmux() {
+    if [ -z "$TMUX" ]; then
+        echo -e "${RED}Error: Not in a tmux session.${NC}" >&2
+        return 1
+    fi
+    return 0
+}
+
+# Check if we're NOT in tmux (for commands that start new sessions)
+require_no_tmux() {
+    if [ -n "$TMUX" ]; then
+        echo -e "${RED}Error: Already in a tmux session: $TMUX_PANE${NC}" >&2
+        return 1
+    fi
+    return 0
+}
+
+# Get terminal dimensions with fallback
+get_terminal_size() {
+    local width height
+    width=$(tput cols 2>/dev/null || echo 80)
+    height=$(tput lines 2>/dev/null || echo 24)
+    echo "$width $height"
+}
+
+# --- Help Functions ---
+show_help() {
+    printf "Tmux Wrapper.   Usage: t [option] [args...]
+Options:
+  h|help          Quick key binding defaults summary
+  list            List commands: buffers, clients, panes, sessions, windows
+  s|t|start       Start a new tmux session (if not already in one); ${BLUE}tmux new-session${NC}
+  a <name>        Attach to session <name> (or to last session if no name); ${BLUE}tmux attach-session -t <name>${NC}
+  d               Detach from current session; ${BLUE}tmux detach-client${NC} 'C-b d'
+  nh|n\\\\\"          New Horizontal pane split 'C-b \"' (can't do n\" to mimic C-b syntax, so use n\\\\\" on console, or just use nh)
+  ng              New Grid (2x2 layout in current window or new session)
+  nv|n%%           New Vertical pane split 'C-b %%' (nh|nv will create from new, or in existing session)
+  f|b             Pane switch: f (forwards 'C-b f'), or b (backwards 'C-b b');  tmux select-pane -t :.+ (forwards), or :.- (backwards)
+  c|n|p|choose    Windows: c (create 'C-b c'), n (next window 'C-b n'), p (previous window 'C-b p'), choose (choose window screen)
+  btop            Open btop but stay in calling pane
+  vi \$1           Open vi and edit (i.e. stay in the vi pane)
+  rl|rr|ru|rd     Resize current pane (L/R/U/D by 5 cells)
+  copy            Enter copy mode
+  mouse           Toggle tmux mouse mode on/off
+    on:  Left-click on a pane to switch to pane; on pane-divider to drag-resize
+         Left-click to select text in a pane (then use 'C-b ]' to paste)
+         Right-click context-sensitive menu
+    off: Mouse-wheel will scroll console history
+  panes           Flash up the pane numbers, and show details in console
+  rs|rses <name>  Rename current session to <name>
+  rw|rwin <name>  Rename current window to <name>
+  swi <name>      Switch client to session <name>
+  k               ${BLUE}tmux kill-pane${NC} | Kill current tmux pane (with confirmation)
+  ck              Commands & Keys: tmux's internal list-commands and list-keys (paged through less) 
+  cmds            List all tmux commands (paged)
+  keys            List all tmux key bindings (paged)
+
+"
+}
+
+# Check if tmux is installed, offer to install if not
+# if ! command -v tmux &>/dev/null; then
+#   read -p "tmux not found. Install (y/N)? " -n 1 -r REPLY && echo
+#   [[ $REPLY =~ ^[Yy]$ ]] && (sudo apt update && sudo apt install -y tmux) || { echo "tmux not installed. Exiting."; exit 1; }
+# fi
+check_tmux_installed() {
+    if ! command -v tmux >/dev/null 2>&1; then
+        echo -e "${RED}Error: tmux is not installed.${NC}" >&2
+        echo -e "Would you like to install tmux? ${CYAN}[y/N]${NC}: " >&2
+        read -r response
+        case "$response" in
+            [yY]|[yY][eE][sS])
+                echo "Installing tmux..."
+                if command -v apt >/dev/null 2>&1; then      sudo apt update && sudo apt install -y tmux
+                elif command -v yum >/dev/null 2>&1; then    sudo yum install -y tmux
+                elif command -v dnf >/dev/null 2>&1; then    sudo dnf install -y tmux
+                elif command -v pacman >/dev/null 2>&1; then sudo pacman -S tmux
+                elif command -v brew >/dev/null 2>&1; then   brew install tmux
+                else echo -e "${RED}Unable to detect package manager. Please install tmux manually.${NC}" >&2; return 1
+                fi
+                if command -v tmux >/dev/null 2>&1; then echo -e "${GREEN}tmux installed successfully!${NC}"; return 0
+                else echo -e "${RED}tmux installation failed.${NC}" >&2; return 1
+                fi
+                ;;
+            *)
+                echo "tmux installation cancelled."
+                return 1
+                ;;
+        esac
+    fi
+    return 0
+}
+
+create_btop_pane() {
+    local btop_target_width=80
+    local separator_width=1
+    local min_btop_height=24
+    local red='\033[0;31m'
+    local reset='\033[0m'
+
+    if [ -z "$TMUX" ]; then
+        echo "Starting new tmux session with btop setup..."
+        local term_rows term_cols
+        read -r term_rows term_cols <<< "$(stty size)"
+        local min_total_width=$((btop_target_width + separator_width + 1))
+
+        if (( term_cols < min_total_width || term_rows < min_btop_height )); then
+            echo -e "${red}Warning: Terminal (${term_cols}x${term_rows}) may be too small for btop${reset}"
+            # sleep 1
+        fi
+
+        local session="btop_sess$$"
+        local win="main"
+
+        # Start session with left pane running resize logic
+        tmux new-session -d -s "$session" -n "$win" bash -c '
+            sleep 0.1
+            width=$(tmux display -p "#{window_width}")
+            desired=$(( width - 80 - 1 ))
+            if (( desired < 1 )); then desired=1; fi
+            tmux resize-pane -t 0 -x "$desired"
+            tmux wait-for -S btop_ready
+            exec bash
+        '
+
+        # Right pane waits until ready, then runs btop
+        tmux split-window -h -c "$PWD" "tmux wait-for btop_ready; exec btop"
+
+        tmux select-pane -t 0
+        tmux attach-session -t "$session"
+
+    else
+        echo "Already inside tmux; creating btop pane dynamically..."
+        local pane_id=$(tmux display -p '#{pane_id}')
+        local width=$(tmux display -p '#{window_width}')
+        local height=$(tmux display -p '#{window_height}')
+        local desired=$(( width - btop_target_width - separator_width ))
+        if (( desired < 1 )); then desired=1; fi
+
+        if (( width < btop_target_width + separator_width + 1 || height < min_btop_height )); then
+            tmux display-message -d 3000 "Warning: Window too small for btop"
+        fi
+
+        tmux split-window -h -c "#{pane_current_path}" "sleep 0.5; exec btop"
+        tmux resize-pane -L -x "$desired"
+        tmux select-pane -t "$pane_id"
+    fi
+}
+
+create_app_panel() {
+    if [ "$#" -lt 1 ]; then
+        echo "Usage: t create_app_panel <app_name> [app_args...] [--focus|--stay]" >&2
+        return 1
+    fi
+
+    local app_name="$1"
+    shift # Remove app_name from positional parameters, $@ now holds app_args + optional flag
+
+    local app_args_array=()
+    local focus_option_explicitly_set="false"
+    local focus_new_pane_if_explicit="false" # Used if --focus or --stay is given
+
+    # Process remaining arguments to separate app_args from the optional focus flag
+    local num_remaining_args=$#
+    if [ "$num_remaining_args" -gt 0 ]; then
+        local last_arg # Will hold the last argument
+        # Standard way to get the last argument from $@
+        eval "last_arg=\${$#}" # Uses eval to get the last positional parameter
+
+        if [[ "$last_arg" == "--focus" ]]; then
+            focus_option_explicitly_set="true"
+            focus_new_pane_if_explicit="true"
+            if [ "$num_remaining_args" -gt 1 ]; then # If there were actual app_args before the flag
+                app_args_array=("${@:1:$((num_remaining_args - 1))}") # All args except the last one
+            fi
+        elif [[ "$last_arg" == "--stay" ]]; then
+            focus_option_explicitly_set="true"
+            focus_new_pane_if_explicit="false"
+            if [ "$num_remaining_args" -gt 1 ]; then
+                app_args_array=("${@:1:$((num_remaining_args - 1))}")
+            fi
+        else
+            # No focus flag found at the end, all remaining are app_args
+            app_args_array=("$@")
+        fi
+    fi
+    # If num_remaining_args was 0, app_args_array is already empty, focus_option_explicitly_set is false.
+
+    # Determine final focus behavior
+    local should_focus_new_pane # "true" or "false"
+    if [[ "$focus_option_explicitly_set" == "true" ]]; then
+        should_focus_new_pane="$focus_new_pane_if_explicit"
+    else
+        # No explicit flag, use app-specific defaults
+        case "$app_name" in
+            vim|nvim|nano|vi|emacs|micro|helix|hx) # Common editors
+                should_focus_new_pane="true"
+                ;;
+            btop|htop|top|iftop|gotop|glances|gtop) # Common monitoring tools
+                should_focus_new_pane="false"
+                ;;
+            *)
+                should_focus_new_pane="false" # Default for unknown apps: stay
+                ;;
+        esac
+    fi
+
+    # App-specific display configurations
+    local target_width=80
+    local min_height=24
+    case "$app_name" in
+        btop|htop|top|glances|gtop) target_width=80; min_height=24 ;;
+        vim|nvim|nano|vi|emacs|micro|helix|hx) target_width=80; min_height=20 ;;
+        *) target_width=80; min_height=20 ;;
+    esac
+
+    local separator_width=1
+    local red_color='\033[0;31m'
+    local nc_color='\033[0m'
+
+    local args_string_for_exec=""
+    for arg_val in "${app_args_array[@]}"; do
+        args_string_for_exec+=$(printf " %q" "$arg_val")
+    done
+    local exec_command_for_app="exec \"$app_name\"$args_string_for_exec"
+
+    local new_pane_id_capture # To store the ID of the new app pane
+
+    if [ -z "$TMUX" ]; then # New session
+        echo "Starting new tmux session for $app_name..."
+        local term_cols term_rows
+        read -r term_rows term_cols <<< "$(stty size 2>/dev/null || echo '24 80')"
+        local min_total_width_needed=$((target_width + separator_width + 1))
+        if (( term_cols < min_total_width_needed || term_rows < min_height )); then
+            echo -e "${red_color}Warning: Terminal (${term_cols}x${term_rows}) may be too small for $app_name layout.${nc_color}" >&2
+        fi
+
+        local session_name="${app_name}_session_$$"
+        local window_name="main_win"
+        local signal_name="app_pane_ready_${session_name}"
+        
+        # Create the first pane (main shell) and get its ID
+        local first_pane_id
+        first_pane_id=$(tmux new-session -P -F '#{pane_id}' -d -s "$session_name" -n "$window_name" \
+            bash -c "
+                sleep 0.1;
+                current_window_width=\$(tmux display -p '#{window_width}');
+                desired_this_pane_width=\$(( current_window_width - $target_width - $separator_width ));
+                if (( desired_this_pane_width < 1 )); then desired_this_pane_width=1; fi;
+                tmux resize-pane -t \"#{pane_id}\" -x \"\$desired_this_pane_width\"; # Resize self
+                tmux wait-for -S \"$signal_name\";
+                exec bash;
+            ")
+
+        # Split relative to the first pane and get new app pane ID
+        new_pane_id_capture=$(tmux split-window -P -F '#{pane_id}' -t "$first_pane_id" -h -c "$PWD" \
+            "tmux wait-for \"$signal_name\"; $exec_command_for_app")
+
+        if [[ "$should_focus_new_pane" == "true" ]]; then
+            tmux select-pane -t "$new_pane_id_capture" # Select app pane before attach
+        else
+            tmux select-pane -t "$first_pane_id"       # Select main shell pane before attach
+        fi
+        tmux attach-session -t "$session_name"
+
+    else # Already inside a tmux session
+        local original_pane_id=$(tmux display -p '#{pane_id}')
+        local window_width=$(tmux display -p '#{window_width}')
+        local window_height=$(tmux display -p '#{window_height}')
+        local min_total_width_needed=$((target_width + separator_width + 1))
+
+        if (( window_width < min_total_width_needed || window_height < min_height )); then
+            tmux display-message -d 3000 "${red_color}Warning: Window (${window_width}x${window_height}) too small for $app_name layout.${nc_color}"
+        fi
+
+        local desired_original_pane_width=$(( window_width - target_width - separator_width ))
+        if (( desired_original_pane_width < 1 )); then desired_original_pane_width=1; fi
+
+        # Split, run app, and capture new pane ID
+        new_pane_id_capture=$(tmux split-window -P -F '#{pane_id}' -h -c "#{pane_current_path}" \
+            "sleep 0.2; $exec_command_for_app")
+        
+        tmux resize-pane -t "$original_pane_id" -x "$desired_original_pane_width"
+
+        if [[ "$should_focus_new_pane" == "true" ]]; then
+            tmux select-pane -t "$new_pane_id_capture"
+        else
+            tmux select-pane -t "$original_pane_id" # Ensure focus stays/returns to original
+        fi
+    fi
+}
+
+# --- Session Management ---
+start_session() {
+    if ! require_no_tmux; then
+        tmux display-message "Already in a tmux session. No new session started."
+        return 1
+    fi
+    color_echo "Starting new tmux session..."
+    tmux new-session
+}
+
+attach_session() {
+    local target_session="$1"
+    if [ -n "$TMUX" ] && [ -z "$target_session" ]; then
+        echo "You are already in a tmux session. To switch, use 't swi <session>' or 't a <other_session>'."
+        return 1
+    fi
+    if [ -n "$target_session" ]; then
+        tmux attach-session -t "$target_session"
+    else
+        tmux attach-session
+    fi
+}
+
+detach_session() {
+    require_tmux || return 1
+    tmux detach-client
+}
+
+switch_session() {
+    require_tmux || return 1
+    local target_session="$1"
+    if [ -z "$target_session" ]; then
+        echo "Usage: t swi <session-name-or-target>"
+        return 1
+    fi
+    tmux switch-client -t "$target_session"
+}
+
+rename_session() {
+    require_tmux || return 1
+    local new_name="$1"
+    if [ -z "$new_name" ]; then
+        echo "Usage: t rename <new-session-name>"
+        read -r -p "Enter new session name: " new_name
+        if [ -z "$new_name" ]; then
+            echo "No name provided. Aborting."
+            return 1
+        fi
+    fi
+    tmux rename-session "$new_name"
+}
+
+rename_window() {
+    require_tmux || return 1
+    local new_name="$1"
+    if [ -z "$new_name" ]; then
+        echo "Usage: t rename <new-window-name>"
+        read -r -p "Enter new window name: " new_name
+        if [ -z "$new_name" ]; then
+            echo "No name provided. Aborting."
+            return 1
+        fi
+    fi
+    tmux rename-window "$new_name"
+}
+
+# --- Pane Management ---
+select_pane_forward() {
+    require_tmux || return 1
+    tmux select-pane -t :.+
+}
+
+select_pane_backward() {
+    require_tmux || return 1
+    tmux select-pane -t :.-
+}
+
+split_horizontal() {
+    if [ -z "$TMUX" ]; then
+        tmux new-session -d -c "$PWD" \; \
+             split-window -h -c "$PWD" \; \
+             select-pane -t 0 \; \
+             attach-session
+    else
+        tmux split-window -h -c "#{pane_current_path}"
+    fi
+}
+
+split_vertical() {
+    if [ -z "$TMUX" ]; then
+        tmux new-session -d -c "$PWD" \; \
+             split-window -v -c "$PWD" \; \
+             select-pane -t 0 \; \
+             attach-session
+    else
+        tmux split-window -v -c "#{pane_current_path}"
+    fi
+}
+
+split_grid() {
+    if [ -z "$TMUX" ]; then
+        tmux new-session -d -c "$PWD" \; \
+             split-window -h -c "#{pane_current_path}" \; \
+             select-pane -L \; \
+             split-window -v -c "#{pane_current_path}" \; \
+             select-pane -R \; \
+             split-window -v -c "#{pane_current_path}" \; \
+             select-pane -t 0 \; \
+             attach-session
+    else
+        tmux split-window -h -c "#{pane_current_path}"
+        tmux select-pane -L
+        tmux split-window -v -c "#{pane_current_path}"
+        tmux select-pane -R
+        tmux split-window -v -c "#{pane_current_path}"
+        tmux select-pane -t 0
+    fi
+}
+
+
+kill_pane() {
+    require_tmux || return 1
+    tmux kill-pane
+}
+
+show_panes() {
+    require_tmux || return 1
+    tmux list-panes
+    tmux display-panes
+}
+
+# --- Resize Functions ---
+resize_left() {
+    require_tmux || return 1
+    tmux resize-pane -L 5
+}
+
+resize_right() {
+    require_tmux || return 1
+    tmux resize-pane -R 5
+}
+
+resize_up() {
+    require_tmux || return 1
+    tmux resize-pane -U 5
+}
+
+resize_down() {
+    require_tmux || return 1
+    tmux resize-pane -D 5
+}
+
+# --- Copy Mode ---
+enter_copy_mode() {
+    require_tmux || return 1
+    tmux copy-mode
+}
+
+# --- Mouse Toggle ---
+toggle_mouse() {
+    require_tmux || return 1
+    local current_mouse_status
+    current_mouse_status=$(tmux show-options -g mouse | awk '{print $2}')
+    if [ "$current_mouse_status" = "on" ]; then
+        tmux set-option -g mouse off
+        echo -e "Mouse mode turned ${RED}off${NC}."
+    else
+        tmux set-option -g mouse on
+        echo -e "Mouse mode turned ${GREEN}on${NC}."
+    fi
+}
+
+# --- Information Commands ---
+list_all() {
+    tmux list-buffers 2>/dev/null || echo "No buffers"
+    echo "---"
+    tmux list-clients 2>/dev/null || echo "No clients"
+    echo "---"
+    tmux list-panes 2>/dev/null || echo "No panes"
+    echo "---"
+    tmux list-sessions 2>/dev/null || echo "No sessions"
+    echo "---"
+    tmux list-windows 2>/dev/null || echo "No windows"
+}
+
+show_commands() {
+    tmux list-commands | less
+}
+
+show_keys() {
+    tmux list-keys | less
+}
+
+show_tmux_help() {
+    if [ -z "$TMUX" ]; then
+        (tmux list-commands; echo -e "\n${BLUE}--- KEY BINDINGS (default set) ---${NC}\n"; tmux list-keys -N) | less
+    else
+        (tmux list-commands; echo -e "\n${BLUE}--- KEY BINDINGS (current session) ---${NC}\n"; tmux list-keys) | less
+    fi
+}
+
+ask_btop_install() {
+    if ! command -v btop &>/dev/null; then
+        read -p "btop not found. Install (y/N)? " -n 1 -r REPLY && echo
+        [[ $REPLY =~ ^[Yy]$ ]] && (sudo apt update && sudo apt install -y btop) || { echo "btop not installed. Exiting."; exit 1; }
+    fi
+}
+
+show_tmux_keys() {
+    printf "${YELLOW}  *** Default tmux Key Bindings ***${NC}\n  First press ${CYAN}C-b${NC} (Ctrl+b), then one of the following:\n\n${YELLOW}  Splits & Panes                                Navigation${NC}\n  ${CYAN}\"${NC}    : Split horizontally            ${CYAN}o / ;${NC}     : Next / Last pane\n  ${CYAN}%%${NC}    : Split vertically              ${CYAN}Arrow keys${NC}: Move between panes\n  ${CYAN}!${NC}    : Break pane into window        ${CYAN}Ctrl+Arrow${NC}: Resize pane\n  ${CYAN}x${NC}    : Kill current pane             ${CYAN}Space${NC}     : Cycle layouts (often, might need binding)\n  ${CYAN}z${NC}    : Toggle zoom (fullscreen)\n\n${YELLOW}  Windows & Sessions                            Copy Mode${NC}\n  ${CYAN}c${NC}    : Create new window             ${CYAN}[${NC}     : Copy mode (PgUpDn+cursors to move)\n  ${CYAN}n / p${NC} : Next / Prev window              then ${CYAN}Space${NC} to start selection\n  ${CYAN},${NC}    : Rename window                   then ${CYAN}Enter${NC} to copy highlighted to buffer\n  ${CYAN}&${NC}    : Kill window                   ${CYAN}]${NC}     : Paste buffer\n  ${CYAN}w${NC}    : Choose window\n  ${CYAN}s${NC}    : List sessions\n\n${YELLOW}  Mouse & Buffers                               Miscellaneous${NC}\n  ${CYAN}:${NC}    : Open command prompt\n  ${CYAN}:show-buffer${NC}                            ${CYAN}d${NC} : Detach from session\n  ${CYAN}:save-buffer ~/out.txt${NC}                  ${CYAN}?${NC} : List all key bindings\n  ${CYAN}:list-buffers${NC}                           ${CYAN}t${NC} : Show clock\n  ${CYAN}:clear-history${NC}                          ${CYAN}r${NC} : Reload config\n\n${YELLOW}  Mouse Usage (optional, but very useful)${NC}\n  ${CYAN}:set -g mouse on${NC}    : Enable mouse mode (click, resize splits, scroll)\n  ${CYAN}:set -g mouse off${NC}   : Disable mouse mode (back to keyboard only)\n  Useful key binding to easily toggle mouse on/off:\n  ${CYAN}bind g set -g mouse \\; display-message \"Mouse mode: #{?mouse,on,off}\"${NC}\n${YELLOW}  To add this to your config:${NC} ${CYAN}vi ~/.tmux.conf${NC}\n  Then reload with ${CYAN}C-b r${NC} or ${CYAN}:source-file ~/.tmux.conf${NC}\n\n  For full list: ${CYAN}C-b ?${NC} or run ${CYAN}\"t help\"${NC} inside tmux\n"
+}
+
+show_byobu_help() {
+    printf "${YELLOW}  *** Byobu: An Enhanced Terminal Environment ***${NC}\n  Byobu is a wrapper around GNU Screen or tmux, with useful keybindings, automatic session\n  management (auto-start/attach on login), and system info bar.\n  Defaults to preferring ${GREEN}tmux${NC} if available. Use ${GREEN}byobu-config${NC} to change.\n  It chooses based on byobu configuration (${GREEN}~/.byobu/${NC}) and which multiplexers are installed.\n  ${YELLOW}To Start:${NC} ${GREEN}byobu${NC}   To install: sudo apt install byobu, etc.)\n\n${YELLOW}  Default Key Bindings:${NC}\n  (Bindings may vary slightly based on Byobu version and backend)\n\n  ${YELLOW}Windows                                   Panes${NC}\n  ${CYAN}F2${NC}        : New window                  ${CYAN}Shift-F2${NC} : Split horizontally\n  ${CYAN}F3/F4${NC}     : Prev/Next window            ${CYAN}Ctrl-F2${NC}  : Split vertically\n  ${CYAN}Sh-F3/F4${NC}  : Move window L/R             ${CYAN}Shift-Left/Right/Up/Down${NC}: Navigate panes\n  ${CYAN}F8${NC}        : Rename window               ${CYAN}Ctrl-Left/Right/Up/Down${NC}: Resize pane\n  ${CYAN}F10${NC}       : Exit Byobu/window           ${CYAN}Ctrl-D${NC}   : Close pane/shell\n\n  ${YELLOW}Sessions                                  Miscellaneous${NC}\n  ${CYAN}Shift-F1${NC}: Show help/keys              ${CYAN}F5${NC}       : Refresh status\n  ${CYAN}F6${NC}        : Detach                      ${CYAN}F7${NC}       : Enter scrollback (Copy mode)\n  ${CYAN}Shift-F6${NC}: Attach to session           ${CYAN}F9${NC}       : Configuration menu\n  ${CYAN}Ctrl-F6${NC} : Kill session                  ${CYAN}Ctrl-L${NC}   : Clear screen\n"
+}
+
+# --- Main Script Logic ---
+main() {
+    local command="$1"
+    shift # Remove first argument, leaving the rest for individual functions
+    
+    case "$command" in
+        "")      # Previously ""|-h|--help, removed -h|--help
+            show_help
+            ;;
+        list)
+            list_all
+            ;;
+        s|t|start)
+            start_session
+            ;;
+        a|at|att|attach)
+            attach_session "$1"
+            ;;
+        d|de|det|detach)
+            detach_session
+            ;;
+        f) select_pane_forward ;;
+        b) select_pane_backward ;;
+        nh|n\")
+            split_horizontal
+            ;;
+        nv|n%)
+            split_vertical
+            ;;
+        ng)
+            split_grid
+            ;;
+        c) tmux new-window ;;   # tmux new-window -t my-session  (to create a window in a named session even when detached)
+        choose) tmux choose-window ;;
+        p) select_window_previous ;;
+        n) select_window_next ;;
+        vi)
+            create_app_panel vi "$@" --focus  # Pass remaining args to vim
+            ;;
+        btop)
+            ask_btop_install
+            create_app_panel btop   # create_btop_pane
+            ;;
+        k) kill_pane ;;
+        panes) show_panes ;;
+        rl) resize_left ;;
+        rr) resize_right ;;
+        ru) resize_up ;;
+        rd) resize_down ;;
+        copy) enter_copy_mode ;;
+        mouse) toggle_mouse ;;
+        rs|rses) rename_session "$1" ;;
+        rw|rwin) rename_window "$1" ;;
+        swi) switch_session "$1" ;;
+        h) show_tmux_keys ;;    # hb) show_byobu_help ;;  No longer using byobu, keys clash with too many apps
+        ck) show_commands; show_keys ;;
+        cmd) show_commands ;;
+        key) show_keys ;;
+        
+        *)
+            echo -e "${RED}Unknown option: $command${NC}\n" >&2
+            show_help
+            return 1
+            ;;
+    esac
+}
+
+# --- Script Entry Point ---
+if [[ $# -eq 0 ]]; then
+    show_help
+    exit 0
+fi
+
+# Check if tmux is installed before proceeding
+if ! check_tmux_installed; then
+    exit 1
+fi
+
+main "$@"
+exit $?

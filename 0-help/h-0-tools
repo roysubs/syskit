@@ -1,0 +1,153 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# 100 Amazing Tools
+
+Here is a categorized list of 100 tools that are highly regarded for their utility and impact.
+
+## System Utilities
+
+* **htop:** An interactive process viewer for Unix systems, providing a much more user-friendly and informative display than the standard `top`.
+* **glances:** A cross-platform monitoring tool that provides a lot of system information in a single, curses-based interface.
+* **rsync:** A versatile command-line utility for syncing files and directories locally and remotely, minimizing data transfer through delta encoding.
+* **cron:** A time-based job scheduler in Unix-like operating systems.
+* **anacron:** Similar to cron, but for systems that are not running continuously.
+* **logrotate:** A utility for managing log files, automatically rotating, compressing, and mailing them.
+* **systemd:** A suite of basic building blocks for a Linux system, including a system and service manager.
+* **journalctl:** A utility for querying and displaying logs from the systemd journal.
+* **lsblk:** Lists block devices (like disks and their partitions).
+* **duf:** A disk usage tool with a user-friendly output.
+* **ncdu:** A disk usage analyzer with an ncurses interface.
+* **iotop:** Monitors disk I/O usage by processes.
+* **atop:** A performance monitor that reports the activity of processes, memory, disk, network and I/O.
+* **tldr:** Community-maintained man pages with simplified, practical examples.
+* **man:** The standard command for displaying manual pages.
+* **apropos:** Searches the manual page names and descriptions for keywords.
+* **alias:** Creates a shortcut for a command.
+* **tree:** Lists the contents of directories in a tree-like format.
+* **find:** Command-line utility to locate files.
+* **locate:** Finds files by name using a prebuilt database, often faster than `find`.
+
+## Command Line Tools
+
+* **tmux:** A terminal multiplexer that allows you to create, access, and control multiple independent terminal sessions from a single terminal window.
+* **GNU screen:** Another widely used terminal multiplexer with similar capabilities to tmux.
+* **fzf:** A general-purpose command-line fuzzy finder.
+* **ripgrep (rg):** A line-oriented search tool that recursively searches the current directory for a regex pattern. Faster than `grep` for many use cases.
+* **fd:** A simple, fast and user-friendly alternative to 'find'.
+* **bat:** A `cat(1)` clone with syntax highlighting and Git integration.
+* **exa:** A modern replacement for `ls`.
+* **zoxide:** A smarter `cd` command that learns your habits.
+* **starship:** A minimal, blazing fast, and infinitely customizable prompt for any shell.
+* **httpie:** A user-friendly command-line HTTP client.
+* **curl:** A command-line tool for transferring data with URLs.
+* **wget:** A free utility for non-interactive download of files from the web.
+* **jq:** A lightweight and flexible command-line JSON processor.
+* **yq:** A portable command-line YAML processor.
+* **tokei:** Counts lines of code, written in Rust.
+* **procs:** A modern replacement for `ps`.
+* **grc:** A generic coloured wrapper that allows to colorize output of command-line tools.
+* **parallel:** A shell tool for running jobs in parallel.
+
+## Development Tools
+
+* **Git:** A distributed version control system.
+* **Docker:** A platform for developing, shipping, and running applications in containers.
+* **Podman:** A daemonless container engine for developing, managing, and running OCI Containers.
+* **Kubernetes (k8s):** An open-source system for automating deployment, scaling, and management of containerized applications.
+* **VS Code:** A popular free source-code editor made by Microsoft.
+* **Vim:** A highly configurable text editor built to make creating and changing any kind of text very efficient.
+* **Emacs:** An extensible, customizable, free/libre text editor—and much more.
+* **Jupyter Notebook:** An open-source web application that allows you to create and share documents that contain live code, equations, visualizations, and narrative text.
+* **ngrok:** Secure introspectable tunnels to localhost.
+* **Postman:** An API platform for building and using APIs.
+* **Swagger (OpenAPI):** A framework for describing, producing, consuming, and visualizing RESTful web services.
+* **Ansible:** An open-source automation tool, configuration management, and application-deployment system.
+* **Terraform:** An open-source infrastructure as code tool.
+* **make:** A build automation tool.
+* **cmake:** An open-source, cross-platform family of tools designed to build, test and package software.
+* **gdb:** The GNU Debugger.
+* **pdb:** The Python Debugger.
+* **IDE (Integrated Development Environment):** (e.g., IntelliJ IDEA, Eclipse) - Provides comprehensive facilities to computer programmers for software development.
+* **ESLint:** A pluggable linting utility for JavaScript and JSX.
+* **Prettier:** An opinionated code formatter.
+
+## Networking Tools
+
+* **WireGuard:** An extremely simple yet fast and modern VPN that utilizes state-of-the-art cryptography.
+* **OpenVPN:** A widely used open-source VPN protocol.
+* **Nmap:** A free and open-source network scanner.
+* **Wireshark:** A network protocol analyzer.
+* **MTR (My TraceRoute):** A network diagnostic tool that combines traceroute and ping.
+* **iperf:** A tool for active measurements of the maximum achievable bandwidth on IP networks.
+* **netcat (nc):** A networking utility for reading from and writing to network connections using TCP or UDP.
+* **tcpdump:** A command-line packet analyzer.
+* **ssh:** A secure protocol for remote login and other secure network services.
+* **mosh:** A mobile shell that allows roaming, supports intermittent connectivity, and provides intelligent local echo and line editing of user keystrokes.
+
+## Productivity & Organization
+
+* **Syncthing:** A continuous file synchronization program. (Included as requested)
+* **Obsidian:** A powerful knowledge base that works on top of a local folder of plain text Markdown files.
+* **Logseq:** A local-first, non-linear, outliner notebook for organizing and sharing your knowledge.
+* **Todoist:** A popular task management application.
+* **Trello:** A web-based project management application that uses boards, lists, and cards.
+* **Notion:** An all-in-one workspace for notes, tasks, wikis, and databases.
+* **AnyType:** A local-first, open-source knowledge base.
+* **Zotero:** A free, easy-to-use tool to help you collect, organize, cite, and share research.
+* ** calibre:** A powerful and easy to use e-book manager.
+* **KeePassXC:** A free and open-source password manager (a community fork of KeePassX).
+
+## Security Tools
+
+* **Bitwarden:** A free and open-source password manager. (Included as requested)
+* **GPG (GNU Privacy Guard):** A tool for encryption and digital signatures.
+* **OpenSSL:** A toolkit for the Transport Layer Security (TLS) and Secure Socket Layer (SSL) protocols.
+* **Fail2ban:** An intrusion prevention framework that scans log files and bans IP addresses that show malicious signs.
+* **UFW (Uncomplicated Firewall):** A user-friendly front-end for managing `iptables` firewall rules.
+* **clamav:** An open-source antivirus engine.
+* **LastPass:** A commercial password manager (while not open-source, widely used).
+* **Authy / Google Authenticator:** Two-factor authentication (2FA) applications.
+
+## Multimedia Tools
+
+* **yt-dlp:** A command-line program to download videos from YouTube and many other video hosting websites. (Included as requested)
+* **FFmpeg:** A leading multimedia framework, able to decode, encode, transcode, mux, demux, stream, filter and play pretty much anything that humans and machines have created.
+* **VLC media player:** A highly portable multimedia player, encoder, and streamer that supports numerous audio and video formats.
+* **Audacity:** Free, open-source, cross-platform audio software for multi-track recording and editing.
+* **DaVinci Resolve:** A professional video editing, color correction, visual effects, and audio post-production software application.
+* **GIMP (GNU Image Manipulation Program):** A free and open-source raster graphics editor.
+* **Inkscape:** A free and open-source vector graphics editor.
+* ** Blender:** A free and open-source 3D creation suite.
+* **OBS Studio:** Free and open-source software for video recording and live streaming.
+
+## Data Management
+
+* **PostgreSQL:** A powerful, open-source object-relational database system.
+* **MySQL:** A popular open-source relational database management system.
+* **SQLite:** A C library that provides a lightweight, serverless, self-contained, transactional SQL database engine.
+* **MongoDB:** A NoSQL document database.
+* **Redis:** An in-memory data structure store, used as a database, cache, and message broker.
+* **DBeaver:** A free multi-platform database tool for developers, database administrators, analysts and all people who need to work with databases.
+* **pgcli:** A command-line interface for PostgreSQL with auto-completion and syntax highlighting.
+* **mycli:** A command-line client for MySQL, MariaDB, and Percona with auto-completion and syntax highlighting.
+* **csvtk:** A cross-platform, efficient, and rich-featured command-line toolkit for CSV files.
+
+## Miscellaneous but Amazing
+
+* **pandoc:** A universal document converter. (Included as requested)
+* **rá:** A modern, interactive `find` alternative (as you mentioned).
+* **Taskwarrior:** A command-line task management tool.
+* **pass (Password Store):** A simple command-line password manager using GPG.
+* **Aircast (formerly Mkcast):** Cast your desktop to Chromecast devices.
+* **ncspot:** A Spotify client for the terminal with a ncurses interface.
+* **lazygit:** A simple terminal UI for git commands.
+* ** glances (as a web server):** Can provide monitoring data via a web interface or API.
+* **bpytop / bashtop / btm (Bottom):** Resource monitors with a retro/modern look.
+* **neofetch:** A command-line system information tool that displays information about your operating system, software and hardware.
+
+EOF
+) | less -R

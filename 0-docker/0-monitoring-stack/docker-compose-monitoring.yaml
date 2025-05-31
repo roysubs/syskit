@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.51.2 # Using a specific version for stability
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090" # Prometheus web UI
+    volumes:
+      - ./prometheus/:/etc/prometheus/ # Mounts the prometheus config directory
+      - prometheus_data:/prometheus    # Named volume for Prometheus data
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    environment:
+      - TZ=${TZ:-Etc/UTC} # Timezone, can be set in .env
+
+  grafana:
+    image: grafana/grafana-oss:10.4.2 # Using a specific version for stability
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000" # Grafana web UI
+    volumes:
+      - grafana_data:/var/lib/grafana # Named volume for Grafana data
+      # Optional: For future provisioning of datasources and dashboards
+      # - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      # - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false # Disables user self-registration
+      - TZ=${TZ:-Etc/UTC} # Timezone, can be set in .env
+    depends_on:
+      - prometheus # Ensures Prometheus starts before Grafana
+
+volumes:
+  prometheus_data: {} # Defines the named volume for Prometheus
+  grafana_data: {}    # Defines the named volume for Grafana

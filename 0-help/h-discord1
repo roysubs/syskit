@@ -1,0 +1,59 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Discord Quick Notes
+===============
+
+- **Install Discord**:
+    - For Debian-based systems (e.g., Ubuntu):
+      - Download the `.deb` package from [Discord's website](https://discord.com/download) and install with: `sudo dpkg -i discord.deb`
+      - Or use Snap: `sudo snap install discord`
+    - For Red Hat-based systems (e.g., Fedora):
+      - Download the `.rpm` package from [Discord's website](https://discord.com/download) and install with: `sudo rpm -i discord.rpm`
+
+- **Run Discord**:
+    - From terminal: `discord`
+    - Or find it in the applications menu.
+
+- **Set Up Your Discord Account**:
+    - Launch Discord and log in with your account.
+    - If you don't have an account, you can register directly within the app.
+
+- **Navigating the Discord Interface**:
+    - **Servers**: The left sidebar lists all servers you're a member of.
+    - **Channels**: Inside each server, channels are listed under categories. Click on a text or voice channel to join.
+    - **Direct Messages**: Click on the Home icon to access DMs.
+    - **User Settings**: Click the gear icon near your profile name to access settings like notification preferences, appearance, and keybinds.
+
+- **Voice and Video Calls**:
+    - To join a voice channel, click on any voice channel in a server.
+    - Use the camera icon to start a video call in a voice channel.
+    - Use the microphone icon to mute/unmute yourself.
+
+- **Discord Shortcuts**:
+    - `Ctrl+K`: Quick switch between servers and channels.
+    - `Ctrl+Shift+M`: Mute/unmute your microphone.
+    - `Ctrl+Shift+D`: Turn on/off your webcam.
+    - `Ctrl+/`: Open help menu for keybinds.
+
+- **Customizing Discord**:
+    - **Themes**: Go to **User Settings > Appearance** to select a light or dark theme.
+    - **Notifications**: Go to **User Settings > Notifications** to customize sound, alerts, and notifications for servers and DMs.
+    - **Keybinds**: Go to **User Settings > Keybinds** to set custom shortcuts for various actions (mute, push-to-talk, etc.).
+
+- **Discord Bots**:
+    - Bots can be added to servers to automate tasks (e.g., music bots, moderation bots).
+    - Add a bot by inviting it via its website (e.g., for a music bot: `https://top.gg/`).
+    - Once added, configure it using the appropriate commands (e.g., `!help` for most bots).
+
+- **Troubleshooting**:
+    - **No sound**: Ensure your audio settings are correctly configured in **User Settings > Voice & Video**.
+    - **Frozen app**: Try restarting Discord or clearing the cache: `rm -r ~/.discord/` (Discord will rebuild it upon restart).
+    - **Can't join voice channels**: Check if your microphone is properly configured and Discord has permission to access it.
+
+EOF
+) | less -R
+

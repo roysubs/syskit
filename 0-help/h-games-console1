@@ -1,0 +1,67 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Classic Roguelikes & Dungeon Crawlers:
+
+Angband (angband) : A classic dungeon-crawling roguelike with complex mechanics.
+Brogue (brogue) : Simple and elegant roguelike focused on puzzle mechanics.
+Dungeon Crawl Stone Soup (crawl) : Popular and accessible roguelike dungeon crawler.
+Larn (larn) : Classic roguelike, similar to Rogue and NetHack.
+NetHack (nethack-console) : One of the oldest and most famous roguelikes.
+ADOM (adom) : Complex, narrative-driven roguelike.
+Cataclysm: Dark Days Ahead (cataclysm-dda) : Post-apocalyptic survival roguelike.
+ToME (tome) : A story-heavy roguelike with deep character progression.
+Rogue (rogue) : The original game that started the roguelike genre.
+Zangband (zangband) : Another variant of Angband, with some unique features.
+
+# Puzzle and Strategy Games:
+Ascii Patrol (ascii-patrol) : Puzzle game with tactical combat using ASCII graphics.
+OpenTetris (opentetris) : Play Tetris in the terminal.
+Hex-a-hop (hex-a-hop) : Puzzle game in the terminal based on a hexagonal grid.
+
+# Text-based Adventures:
+Adventure (adventure) : A text-based exploration game, also known as "Colossal Cave Adventure."
+Frotz (frotz) : For playing interactive fiction games.
+Mystery Mansion (mystery-mansion) : Text adventure game with a horror theme.
+The Hitchhiker’s Guide to the Galaxy (hitchhikers-guide-to-the-galaxy) : Text-based interactive fiction based on the popular book series.
+Zork (zork) : The legendary interactive fiction game.
+
+# Action/Arcade Games:
+Boulder Dash (boulderdash) : Classic puzzle game with an emphasis on navigating mazes.
+NInvaders (ninvaders) : An ASCII version of Space Invaders.
+ASCII Invaders (ascii-invaders) : Another Space Invaders clone in ASCII.
+Dune II - The Maker (dune2) : Real-time strategy game inspired by Dune II.
+Pacman4Console (pacman4console) : ASCII-based version of the classic Pac-Man.
+Tetris (tetris) : The classic arcade game ported to the terminal.
+blockattack (blockattack) : puzzle game inspired by Tetris
+blockout2 (blockout2) : Tetris-like game (3D-tetris)
+blocks-of-the-undead (blocks-of-the-undead) : Tetris Attack clone with spooky undertones
+Bastet (bastet) : A Tetris clone for the terminal.
+
+# Board & Card Games:
+Four-in-a-Row (four-in-a-row) : A terminal version of Connect Four.
+Chess (chess) : Console-based chess game.
+Go (gnugo) : Play the ancient Chinese game of Go in the terminal.
+Solitaire (solitaire) : Card game, simple and terminal-based.
+Worms (worms) : A terminal-based clone of the Worms series.
+Freecell (freecell) : The classic Freecell card game for the terminal.
+PokerTH (pokerth) : A poker game for the terminal.
+
+# Simulation Games:
+Lincity-NG (lincity-ng) : City-building simulation game.
+Scorched 3D (scorched3d) : Tank-based strategy game with ASCII graphics.
+SimFarm (simfarm) : A farming simulation game for the terminal.
+Linux Tycoon (linux-tycoon) : A business simulation game where you manage a tech company.
+
+# Miscellaneous Games:
+Nudoku (nudoku) : A terminal version of Sudoku.
+Minesweeper (mines) : The classic Minesweeper game for the terminal.
+Snake (snake) : A simple terminal-based version of the Snake game.
+Tegucigalpa (tegucigalpa) : A crossword puzzle game for the terminal.
+Wordoku (wordoku) : A Sudoku game with words instead of numbers.
+
+EOF
+) | less -R

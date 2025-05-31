@@ -1,0 +1,155 @@
+services:
+  plex:
+    image: linuxserver/plex:latest
+    container_name: plex
+    # Using host network for Plex is often easier for discovery (DLNA, GDM) and avoids manual port mapping for all its services.
+    # If you prefer not to use host mode, remove network_mode and map all required ports:
+    # ports:
+    #   Shifted all Plex ports +1 to avoid conflict with local install
+    #   - "32401:32400/tcp" # Main Plex port
+    #   - "3006:3005/tcp"   # Plex Companion
+    #   - "8325:8324/tcp"   # Plex Roku via Plex Companion
+    #   - "32470:32469/tcp" # Plex DLNA Server
+    #   - "1901:1900/udp"   # Plex DLNA Server (discovery)
+    #   - "32410:32410/udp" # GDM discovery
+    #   - "32412:32412/udp" # GDM discovery
+    #   - "32413:32413/udp" # GDM discovery
+    #   - "32414:32414/udp" # GDM discovery
+    network_mode: host
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - VERSION=docker
+      - PLEX_CLAIM=${PLEX_CLAIM} # Get from plex.tv/claim ; set in .env file
+    volumes:
+      - ${CONFIG_ROOT}/plex:/config
+      - ${BASE_MEDIA}/tv:/tv
+      - ${BASE_MEDIA}/movies:/movies
+      - ${BASE_MEDIA}/music:/music
+      - ${BASE_MEDIA}/photos:/photos
+      - ${BASE_MEDIA}/other:/other
+      # Optional: For transcoding, point to a fast drive if possible
+      - /tmp/plex_transcode:/transcode
+    restart: unless-stopped
+
+  jellyfin:
+    image: linuxserver/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - JELLYFIN_PublishedServerUrl=${JELLYFIN_SERVER_URL} # Optional: For external access, set in .env
+    volumes:
+      - ${CONFIG_ROOT}/jellyfin:/config
+      - ${CONFIG_ROOT}/jellyfin_cache:/cache # Optional: for caching data
+      - ${BASE_MEDIA}/tv:/data/tvshows
+      - ${BASE_MEDIA}/movies:/data/movies
+      - ${BASE_MEDIA}/music:/data/music
+      - ${BASE_MEDIA}/books:/data/books
+      - ${BASE_MEDIA}/photos:/data/photos
+      - ${BASE_MEDIA}/other:/data/other
+      # Optional: For transcoding, point to a fast drive if possible
+      - /tmp/jellyfin_transcode:/transcode
+    ports:
+      - "8096:8096" # HTTP web interface
+      - "8920:8920" # HTTPS web interface (if configured within Jellyfin)
+      - "7359:7359/udp" # Autodiscovery
+      - "1900:1900/udp" # DLNA (ensure no conflict if Plex also exposes this on specific IPs)
+    restart: unless-stopped
+
+  emby:
+    image: linuxserver/emby:latest
+    container_name: emby
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/emby:/config
+      - ${BASE_MEDIA}/tv:/mnt/share/tvshows # Emby often uses /mnt or /mnt/share
+      - ${BASE_MEDIA}/movies:/mnt/share/movies
+      - ${BASE_MEDIA}/music:/mnt/share/music
+      - ${BASE_MEDIA}/books:/mnt/share/books
+      - ${BASE_MEDIA}/photos:/mnt/share/photos
+      - ${BASE_MEDIA}/other:/mnt/share/other
+      # Optional: For transcoding, point to a fast drive if possible
+      - /tmp/emby_transcode:/transcode
+    ports:
+      # Using different host ports to avoid clashes with Jellyfin if running both
+      - "8097:8096" # HTTP web interface (Emby's default is 8096)
+      - "8921:8920" # HTTPS web interface (Emby's default is 8920)
+      # Add other Emby ports if needed, e.g., for DLNA (typically 1900/udp, be mindful of conflicts)
+    restart: unless-stopped
+
+  kodi-headless: # For library updates, web interface (Chorus2), JSON-RPC. Not a GUI.
+    image: linuxserver/kodi-headless:latest
+    container_name: kodi-headless
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/kodi:/config/.kodi
+      - ${BASE_MEDIA}/tv:/data/tvshows
+      - ${BASE_MEDIA}/movies:/data/movies
+      - ${BASE_MEDIA}/music:/data/music
+      - ${BASE_MEDIA}/photos:/data/photos
+      - ${BASE_MEDIA}/other:/data/other
+      # Ensure paths match how you'd set them up in Kodi sources
+    ports:
+      - "8088:8080" # Kodi web interface (Chorus2 default 8080, changed to avoid common conflicts)
+      - "9091:9090" # Kodi JSON-RPC TCP, conflict with 9090 for Prometheus, so moving to 9091
+      - "9777:9777/udp" # Kodi EventServer
+    restart: unless-stopped
+
+  overseerr: # Request management for Plex
+    image: linuxserver/overseerr:latest
+    container_name: overseerr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - LOG_LEVEL=info
+    volumes:
+      - ${CONFIG_ROOT}/overseerr:/config
+    ports:
+      - "5055:5055"
+    # depends_on: # Uncomment if you want to ensure Plex starts before Overseerr
+    #   - plex
+    restart: unless-stopped
+
+  jellyseerr: # Request management for Jellyfin (and Emby)
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - LOG_LEVEL=info
+      # - JELLYFIN_TYPE=jellyfin # Default is jellyfin, can be emby
+    volumes:
+      - ${CONFIG_ROOT}/jellyseerr:/app/config # Jellyseerr uses /app/config internally
+    ports:
+      - "5056:5055" # Using 5056 on host to avoid conflict with Overseerr's 5055
+    # depends_on: # Uncomment if you want to ensure Jellyfin starts before Jellyseerr
+    #   - jellyfin
+    restart: unless-stopped
+
+# Global .env variable definitions (for reference, these are set in the .env file)
+# These are not directly used by docker-compose here but illustrate what the .env file provides.
+# version: "3.8"
+# x-environment: &default-env
+#   PUID: ${PUID}
+#   PGID: ${PGID}
+#   TZ: ${TZ}
+
+# The script will create an .env file with these:
+# TZ=Your/Timezone
+# PUID=your_puid
+# PGID=your_pgid
+# CONFIG_ROOT=/home/user/.config/media-players
+# BASE_MEDIA=/mnt/media
+# PLEX_CLAIM=your_plex_claim_token (optional)
+# JELLYFIN_SERVER_URL=your_jellyfin_url (optional)

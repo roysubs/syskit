@@ -1,0 +1,93 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+
+# Microsoft Edge on Linux + Keyboard Shortcuts
+
+## ✅ Can Microsoft Edge Run on Linux?
+
+Yes, **Microsoft Edge runs on Linux**. Official builds are available for:
+
+- Ubuntu / Debian (`.deb` packages)
+- Fedora / openSUSE (`.rpm` packages)
+
+Download: [Microsoft Edge for Linux](https://www.microsoft.com/edge/download/linux)
+
+---
+
+## ✅ Microsoft Edge Keyboard Shortcuts
+
+### 🔹 General Shortcuts
+| Shortcut | Action |
+|---------|--------|
+| `Ctrl + N` | Open a new window |
+| `Ctrl + Shift + N` | Open a new InPrivate window |
+| `Ctrl + T` | Open a new tab |
+| `Ctrl + W` or `Ctrl + F4` | Close current tab |
+| `Ctrl + Shift + T` | Reopen last closed tab |
+| `Ctrl + Tab` or `Ctrl + Page Down` | Switch to the next tab |
+| `Ctrl + Shift + Tab` or `Ctrl + Page Up` | Switch to the previous tab |
+| `Alt + F4` | Close Edge |
+| `Ctrl + L` or `Alt + D` or `F6` | Focus the address bar |
+| `F11` | Toggle full screen |
+
+### 🔹 Navigation
+| Shortcut | Action |
+|---------|--------|
+| `Alt + Left Arrow` | Back |
+| `Alt + Right Arrow` | Forward |
+| `Alt + Home` | Go to home page |
+| `Esc` | Stop loading |
+| `F5` | Refresh |
+| `Ctrl + F5` | Hard refresh (clear cache and reload) |
+
+### 🔹 Tabs and Windows
+| Shortcut | Action |
+|---------|--------|
+| `Ctrl + Click on link` | Open link in a new tab |
+| `Ctrl + Shift + Click on link` | Open link in a new tab and switch to it |
+| `Shift + Click on link` | Open link in a new window |
+| `Ctrl + 1` to `Ctrl + 8` | Switch to specific tab number |
+| `Ctrl + 9` | Switch to last tab |
+| `Ctrl + Shift + B` | Show/hide bookmarks bar |
+
+### 🔹 Zoom and Display
+| Shortcut | Action |
+|---------|--------|
+| `Ctrl + +` | Zoom in |
+| `Ctrl + -` | Zoom out |
+| `Ctrl + 0` | Reset zoom |
+| `Ctrl + Shift + M` | Switch profile |
+
+### 🔹 Developer and Tools
+| Shortcut | Action |
+|---------|--------|
+| `F12` or `Ctrl + Shift + I` | Open Developer Tools |
+| `Ctrl + Shift + J` | Open DevTools console |
+| `Ctrl + U` | View page source |
+| `Ctrl + Shift + Delete` | Clear browsing data |
+
+### 🔹 Search and Find
+| Shortcut | Action |
+|---------|--------|
+| `Ctrl + F` | Find on page |
+| `Ctrl + H` | Open history |
+| `Ctrl + J` | Open downloads |
+| `Ctrl + D` | Bookmark current page |
+| `Ctrl + Shift + O` | Open favorites manager |
+
+### 🔹 Reading and PDF
+| Shortcut | Action |
+|---------|--------|
+| `Ctrl + P` | Print |
+| `Ctrl + S` | Save page |
+| `Ctrl + R` | Enter Reading Mode (if available) |
+| `Ctrl + E` | Focus search in address bar (Bing by default) |
+| `Ctrl + Shift + G` | Read aloud (text-to-speech) |
+| `Ctrl + Shift + U` | Turn Immersive Reader on/off |
+
+EOF
+) | less -R

@@ -1,0 +1,146 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Linux File Permissions: Master Guide
+
+## Understanding File Permissions
+
+### Breakdown of `ls -l` Output
+A typical `ls -l` output looks like this:
+```plaintext
+-rwxr-xr-- 1 user group 1234 Dec 15 12:00 myfile.sh
+```
+
+| Position | Meaning                       | Example | Description             |
+|----------|-------------------------------|---------|-------------------------|
+| 1        | File type                     | -       | Regular file            |
+| 2-4      | Owner permissions             | rwx     | Read, write, execute    |
+| 5-7      | Group permissions             | r-x     | Read, no write, execute |
+| 8-10     | Others permissions            | r--     | Read-only               |
+
+#### File Type Indicators
+| Symbol | Meaning        |
+|--------|----------------|
+| `-`    | Regular file   |
+| `d`    | Directory      |
+| `l`    | Symbolic link  |
+| `b`    | Block device   |
+| `c`    | Character device |
+| `s`    | Socket         |
+| `p`    | Named pipe     |
+
+### Octal Permissions
+Permissions can also be represented in octal format:
+- **4**: Read (`r`)
+- **2**: Write (`w`)
+- **1**: Execute (`x`)
+
+Combine these to represent permissions:
+| Symbol | Octal | Example | Description       |
+|--------|-------|---------|-------------------|
+| `rwx`  | 7     | 111     | Full permissions  |
+| `r-x`  | 5     | 101     | Read and execute  |
+| `rw-`  | 6     | 110     | Read and write    |
+| `r--`  | 4     | 100     | Read-only         |
+
+### Special Permission Bits
+| Bit     | Octal | Description                                  |
+|---------|-------|----------------------------------------------|
+| Sticky  | 1     | Prevents non-owners from deleting files      |
+| SUID    | 4     | Run file as owner                           |
+| SGID    | 2     | Run file as group                           |
+
+Set sticky/SUID/SGID with:
+```bash
+chmod +t <file>  # Sticky bit
+chmod u+s <file> # SUID
+chmod g+s <file> # SGID
+```
+
+---
+
+## Discovering Permissions with `stat`
+Use `stat` to view detailed file permissions, including octal representation:
+```bash
+stat -c "%A %a %n" myfile.sh
+```
+Output example:
+```plaintext
+-rwxr-xr-- 754 myfile.sh
+```
+- `A`: Symbolic permissions
+- `a`: Octal permissions
+- `n`: Filename
+
+---
+
+## Copying Permissions Between Files
+The `copy-permissions` function copies the permissions of one file to others:
+
+```bash
+copy-permissions() {
+    if [[ $# -lt 2 ]]; then
+        echo "Usage: copy-permissions <source> <target-pattern>"
+        return 1
+    fi
+    local source=$1
+    shift
+    local targets=($@)
+
+    local perms
+    perms=$(stat -c "%a" "$source")
+
+    for target in "${targets[@]}"; do
+        chmod "$perms" "$target"
+        echo "Copied permissions $perms from $source to $target"
+    done
+}
+```
+Usage example:
+```bash
+copy-permissions myfile.sh *.py
+```
+This sets the permissions of all `.py` files to match `myfile.sh`.
+
+---
+
+## Recursive Permission Changes
+Use `chmod` to recursively modify permissions:
+```bash
+chmod -R 755 /path/to/directory
+```
+
+---
+
+## Additional Notes
+
+### Viewing and Changing Ownership
+- View ownership:
+  ```bash
+  ls -l
+  ```
+- Change owner:
+  ```bash
+  chown <user>:<group> <file>
+  ```
+- Recursive ownership change:
+  ```bash
+  chown -R <user>:<group> <directory>
+  ```
+
+### Best Practices
+1. **Minimal Permissions**: Grant only the permissions needed.
+2. **Use Groups**: Assign group permissions for shared access.
+3. **Secure Sensitive Files**:
+   ```bash
+   chmod 600 sensitive_file
+   ```
+4. **Sticky Directories**: Prevent accidental deletion in shared directories:
+   ```bash
+   chmod +t /shared/directory
+   ```
+EOF
+) | less -R

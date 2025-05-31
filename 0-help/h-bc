@@ -1,0 +1,137 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Bc Notes
+========
+
+`bc` (Basic Calculator) is a command-line arbitrary precision calculator language. It's standard on most Linux systems and excellent for scripting.
+
+- **Basic Interactive Use**:
+    - Type `bc` to start an interactive session.
+    - Type expressions and press Enter. Results are printed.
+    - Type `quit` or `exit` to leave.
+    - Example:
+        ```bash
+        $ bc
+        2 + 2
+        4
+        (5 + 3) * 2
+        16
+        10 / 3
+        3
+        quit
+        ```
+    - Note: By default, division is integer division unless `scale` is set.
+
+- **Using `bc` in Scripts (Non-Interactive)**:
+    - Pipe the expression to `bc` using `echo`.
+    - Capture the output using command substitution `$(...)`.
+    - Example: Simple calculation in a script
+        ```bash
+        #!/bin/bash
+        sum=$(echo "15 + 27" | bc)
+        echo "The sum is: $sum"
+        ```
+    - Example: Calculation with variables in a script
+        ```bash
+        #!/bin/bash
+        num1=100
+        num2=7
+        # Pass shell variables into bc
+        result=$(echo "$num1 * $num2" | bc)
+        echo "$num1 * $num2 = $result"
+        ```
+
+- **Controlling Precision (`scale`)**:
+    - `scale` is a special variable that determines the number of digits after the decimal point for division and square root operations. Default is 0.
+    - Example: Setting precision interactively
+        ```bash
+        $ bc
+        scale=2
+        10 / 3
+        3.33
+        scale=5
+        10 / 3
+        3.33333
+        quit
+        ```
+    - Example: Setting precision in a script
+        ```bash
+        #!/bin/bash
+        pi_approx=$(echo "scale=10; 4 * atan(1)" | bc -l) # -l loads math library
+        echo "Pi to 10 decimal places: $pi_approx"
+
+        fraction=$(echo "scale=3; 22 / 7" | bc)
+        echo "22/7 with scale=3: $fraction"
+        ```
+
+- **Base Conversion (`ibase`, `obase`)**:
+    - `ibase`: Input base (default 10)
+    - `obase`: Output base (default 10)
+    - Bases can be between 2 and 16. Use A-F for digits 10-15 when `ibase` is 16.
+    - Example: Hex to Decimal interactively
+        ```bash
+        $ bc
+        ibase=16
+        FF
+        255
+        ibase=10 # Good practice to reset ibase
+        quit
+        ```
+    - Example: Decimal to Binary in a script
+        ```bash
+        #!/bin/bash
+        dec_num=255
+        bin_num=$(echo "obase=2; $dec_num" | bc)
+        echo "Decimal $dec_num in Binary is: $bin_num"
+        ```
+    - Example: Hex arithmetic in a script (requires setting ibase for inputs and obase for output)
+        ```bash
+        #!/bin/bash
+        hex_sum=$(echo "obase=16; ibase=16; A + F" | bc)
+        echo "A (hex) + F (hex) = $hex_sum (hex)" # Output: 19
+        ```
+
+- **Using the Math Library (`-l`)**:
+    - The `-l` option loads the standard math library, which provides functions like `s` (sine), `c` (cosine), `a` (arctangent), `l` (natural log), `e` (exponential), and `sqrt` (square root). It also sets the default `scale` to 20.
+    - Example: Calculate square root
+        ```bash
+        #!/bin/bash
+        root=$(echo "sqrt(25)" | bc -l)
+        echo "Square root of 25 is: $root" # Output includes default 20 decimal places
+
+        # Calculate sine of pi/2 (requires radians)
+        # Use 4*a(1) for pi when mathlib is loaded
+        sin_val=$(echo "scale=4; s(4*a(1)/2)" | bc -l)
+        echo "Sine of pi/2 is approx: $sin_val" # Output: 1.0000
+        ```
+
+- **Variables in `bc` Language**:
+    - You can define variables within the `bc` expression itself.
+    - Example:
+        ```bash
+        #!/bin/bash
+        calculation=$(echo "
+          a = 10
+          b = 20
+          a * b + (a + b) / 2
+        " | bc)
+        echo "Result of internal bc variables: $calculation" # Output: 215
+        ```
+
+- **Comments**:
+    - Lines starting with `#` are treated as comments in `bc` if it's the first character of the line being processed.
+    - Example (see variable example above for multi-line comment within the echo string).
+
+- **Key Points for Scripting**:
+    - Always use `echo "expression" | bc` for non-interactive use.
+    - Use `$()` to capture `bc`'s output into a shell variable.
+    - Be mindful of `scale` for floating-point results.
+    - Use `bc -l` to enable math functions and set a default high precision (adjust `scale` afterwards if needed).
+    - Pass shell variables into the `echo` string for dynamic calculations.
+
+EOF
+) | less -R

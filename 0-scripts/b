@@ -1,0 +1,370 @@
+#!/bin/bash
+# BorgBackup Tool Script
+# Provides a simplified interface for common borg operations, showing commands before execution.
+
+# --- Configuration ---
+# Define colors for output
+RED='\e[31m'
+GREEN='\e[32m'
+YELLOW='\e[33m'
+BLUE='\e[34m' # Added Blue for headings
+NC='\e[0m' # No Color
+
+missing_pkgs=(); REQUIRED_PKGS=(borgbackup)
+for pkg in "${REQUIRED_PKGS[@]}"; do
+    if ! command -v "$pkg" >/dev/null 2>&1; then echo "  [MISSING] $pkg"; missing_pkgs+=("$pkg"); fi
+done
+[ "${#missing_pkgs[@]}" -eq 0 ] && return 0 2>/dev/null || :   # Silently proceed if all present
+if ! command -v a >/dev/null 2>&1; then   # Check for 'a' helper tool
+  echo "ERROR: Missing packages and 'a' (package manager helper) not found.";  exit 1
+fi
+for pkg in "${missing_pkgs[@]}"; do       # Offer to install each missing package
+  read -rp "Install missing package '$pkg' using 'a'? [y/N]: " ans
+  case "$ans" in
+      [yY]) a i "$pkg" ;;
+      *) echo "Aborted. '$pkg' is required. Exiting."; exit 1 ;;
+  esac
+done
+for pkg in "${missing_pkgs[@]}"; do
+    if ! command -v "$pkg" >/dev/null 2>&1; then echo "ERROR: '$pkg' is still missing after attempted install. Exiting."; exit 1; fi
+done
+
+# --- Helper Functions ---
+
+# Function to show usage help
+show_help() {
+    echo "BorgBackup Tool. Usage: ${0##*/} [option] <arguments>"
+    echo "Options:"
+    echo "  -h | --help                 Show this help message"
+    echo "  -backup <repo_path> <source> [options] Backup <source> to <repo_path>"
+    echo "                              [options] can include --exclude <pattern>, --compression <level>, etc."
+    echo "  -restore <repo_path>        Interactive restore from <repo_path>"
+    echo "  -list <repo_path>           List archives in <repo_path>"
+    echo "  -info <repo_path>           Show information about <repo_path>"
+    echo "  -examples                   Show examples of common borg commands" # Added examples option to help
+    echo
+    echo "Examples:"
+    echo "  ${0##*/} -backup /mnt/my_borg_repo /home/user --compression zstd,6"
+    echo "  ${0##*/} -list /mnt/my_borg_repo"
+    echo "  ${0##*/} -restore /mnt/my_borg_repo"
+    echo "  ${0##*/} -info /mnt/my_borg_repo"
+    echo "  ${0##*/} -examples" # Added example usage for -examples
+    echo
+    echo "Note: For restore, the script will guide you through selecting an archive and target."
+    echo "      Additional borg options can be passed directly after the main arguments for backup."
+}
+
+# Function to print a command in green and execute it
+# Handles commands that might require sudo (though borg init/create/extract often don't need it if permissions are set)
+run_command() {
+    local full_cmd_string="$1"
+    echo -e "\n# ${GREEN}${full_cmd_string}${NC}"
+    # Execute the command string. Using bash -c is generally safe for constructed strings.
+    # We use eval here to handle potential quotes and spaces within arguments correctly,
+    # but be cautious with eval if input is not controlled. For this script's purpose,
+    # where arguments are passed from the command line, it's generally acceptable.
+    eval "$full_cmd_string"
+    local exit_status=$?
+    if [ $exit_status -ne 0 ]; then
+        echo -e "${RED}Command failed with exit status $exit_status${NC}"
+    fi
+    return $exit_status
+}
+
+# --- Main Logic ---
+
+# Show help if no arguments are provided or if -h/--help is the first argument
+if [ $# -eq 0 ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+    show_help
+    exit 0
+fi
+
+# Parse the main option
+option="$1"
+shift # Consume the option
+
+case "$option" in
+    -backup)
+        if [ $# -lt 2 ]; then
+            echo -e "${RED}Error: -backup requires repository path and source path.${NC}"
+            show_help
+            exit 1
+        fi
+        REPO_PATH="$1"
+        SOURCE_PATH="$2"
+        shift 2 # Consume repo and source paths
+
+        # Construct the borg create command
+        # Archive name format: hostname-date-time
+        ARCHIVE_NAME="$(hostname)-$(date +%Y-%m-%d_%H-%M-%S)"
+        BORG_CMD="borg create --verbose --stats --progress ${REPO_PATH}::${ARCHIVE_NAME} ${SOURCE_PATH} $@"
+
+        # Ensure the repository exists or initialize it
+        if ! borg check "$REPO_PATH" > /dev/null 2>&1; then
+            echo -e "${YELLOW}Repository does not exist at ${REPO_PATH}. Initializing...${NC}"
+            # Offer to initialize the repo
+            read -p "Initialize repository? (y/N): " initialize_repo
+            if [[ "$initialize_repo" =~ ^[Yy]$ ]]; then
+                 # Note: borg init requires a repository type (--storage-encryption=...)
+                 # We'll use authenticated encryption as a common default. User can change this.
+                 INIT_CMD="borg init --encryption=authenticated ${REPO_PATH}"
+                 run_command "$INIT_CMD"
+                 if [ $? -ne 0 ]; then
+                     echo -e "${RED}Repository initialization failed. Aborting backup.${NC}"
+                     exit 1
+                 fi
+            else
+                echo -e "${RED}Repository not initialized. Aborting backup.${NC}"
+                exit 1
+            fi
+        fi
+
+        # Run the backup command
+        run_command "$BORG_CMD"
+
+        # Optional: Prune old backups after successful backup
+        # You might want to add logic here to ask the user if they want to prune
+        # or add a separate -prune option. For now, just a placeholder comment.
+        # echo -e "\n${YELLOW}Consider pruning old archives using 'borg prune'.${NC}"
+        # Example prune command (adjust retention policy as needed):
+        # run_command "borg prune --list --keep-daily 7 --keep-weekly 4 --keep-monthly 6 ${REPO_PATH}"
+
+        ;;
+
+    -restore)
+        if [ $# -lt 1 ]; then
+            echo -e "${RED}Error: -restore requires repository path.${NC}"
+            show_help
+            exit 1
+        fi
+        REPO_PATH="$1"
+        shift # Consume repo path
+
+        # List archives first
+        echo -e "${YELLOW}Listing archives in ${REPO_PATH}...${NC}"
+        run_command "borg list ${REPO_PATH}"
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Failed to list archives. Ensure the repository path is correct and accessible.${NC}"
+            exit 1
+        fi
+
+        echo -e "${YELLOW}Listing archive info (size, compression stats)...${NC}"
+        # Note: borg list --info provides size info per archive.
+        # Compression level isn't stored per archive, but repo info gives overall stats.
+        run_command "borg list --info ${REPO_PATH}"
+         if [ $? -ne 0 ]; then
+            echo -e "${RED}Failed to list archive info.${NC}"
+            # Continue as listing might still work even if info fails
+         fi
+
+        echo -e "${YELLOW}Showing repository info...${NC}"
+        run_command "borg info ${REPO_PATH}"
+         if [ $? -ne 0 ]; then
+            echo -e "${RED}Failed to show repository info.${NC}"
+            # Continue
+         fi
+
+
+        read -p "Enter the ARCHIVE name to restore from (e.g., hostname-YYYY-MM-DD_HH-MM-SS): " RESTORE_ARCHIVE
+        if [ -z "$RESTORE_ARCHIVE" ]; then
+            echo -e "${RED}No archive name entered. Aborting restore.${NC}"
+            exit 1
+        fi
+
+        read -p "Enter the TARGET directory to restore to (e.g., /tmp/restore_test): " TARGET_DIR
+        if [ -z "$TARGET_DIR" ]; then
+            echo -e "${RED}No target directory entered. Aborting restore.${NC}"
+            exit 1
+        fi
+
+        # Ensure target directory exists
+        if [ ! -d "$TARGET_DIR" ]; then
+            echo -e "${YELLOW}Target directory ${TARGET_DIR} does not exist. Creating it.${NC}"
+            mkdir -p "$TARGET_DIR"
+            if [ $? -ne 0 ]; then
+                echo -e "${RED}Failed to create target directory. Aborting restore.${NC}"
+                exit 1
+            fi
+        fi
+
+        # --- Restore Options ---
+        echo -e "\n${YELLOW}Restore Options:${NC}"
+        echo "1) Restore the entire archive"
+        echo "2) Restore a specific file or directory"
+        read -p "Choose restore type (1 or 2): " RESTORE_TYPE
+
+        RESTORE_PATH="" # Path inside the archive to restore
+
+        case "$RESTORE_TYPE" in
+            1)
+                echo -e "${YELLOW}Restoring the entire archive...${NC}"
+                ;;
+            2)
+                read -p "Enter the path inside the archive to restore (e.g., home/user/Documents/myfile.txt): " RESTORE_PATH
+                if [ -z "$RESTORE_PATH" ]; then
+                    echo -e "${RED}No path specified for partial restore. Aborting.${NC}"
+                    exit 1
+                fi
+                echo -e "${YELLOW}Restoring specific path: ${RESTORE_PATH}...${NC}"
+                ;;
+            *)
+                echo -e "${RED}Invalid restore type selected. Aborting.${NC}"
+                exit 1
+                ;;
+        esac
+
+        # Construct the borg extract command
+        # The --strip-components option is useful to avoid restoring the full path from the root
+        # e.g., restoring /home/user/docs from archive to /tmp/restore_test
+        # without --strip-components, it would restore to /tmp/restore_test/home/user/docs
+        # with --strip-components 3, it would restore to /tmp/restore_test/docs
+        # For simplicity, we won't add --strip-components automatically, the user can add it manually if needed
+        # or we could add a prompt for it. Let's keep it simple for now.
+
+        BORG_CMD="borg extract --verbose --list ${REPO_PATH}::${RESTORE_ARCHIVE} ${RESTORE_PATH} --to ${TARGET_DIR}"
+
+        # Run the restore command
+        run_command "$BORG_CMD"
+
+        echo -e "${GREEN}Restore command finished. Check ${TARGET_DIR} for restored files.${NC}"
+
+        ;;
+
+    -list)
+        if [ $# -lt 1 ]; then
+            echo -e "${RED}Error: -list requires repository path.${NC}"
+            show_help
+            exit 1
+        fi
+        REPO_PATH="$1"
+        shift # Consume repo path
+
+        echo -e "${YELLOW}Listing archives in ${REPO_PATH}...${NC}"
+        run_command "borg list ${REPO_PATH}"
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Failed to list archives. Ensure the repository path is correct and accessible.${NC}"
+            exit 1
+        fi
+
+        echo -e "${YELLOW}Listing archive info (size, compression stats)...${NC}"
+        run_command "borg list --info ${REPO_PATH}"
+         if [ $? -ne 0 ]; then
+            echo -e "${RED}Failed to list archive info.${NC}"
+         fi
+
+        ;;
+
+    -info)
+         if [ $# -lt 1 ]; then
+            echo -e "${RED}Error: -info requires repository path.${NC}"
+            show_help
+            exit 1
+        fi
+        REPO_PATH="$1"
+        shift # Consume repo path
+
+        echo -e "${YELLOW}Showing repository info for ${REPO_PATH}...${NC}"
+        run_command "borg info ${REPO_PATH}"
+         if [ $? -ne 0 ]; then
+            echo -e "${RED}Failed to show repository info. Ensure the repository path is correct and accessible.${NC}"
+            exit 1
+         fi
+        ;;
+
+    -examples)
+        printf '%s\n' "
+$(tput bold)$(tput setaf 3)BORGBACKUP COMMAND EXAMPLES$(tput sgr0)
+==========================================================================================================
+
+$(tput setaf 3)INITIALIZATION$(tput sgr0): You must initialize a repo before using it.
+borg init --encryption=authenticated /path/to/your/repo
+    # Initialize a new repository with authenticated encryption. You will be prompted for a passphrase.
+borg init --encryption=none /path/to/your/repo
+    # Initialize a new repository with no encryption. No passphrase will be required to view the contents.
+
+$(tput setaf 3)BACKUP (CREATE)$(tput sgr0): You need an initialized repo to backup to
+borg create --verbose --stats --progress /path/to/your/repo::archive-{now} /path/to/backup --exclude '/home/user/.cache/*'
+    # Create a new archive named 'archive-YYYY-MM-DD_HH-MM-SS' in the specified repo.
+    # Backs up '/path/to/backup' and excludes the user's cache directory.
+    # --verbose: Show details
+    # --stats: Show statistics after completion
+    # --progress: Show progress bar
+borg create --compression zstd,6 /path/to/your/repo::mybackup-{now} /data
+    # Create a backup of '/data' using zstd compression level 6.
+
+$(tput setaf 3)LISTING ARCHIVES$(tput sgr0)
+borg list ~/.backup/syskit_backup    # List all archives in the repository. e.g.
+    Enter passphrase for key /home/boss/.backup/syskit_backup:
+    archive-2025-05-13T18:18:33          Tue, 2025-05-13 18:18:34 [1b1953f07068ace4c0a17642fadb5e46e307a486ef4e074e11a3bea822f2602c]
+    archive-2025-05-13T18:18:38          Tue, 2025-05-13 18:18:40 [4ddc1df2fc6f2371891b44fc5d9f3864e5aaaa0e98cd6f4851ced7a870d76151]
+    archive-2025-05-13T18:19:01          Tue, 2025-05-13 18:19:02 [c4fbc547cb6fdddd7ae2f2ad1931abc9509171d062c252b39dcea5b35b45bcc0]
+borg list ~/.backup/syskit_backup::archive-2025-05-13T18:18:33
+    # Will show a list of all files
+    # You can add --format options to see sizes, timestamps, etc.
+📋 2. Compare contents of two archives
+    # To list and compare which files exist in one archive vs. another:
+borg list ~/.backup/syskit_backup::archive-2025-05-13T18:18:33 > list1.txt
+borg list ~/.backup/syskit_backup::archive-2025-05-13T18:19:01 > list2.txt
+diff -u list1.txt list2.txt | less
+This will show added/removed files between the two snapshots.
+🧾 3. Diff file contents between two archives
+Use borg diff to compare actual content differences (not just file lists):
+borg diff ~/.backup/syskit_backup::archive-2025-05-13T18:18:33 ~/.backup/syskit_backup::archive-2025-05-13T18:19:01
+This will show:
+added / removed files
+modified files (with size or metadata changes)
+File content diffs (optional with --content-only or --sort flags)
+You can make the output more readable with:
+borg diff --content-only ~/.backup/syskit_backup::old ::new | less
+🧠 Tip: Archive tab-completion
+Borg doesn’t offer native tab-completion for archives unless scripted, so you can make a helper like:
+borg list ~/.backup/syskit_backup/ --short
+To just get archive names you can paste into commands.
+borg list --info /path/to/your/repo
+    # List archives with additional information like size and compression stats.
+borg list /path/to/your/repo::archive-name
+    # List the contents of a specific archive.
+
+$(tput setaf 3)REPOSITORY INFORMATION$(tput sgr0)
+borg info /path/to/your/repo
+    # Show detailed information about the repository, including total size, compression stats, etc.
+
+$(tput setaf 3)RESTORING (EXTRACT)$(tput sgr0)
+borg extract /path/to/your/repo::archive-name --to /tmp/restore_location
+    # Extract the entire 'archive-name' to '/tmp/restore_location'.
+
+borg extract /path/to/your/repo::archive-name path/within/archive/file.txt --to /tmp/restore_location
+    # Extract a specific file from 'archive-name' to '/tmp/restore_location'.
+
+borg extract /path/to/your/repo::archive-name path/within/archive/folder --to /tmp/restore_location
+    # Extract a specific folder from 'archive-name' to '/tmp/restore_location'.
+
+borg extract --strip-components 2 /path/to/your/repo::archive-name home/user/documents --to /tmp/restore_location
+    # Extract the 'documents' folder from 'home/user/documents' inside the archive
+    # to '/tmp/restore_location/documents' (strips 'home/user').
+
+$(tput setaf 3)PRUNING OLD ARCHIVES$(tput sgr0)
+borg prune --list --keep-daily 7 --keep-weekly 4 --keep-monthly 6 /path/to/your/repo
+    # Prune archives in the repo, keeping 7 daily, 4 weekly, and 6 monthly backups.
+    # --list: Show which archives would be pruned (use -n for a dry run first!)
+
+$(tput setaf 3)CHECKING INTEGRITY$(tput sgr0)
+borg check --verbose /path/to/your/repo
+    # Check the integrity of the repository metadata and data chunks.
+
+borg check --repository-only --verbose /path/to/your/repo
+    # Check only the repository metadata (faster).
+
+----------------------------------------------------------------------------------------------------------
+"
+        ;;
+
+    *)
+        echo -e "${RED}Unknown option: $option${NC}\n"
+        show_help
+        exit 1 # Indicate error
+        ;;
+esac
+
+exit 0 # Indicate success
+

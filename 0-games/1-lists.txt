@@ -1,0 +1,68 @@
+Curated Lists:
+
+https://ligurio.github.io/awesome-ttygames/
+https://github.com/ligurio/awesome-ttygames
+https://github.com/agarrharr/awesome-cli-apps
+
+https://github.com/leereilly/games
+
+https://gitlab.com/explore/projects/topics/terminal
+https://gitlab.com/explore/projects/topics/terminal?name=game&sort=latest_activity_desc
+
+https://github.com/Calinou/awesome-gamedev?tab=readme-ov-file#games
+
+https://github.com/topics/terminal-game?l=c&o=desc&s=updated
+
+https://games-on-whales.github.io/wolf/stable/
+Wolf is an open source streaming server for Moonlight that allows you to share a single server with multiple remote clients in order to play videogames!
+
+https://github.com/OpenSourceLAN/gameservers-docker
+Putting game servers in Docker containers. Because it makes life easier.
+A set of game servers that have been wrapped with Docker. All images are composed of other images in this repository, except for base. Most images will auto-download any dependencies they have (eg, factorio server files or sourcemod for srcds), making it almost one command to install a server. No binaries are stored in this repo, so make sure you have internet to download them with.
+Includes a utility script start_server.sh which mounts save data to an external volume and sorts out networking for you.
+
+
+Super Serif Brothers, find compiled console version
+https://foon.uk/farcade/ssb/
+
+ASCIIpOrtal
+https://www.moddb.com/games/asciiportal
+
+Portile
+https://www.increpare.com/2008/11/portile/
+
+
+🎮 Curated Lists of Terminal Games
+Awesome TUI Games
+This GitHub repository offers a collection of terminal-based games, including:
+awkaster: A pseudo-3D shooter written entirely in AWK using raycasting techniques.
+cbonsai: A bonsai tree generator for your terminal.
+chess-tui: Play chess directly in your terminal, built in Rust.
+clidle: A Wordle clone playable in the terminal, also accessible over SSH.
+
+Awesome TTY Games
+This list focuses on ASCII games for Unix terminals, featuring titles like:
+Cavez of Phear: A Boulder Dash clone adapted for terminal play.
+Zork: The classic text-based adventure game.
+
+Terminal Games Repository
+A GitHub repository containing a variety of terminal games written in C using the ncurses library. Games include:
+snake, tetris, pong, brick breaker, space invaders
+You can compile all games using make, or compile individual games as needed.
+
+Awesome CLI Apps
+While this list encompasses a broad range of command-line applications, it includes a section dedicated to games, offering a variety of entertainment options for the terminal.
+
+Awesome Linux Games
+A curated list hosted on GitLab, featuring a selection of games suitable for Linux distributions.
+
+🧵 Community Contributions
+Reddit: Big List of ASCII Games
+A Reddit thread compiling a comprehensive list of ASCII games playable in the terminal. Users have shared links to individual repositories, making it easier to explore and install these games.
+Reddit
+
+🔍 Exploring Further
+Look at GitHub topics like cli-games and terminal-based, which aggregate repositories tagged accordingly. These topics can lead you to a plethora of projects, ranging from simple games to complex simulations, all designed for terminal play.
+
+
+

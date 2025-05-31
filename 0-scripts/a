@@ -1,0 +1,156 @@
+#!/bin/bash
+
+# Universal Application Package Manager Wrapper
+#
+# This script will check which package manager is present on this system, then use that corresponding wrapper script.
+# Always make sure that 'a i' points to 'install' syntax for each package manager for compatibility across platforms.
+# apt, apk, dnf, yum, zypper, pacman (see end of script for more details).
+
+# Define colors
+RED='\e[31m'
+NC='\e[0m' # No Color
+
+# Get the directory of the current script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" &> /dev/null
+}
+
+# --- Check for Package Managers in a common order ---
+
+# Check for apt (Debian/Ubuntu based)
+if command_exists apt; then
+    HELPER_SCRIPT="${SCRIPT_DIR}/0-a-helpers/apt-a"
+    if [ -x "$HELPER_SCRIPT" ]; then
+        # echo "Detected 'apt'. Running '$HELPER_SCRIPT'..."
+        exec "$HELPER_SCRIPT" "$@"
+    else
+        echo -e "${RED}Error: 'apt' command found, but 'aapt' script not found or not executable at '$HELPER_SCRIPT'.${NC}"
+        exit 1
+    fi
+# Check for apk (Alpine Linux)
+elif command_exists apk; then
+    HELPER_SCRIPT="${SCRIPT_DIR}/0-a-helpers/apk-a"
+    if [ -x "$HELPER_SCRIPT" ]; then
+        # echo "Detected 'apk'. Running '$HELPER_SCRIPT'..."
+        exec "$HELPER_SCRIPT" "$@"
+    else
+        echo -e "${RED}Error: 'apk' command found, but 'aapk' script not found or not executable at '$HELPER_SCRIPT'.${NC}"
+        exit 1
+    fi
+# Check for dnf (Newer RHEL/Fedora based)
+elif command_exists dnf; then
+    HELPER_SCRIPT="${SCRIPT_DIR}/0-a-helpers/dnf-a"
+    if [ -x "$HELPER_SCRIPT" ]; then
+        # echo "Detected 'dnf'. Running '$HELPER_SCRIPT'..."
+        exec "$HELPER_SCRIPT" "$@"
+    else
+        echo -e "${RED}Error: 'dnf' command found, but 'adnf' script not found or not executable at '$HELPER_SCRIPT'.${NC}"
+        exit 1
+    fi
+# Check for yum (Older RHEL/Fedora based)
+elif command_exists yum; then
+     HELPER_SCRIPT="${SCRIPT_DIR}/0-a-helpers/yum-a"
+    if [ -x "$HELPER_SCRIPT" ]; then
+        # echo "Detected 'yum'. Running '$HELPER_SCRIPT'..."
+        exec "$HELPER_SCRIPT" "$@"
+    else
+        echo -e "${RED}Error: 'yum' command found, but 'ayum' script not found or not executable at '$HELPER_SCRIPT'.${NC}"
+        exit 1
+    fi
+# Check for zypper (openSUSE)
+elif command_exists zypper; then
+     HELPER_SCRIPT="${SCRIPT_DIR}/0-a-helpers/zypper-a"
+    if [ -x "$HELPER_SCRIPT" ]; then
+        # echo "Detected 'zypper'. Running '$HELPER_SCRIPT'..."
+        exec "$HELPER_SCRIPT" "$@"
+    else
+        echo -e "${RED}Error: 'zypper' command found, but 'azypper' script not found or not executable at '$HELPER_SCRIPT'.${NC}"
+        exit 1
+    fi
+# Check for pacman (Arch Linux based)
+elif command_exists pacman; then
+    HELPER_SCRIPT="${SCRIPT_DIR}/0-a-helpers/pacman-a"
+    if [ -x "$HELPER_SCRIPT" ]; then
+        # echo "Detected 'pacman'. Running '$HELPER_SCRIPT'..."
+        exec "$HELPER_SCRIPT" "$@"
+    else
+        echo -e "${RED}Error: 'pacman' command found, but 'pacmanx' script not found or not executable at '$HELPER_SCRIPT'.${NC}"
+        exit 1
+    fi
+else
+    # None of the supported package managers were found
+    echo -e "${RED}Error: No supported package manager (apt, dnf, yum, zypper, pacman, apk) found on this system.${NC}"
+    echo -e "${RED}Please install a supported package manager or ensure it is in your PATH.${NC}"
+    exit 1
+fi
+
+# The script should not reach here due to 'exec'
+exit 0
+
+
+####################
+#
+# Common installer stub
+# Use this in any script requiring pre-requisite packages
+#
+####################
+# 
+# missing_pkgs=(); REQUIRED_PKGS=(curl jq unzip)   # <-- Customize per script
+# for pkg in "${REQUIRED_PKGS[@]}"; do
+#   if ! command -v "$pkg" >/dev/null 2>&1; then echo "  [MISSING] $pkg"; missing_pkgs+=("$pkg"); fi
+# done
+# [ "${#missing_pkgs[@]}" -eq 0 ] && return 0 2>/dev/null || :   # Silently proceed if all present
+# if ! command -v a >/dev/null 2>&1; then   # Check for 'a' helper tool
+#   echo "ERROR: Missing packages and 'a' (package manager helper) not found.";  exit 1
+# fi
+# for pkg in "${missing_pkgs[@]}"; do       # Offer to install each missing package
+#   read -rp "Install missing package '$pkg' using 'a'? [y/N]: " ans
+#   case "$ans" in
+#     [yY]) a i "$pkg" ;;
+#     *) echo "Aborted. '$pkg' is required. Exiting."; exit 1 ;;
+#   esac
+# done
+# for pkg in "${missing_pkgs[@]}"; do
+#   if ! command -v "$pkg" >/dev/null 2>&1; then echo "ERROR: '$pkg' is still missing after attempted install. Exiting."; exit 1; fi
+# done
+
+
+
+
+####################
+
+# APT (Advanced Package Tool): This is one of the most widely used package management systems. It's known for its robust dependency resolution and ease of use.
+# Associated Distributions: Debian, Ubuntu, Linux Mint, Kali Linux, and many other Debian-based distributions.   
+# Package Format: .deb
+
+# apk (Alpine Package Keeper): A simple, fast, and lightweight package manager designed for the Alpine Linux distribution, which is popular in container environments.    
+# Associated Distributions: Alpine Linux.
+# Package Format: .apk
+
+# DNF (Dandified YUM): DNF is the next-generation version of YUM (Yellowdog Updater, Modified) and is the default package manager for newer Red Hat-based distributions.
+# Associated Distributions: Fedora, CentOS Stream, Rocky Linux, AlmaLinux, Red Hat Enterprise Linux (RHEL) 8 and later.   
+# Package Format: .rpm
+
+# YUM (Yellowdog Updater, Modified): While largely replaced by DNF in newer releases, YUM is still found in older versions of Red Hat-based distributions.
+# Associated Distributions: CentOS 7 and earlier, RHEL 7 and earlier, Fedora 21 and earlier, Amazon Linux (older versions).
+# Package Format: .rpm
+
+# Zypper: This is the command-line package manager for openSUSE, built on top of the ZYpp library.   
+# Associated Distributions: openSUSE Leap, openSUSE Tumbleweed.
+# Package Format: .rpm
+
+# Pacman: Known for its speed and simplicity, Pacman is the package manager for Arch Linux and its derivatives.   
+# Associated Distributions: Arch Linux, Manjaro, EndeavourOS.   
+# Package Format: .tar.xz (often compressed)   
+
+# Portage: Distinct from binary package managers, Portage is a source-based package management system. It downloads the source code and compiles the software locally according to the user's specifications.
+# Associated Distributions: Gentoo Linux, Funtoo Linux.   
+# Package Format: Source-based (managed via ebuild scripts)
+
+# pkgtool / installpkg / upgradepkg / removepkg: Slackware uses a collection of command-line tools for package management, operating more directly with compressed tarball packages. slackpkg is a common community-contributed tool for managing packages from repositories.
+# Associated Distributions: Slackware Linux.
+# Package Format: .tgz, .txz
+

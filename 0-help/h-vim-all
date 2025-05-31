@@ -1,0 +1,215 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Vim Notes
+===============
+
+# Complete Vim Shortcuts Reference
+
+*A comprehensive, condensed guide to virtually all vim shortcuts organized by activity type*
+
+## MOVEMENT (Most Essential)  
+`h j k l`    Left, down, up, right (basic movement)  
+`w b e`      Word forward, word back, end of word  
+`W B E`      WORD forward/back/end (ignores punctuation)  
+`0 ^ $`      Start of line, first non-blank, end of line  
+`gg G`       Top of file, bottom of file  
+`{ }`        Previous/next paragraph (blank line separated)  
+`( )`        Previous/next sentence  
+`f F ; ,`    Find char forward/back, repeat find forward/back  
+`t T`        Till char (stop before char) forward/back  
+`/ ? n N`    Search forward/back, next/previous match  
+`H M L`      Top/middle/bottom of screen  
+`ctrl-u ctrl-d`  Half page up/down  
+`ctrl-b ctrl-f`  Full page up/down  
+`%`          Jump to matching bracket/paren  
+`''`         Jump back to previous position  
+`` `. `" ``  Jump to last edit, last exit position  
+`gi`         Go to last insert position and enter insert mode  
+  
+## EDITING (Core Actions)  
+`i a I A`    Insert before cursor/after cursor/start of line/end of line  
+`o O`        Open line below/above current line  
+`x X`        Delete char under/before cursor  
+`s S`        Substitute char/entire line  
+`r R`        Replace one char/enter replace mode  
+`c`          Change (delete and enter insert) - use with motions  
+`d`          Delete - use with motions (`dw`, `dd`, `d$`, etc)  
+`y`          Yank (copy) - use with motions (`yw`, `yy`, `y$`, etc)  
+`p P`        Paste after/before cursor  
+`u ctrl-r`   Undo/redo  
+`.`          Repeat last command  
+`~`          Toggle case of character  
+`J`          Join current line with next line  
+  
+## PASTE VARIATIONS (Like your [ example)  
+`p P`        Paste after/before cursor  
+`]p [p`      Paste after/before and auto-indent  
+`]P [P`      Paste before/after and auto-indent (opposite order)  
+`gp gP`      Paste after/before but leave cursor after pasted text  
+  
+## VISUAL MODE  
+`v V ctrl-v` Character/line/block visual mode  
+`gv`         Reselect last visual selection  
+`o`          Move to other end of selection (in visual mode)  
+`aw iw`      Select a word/inner word (in visual or with operators)  
+`as is`      Select a sentence/inner sentence  
+`ap ip`      Select a paragraph/inner paragraph  
+`a( i( a) i)` Select around/inside parentheses  
+`a[ i[ a] i]` Select around/inside brackets  
+`a{ i{ a} i}` Select around/inside braces  
+`a< i< a> i>` Select around/inside angle brackets  
+`a" i" a' i'` Select around/inside quotes  
+`at it`      Select around/inside XML/HTML tags  
+  
+## REGISTERS & MACROS  
+`"ayy`       Yank line into register 'a'  
+`"ap`        Paste from register 'a'  
+`"_d`        Delete to black hole register (don't overwrite default)  
+`"+y "+p`    Yank to/paste from system clipboard  
+`qa`         Start recording macro into register 'a'  
+`q`          Stop recording macro  
+`@a @@`      Execute macro 'a', repeat last macro  
+`:reg`       Show all registers  
+  
+## MARKS & JUMPS  
+`ma`         Set mark 'a' at current position  
+`'a `a`      Jump to line/exact position of mark 'a'  
+`ctrl-o ctrl-i` Jump backward/forward in jump list  
+`g; g,`      Jump to previous/next edit location  
+`''`         Jump to previous position (before last jump)  
+  
+## TEXT OBJECTS & OPERATORS (Advanced Combinations)  
+`ciw diw yiw` Change/delete/yank inner word  
+`ca( da( ya(` Change/delete/yank around parentheses  
+`ci" di" yi"` Change/delete/yank inside quotes  
+`cit dit yit` Change/delete/yank inside XML/HTML tags  
+`c2w d3j y4l` Change 2 words, delete 3 lines down, yank 4 chars right  
+`gc`         Toggle comment (with vim-commentary plugin)  
+  
+## SEARCH & REPLACE  
+`/pattern`   Search forward for pattern  
+`?pattern`   Search backward for pattern  
+`*`          Search forward for word under cursor  
+`#`          Search backward for word under cursor  
+`n N`        Next/previous search result  
+`:s/old/new/` Replace first occurrence on line  
+`:s/old/new/g` Replace all occurrences on line  
+`:%s/old/new/g` Replace all occurrences in file  
+`:%s/old/new/gc` Replace all with confirmation  
+`:nohl`      Remove search highlighting  
+  
+## FOLDING  
+`zf`         Create fold (use with motion)  
+`za zo zc`   Toggle/open/close fold  
+`zR zM`      Open/close all folds  
+`zj zk`      Move to next/previous fold  
+  
+## WINDOW MANAGEMENT  
+`ctrl-w s`   Split window horizontally  
+`ctrl-w v`   Split window vertically  
+`ctrl-w w`   Switch between windows  
+`ctrl-w hjkl` Move to window left/down/up/right  
+`ctrl-w q`   Close current window  
+`ctrl-w o`   Close all other windows  
+`ctrl-w +-`  Increase/decrease window height  
+`ctrl-w <>`  Increase/decrease window width  
+`ctrl-w =`   Make all windows equal size  
+  
+## TABS  
+`:tabnew`    Open new tab  
+`gt gT`      Next/previous tab  
+`:tabclose`  Close current tab  
+`:tabonly`   Close all other tabs  
+  
+## BUFFERS  
+`:e file`    Edit file  
+`:b#`        Switch to previous buffer  
+`:bn :bp`    Next/previous buffer  
+`:bd`        Delete (close) buffer  
+`:ls`        List all buffers  
+`ctrl-^`     Switch to alternate buffer  
+  
+## COMMAND MODE SHORTCUTS  
+`:`          Enter command mode  
+`q:`         Open command history window  
+`ctrl-p ctrl-n` Previous/next in command history  
+`ctrl-r a`   Insert register 'a' in command mode  
+`ctrl-w`     Delete word backward in command mode  
+`ctrl-u`     Delete to beginning of line in command mode  
+  
+## INSERTION MODE SHORTCUTS  
+`ctrl-w`     Delete word backward  
+`ctrl-u`     Delete to beginning of line  
+`ctrl-t ctrl-d` Indent/unindent current line  
+`ctrl-n ctrl-p` Autocomplete next/previous match  
+`ctrl-x ctrl-l` Line completion  
+`ctrl-x ctrl-f` Filename completion  
+`ctrl-r a`   Insert register 'a'  
+`ctrl-r =`   Insert result of expression  
+`ctrl-o`     Execute one normal mode command and return to insert  
+  
+## ADVANCED MOVEMENT  
+`g0 gm g$`   Move to screen line start/middle/end (when wrapping)  
+`gj gk`      Move down/up screen lines (when wrapping)  
+`ctrl-e ctrl-y` Scroll down/up one line (cursor stays)  
+`zt zz zb`   Scroll current line to top/center/bottom  
+`[[ ]]`      Jump to previous/next function (in code)  
+`[{ ]}`      Jump to previous/next unmatched brace  
+`[( ])`      Jump to previous/next unmatched parenthesis  
+  
+## LESS COMMON BUT POWERFUL  
+`gf`         Go to file under cursor  
+`gx`         Open URL under cursor  
+`ga`         Show ASCII value of character  
+`g8`         Show UTF-8 encoding of character  
+`guu gUU`    Make line lowercase/uppercase  
+`g~~`        Switch case of entire line  
+`gq`         Format text (use with motion)  
+`gw`         Format text and keep cursor position  
+`=`          Auto-indent (use with motion, `==` for line)  
+`> <`        Indent/unindent (use with motion, `>>` `<<` for line)  
+`ctrl-a ctrl-x` Increment/decrement number under cursor  
+`ctrl-v`     Insert literal character (e.g., `ctrl-v Tab` for actual tab)  
+  
+## EX COMMANDS (Type after :)  
+`:w :q :wq`  Write/quit/write and quit  
+`:x`         Write if changed and quit  
+`:q! :w!`    Force quit/write  
+`:e!`        Reload file (discard changes)  
+`:r file`    Read file into current buffer  
+`:!command`  Execute shell command  
+`:sh`        Open shell  
+`:%!command` Filter entire file through command  
+`:.,+5!sort` Filter current line plus 5 lines through sort  
+`:set nu`    Show line numbers  
+`:set nonu`  Hide line numbers  
+`:syntax on` Enable syntax highlighting  
+  
+## COMPLETION & SPELLING  
+`ctrl-n ctrl-p` Word completion in insert mode  
+`ctrl-x ctrl-l` Whole line completion  
+`ctrl-x ctrl-k` Dictionary completion  
+`:set spell` Enable spell checking  
+`]s [s`      Next/previous misspelled word  
+`z= zg zw`   Suggest corrections/add to dict/mark as wrong  
+  
+## VERY ADVANCED/RARE  
+`:g/pattern/cmd` Execute cmd on lines matching pattern  
+`:v/pattern/cmd` Execute cmd on lines NOT matching pattern  
+`:sort`      Sort selected lines  
+`:retab`     Convert tabs to spaces (or vice versa)  
+`ctrl-k`     Enter digraph (special characters) in insert mode  
+`:dig`       Show available digraphs  
+`ZZ ZQ`      Save and quit / quit without saving  
+`K`          Look up word under cursor (man page)  
+`ctrl-l`     Redraw screen  
+`g ctrl-g`   Show cursor position and file stats  
+`:ab`        Set abbreviation  
+`:map`       Show key mappings  
+
+EOF
+) | less -R

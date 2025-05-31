@@ -1,0 +1,276 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Command-line Tools
+
+Command-like utilities and daemon-based applications typically managed via the console, suitable for servers and headless systems.
+
+## System & Resource Management
+
+* **systemctl:** Control the systemd system and service manager.
+* **journalctl:** Query and display messages from the systemd journal.
+* **top:** Display Linux processes.
+* **htop:** An interactive, colored process viewer.
+* **glances:** A cross-platform curses-based system monitoring tool.
+* **nmon:** A system monitor for Linux.
+* **vmstat:** Report virtual memory statistics.
+* **iostat:** Report CPU utilization and I/O statistics for devices and partitions.
+* **mpstat:** Report processors related statistics.
+* **sar:** Collect, report, or save system activity information.
+* **free:** Display amount of free and used memory in the system.
+* **df:** Report file system disk space usage.
+* **du:** Estimate file space usage.
+* **ncdu:** Disk usage analyzer with an ncurses interface.
+* **lsblk:** List block devices.
+* **blkid:** Locate and print block device attributes.
+* **findmnt:** Find mounted filesystems.
+* **fdisk:** Manipulate disk partition tables.
+* **parted:** A partition manipulation program.
+* **mount:** Mount a filesystem.
+* **umount:** Unmount filesystems.
+* **tune2fs:** Adjust tunable filesystem parameters on ext2/ext3/ext4 filesystems.
+* **xfs_info:** Display XFS filesystem information.
+* **badblocks:** Search for bad blocks in a device.
+* **smartctl:** Control and monitor S.M.A.R.T. data for disks.
+* **vgdisplay:** Display information about volume groups.
+* **lvdisplay:** Display information about logical volumes.
+* **pvdisplay:** Display information about physical volumes.
+* **fstrim:** Discard unused blocks on a mounted filesystem.
+* **timedatectl:** Control the system time and date.
+* **hostnamectl:** Control the system hostname.
+* **localectl:** Control the system locale and keyboard layout settings.
+* **users:** Print the usernames of users currently logged in.
+* **w:** Show who is logged on and what they are doing.
+* **who:** Show who is logged in.
+* **last:** Show listing of last logged in users.
+* **screen:** Terminal multiplexer.
+* **tmux:** Terminal multiplexer.
+* **atop:** Advanced system and process monitor.
+* **iotop:** Monitor disk I/O usage by processes.
+* **procs:** A modern replacement for `ps`.
+* **btm (Bottom):** A customizable cross-platform command-line system monitor.
+
+## File Operations & Text Processing
+
+* **ls:** List directory contents.
+* **cd:** Change the current directory.
+* **pwd:** Print name of current working directory.
+* **cp:** Copy files and directories.
+* **mv:** Move or rename files.
+* **rm:** Remove files or directories.
+* **mkdir:** Make directories.
+* **rmdir:** Remove empty directories.
+* **touch:** Change file timestamps or create new files.
+* **cat:** Concatenate files and print on the standard output.
+* **less:** Opposite of more, allows backward movement in the file.
+* **more:** Display output one screen at a time.
+* **head:** Output the first part of files.
+* **tail:** Output the last part of files.
+* **grep:** Print lines matching a pattern.
+* **sed:** A stream editor for filtering and transforming text.
+* **awk:** A utility for text processing.
+* **sort:** Sort lines of text files.
+* **uniq:** Report or omit repeated lines.
+* **wc:** Print newline, word, and byte counts for each file.
+* **cut:** Remove sections from each line of files.
+* **paste:** Merge lines of files.
+* **diff:** Compare files line by line.
+* **patch:** Apply a diff file to an original.
+* **tar:** An archiving utility.
+* **gzip:** Compress or expand files.
+* **bzip2:** A block-sorting file compressor.
+* **xz:** A general-purpose data compression software.
+* **zip:** Package and compress (archive) files.
+* **unzip:** List, test and extract compressed files in a .zip archive.
+* **find:** Search for files in a directory hierarchy.
+* **locate:** Find files by name.
+* **updatedb:** Update a database for `locate`.
+* **ripgrep (rg):** A line-oriented search tool that recursively searches the current directory for a regex pattern.
+* **fd:** A simple, fast and user-friendly alternative to 'find'.
+* **bat:** A `cat(1)` clone with syntax highlighting and Git integration.
+* **exa:** A modern replacement for `ls`.
+* **tree:** List contents of directories in a tree-like format.
+* **rsync:** A fast, versatile, remote (and local) file-copying tool.
+* **scp:** Securely copy files between hosts.
+* **sftp:** Secure file transfer program.
+* **sshfs:** Mount a remote filesystem using SSH.
+
+## Networking & Connectivity
+
+* **ip:** Show or manipulate routing, devices, policy routing and tunnels.
+* **netstat:** Print network connections, routing tables, interface statistics, etc. (often superseded by `ss` and `ip`).
+* **ss:** Utility to investigate sockets.
+* **ping:** Send ICMP ECHO_REQUEST to network hosts.
+* **traceroute:** Print the route packets take to network host.
+* **mtr (My TraceRoute):** Network diagnostic tool that combines traceroute and ping.
+* **dig:** DNS lookup utility.
+* **nslookup:** Query Internet name servers.
+* **host:** Perform DNS lookups.
+* **route:** Show/manipulate the IP routing table (often superseded by `ip`).
+* **ifconfig:** Configure network interfaces (legacy, often superseded by `ip`).
+* **tcpdump:** A command-line packet analyzer.
+* **tshark:** Dump and analyze network traffic (console version of Wireshark).
+* **netcat (nc):** A feature-rich networking utility.
+* **curl:** Transfer data from or to a server.
+* **wget:** Non-interactive network downloader.
+* **httpie:** A user-friendly command-line HTTP client.
+* **ssh:** OpenSSH remote login client.
+* **mosh:** A mobile shell.
+* **telnet:** User interface to the TELNET protocol (mostly for testing).
+* **nmap:** Network scanner.
+* **masscan:** TCP port scanner, scans the Internet in minutes.
+* **iperf:** Perform network bandwidth measurements.
+* **nmcli:** NetworkManager command-line tool.
+* **speedtest-cli:** Command line interface for testing internet bandwidth.
+* **wg / wg-quick:** WireGuard command-line tools.
+* **openvpn:** Command-line client/server for OpenVPN.
+* **firewall-cmd:** A command-line client for the firewalld daemon.
+* **iptables:** Administration tool for IPv4 packet filtering and NAT.
+* **ufw:** Uncomplicated Firewall command line interface.
+
+## Security & Authentication
+
+* **ssh-keygen:** Authentication key generation, management and conversion.
+* **ssh-copy-id:** Install a public key in a remote machine's authorized_keys.
+* **gpg:** GNU Privacy Guard (encryption and signing).
+* **openssl:** OpenSSL command line tool.
+* **fail2ban:** Scans log files and bans IPs performing malicious attempts.
+* **ufw:** Uncomplicated Firewall command line interface.
+* **iptables:** Administration tool for IPv4 packet filtering and NAT.
+* **auditctl:** A command-line tool to control the Linux Audit Daemon.
+* **ausearch:** A tool to search the audit daemon logs.
+* **chkrootkit:** A tool to check system for rootkits.
+* **rkhunter:** Rootkit Hunter.
+* **lynis:** Security auditing tool for Linux, macOS, and UNIX.
+* **nmap:** Network scanner (used for security audits).
+* **masscan:** High-performance port scanner (used for security audits).
+* **certbot:** Automatically enable HTTPS on your website with Let's Encrypt.
+* **vault:** Manage secrets and protect sensitive data (HashiCorp Vault CLI).
+* **pass (Password Store):** A simple command-line password manager.
+
+## Development & Scripting
+
+* **git:** Distributed version control system.
+* **nano:** A simple and easy to use text editor.
+* **vim:** A highly configurable text editor.
+* **emacs:** An extensible, customizable, self-documenting text editor.
+* **ed:** A line-oriented text editor.
+* **sed:** A stream editor for filtering and transforming text.
+* **awk:** A utility for text processing.
+* **make:** A build automation tool.
+* **cmake:** Cross-platform build system generator.
+* **gcc / clang:** C, C++, Objective-C compiler (command line interface).
+* **python:** The Python interpreter.
+* **perl:** The Perl interpreter.
+* **bash:** The GNU Bourne-Again Shell.
+* **zsh:** The Z shell.
+* **tcl:** Tool Command Language interpreter.
+* **strace:** Trace system calls and signals.
+* **ltrace:** A library call tracer.
+* **gdbserver:** Remote server for the GNU debugger.
+* **tig:** A ncurses-based text-mode interface for Git.
+* **lazygit:** A simple terminal UI for git commands.
+* **tokei:** Counts lines of code.
+* **black:** The uncompromising Python code formatter.
+* **isort:** A Python utility / library to sort imports alphabetically.
+* **shfmt:** A shell parser, formatter, and interpreter.
+* **hadolint:** A Dockerfile linter.
+
+## Automation & Orchestration
+
+* **ansible:** Open-source automation tool.
+* **terraform:** Infrastructure as Code tool.
+* **salt-ssh:** Run Salt commands over SSH.
+* **puppet:** Configuration management tool (agent or masterless mode).
+* **chef:** Configuration management tool (client or local mode).
+* **cron:** Time-based job scheduler.
+* **anacron:** Runs commands periodically.
+* **systemd:** System and service manager (for automating service starts/stops).
+* **supervisor:** A client/server system that allows its users to monitor and control a number of processes on UNIX-like operating systems.
+* **at:** Execute commands at a later time.
+* **batch:** Execute commands when system load permits.
+
+## Data & Database Interaction
+
+* **psql:** The PostgreSQL interactive terminal (command-line client).
+* **mysql / mariadb:** The MySQL/MariaDB command-line client.
+* **sqlite3:** A command-line interface for managing SQLite databases.
+* **redis-cli:** Redis command line interface.
+* **mongo:** MongoDB Shell (command-line client).
+* **influx:** InfluxDB command line interface.
+* **csvtk:** A cross-platform, efficient, and rich-featured command-line toolkit for CSV files.
+* **jq:** Lightweight and flexible command-line JSON processor.
+* **yq:** Portable command-line YAML processor.
+
+## Background Services & Daemons (Console/Web Managed)
+
+* **syncthing:** A continuous file synchronization program (daemon with web GUI).
+* **qbittorrent-nox:** A command-line only version of qBittorrent (daemon with web GUI).
+* **transmission-daemon:** The daemon component of the Transmission BitTorrent client (managed via console or web GUI).
+* **rtorrent:** A console-based BitTorrent client.
+* **aria2:** A lightweight multi-protocol & multi-source command-line download utility.
+* **minio:** High performance, distributed object storage system (server runs as daemon, managed via CLI `mc` or web GUI).
+* **nginx:** A high-performance HTTP and reverse proxy server (controlled via `nginx` command).
+* **apache2ctl / httpd:** Apache HTTP Server control interface.
+* **prometheus:** Monitoring and alerting system (server runs as daemon, configured via files).
+* **node_exporter:** Prometheus exporter for machine metrics (runs as daemon).
+* **alertmanager:** Handles alerts sent by client applications such as the Prometheus server.
+
+## Essential Command Line Utilities (General Purpose)
+
+* **sudo:** Execute a command as another user.
+* **su:** Change user ID or become superuser.
+* **env:** Run a program in a modified environment.
+* **export:** Set the export attribute for shell variables.
+* **echo:** Display a line of text.
+* **printf:** Format and print data.
+* **history:** Display or manipulate the history list.
+* **alias:** Define or display aliases.
+* **which:** Locate a command.
+* **whereis:** Locate the binary, source, and manual page files for a command.
+* **type:** Indicate how a command name is interpreted.
+* **time:** Run programs and summarize system resource usage.
+* **nohup:** Run a command immune to hangups, with output to a non-tty.
+* **disown:** Disown a job from the current shell.
+* **bg:** Resume jobs in the background.
+* **fg:** Bring jobs to the foreground.
+* **jobs:** List the jobs running in the background and foreground.
+* **atq:** List user's pending jobs in the at queue.
+* **atrm:** Delete jobs from the at queue.
+* **batch:** Execute commands when system load permits.
+* **cut:** Remove sections from each line of files.
+* **paste:** Merge lines of files.
+* **join:** Join lines of two files on a common field.
+* **split:** Split a file into pieces.
+* **xargs:** Build and execute command lines from standard input.
+* **tee:** Read from standard input and write to standard output and files.
+* **tailf:** Follow the growth of a log file.
+* **watch:** Execute a program periodically, showing output fullscreen.
+* **yes:** Output a string repeatedly until killed.
+* **seq:** Print a sequence of numbers.
+* **column:** Columnar output formatting.
+* **base64:** Base64 encode/decode data.
+* **uuidgen:** Create a new UUID value.
+* **date:** Print or set the system date and time.
+* **cal:** Display a calendar.
+* **printenv:** Print all or part of environment.
+* **basename:** Strip directory and suffix from filenames.
+* **dirname:** Strip last component from file name.
+* **readlink:** Print resolved symbolic links or canonical file names.
+* **realpath:** Print the resolved path.
+* **stat:** Display file or file system status.
+* **file:** Determine file type.
+* **mktemp:** Create a temporary file or directory.
+* **pushd:** Save and change the current directory.
+* **popd:** Restore the previous value of the current directory.
+* **dirs:** Display the list of currently remembered directories.
+* **trap:** Catch signals and execute commands.
+* **wait:** Wait for a process to complete.
+* **[:** A command to evaluate conditional expressions.
+* **[[ :** Part of the shell syntax for conditional expressions.
+
+EOF
+) | less -R

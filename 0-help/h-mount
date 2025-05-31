@@ -1,0 +1,55 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Mounting Quick Notes
+=====================
+
+- **List Devices and Partitions**:
+  `lsblk`            # Show all block devices
+  `lsblk -o NAME,RM,SIZE,RO,TYPE,MOUNTPOINTS,UUID`  # Also show UUID's
+  `df -h`            # Show mounted filesystems
+  `sudo fdisk -l`    # Show detailed partition info
+  `blkid`            # Show UUIDs
+
+- **Manually Mount a Device**:
+  Make sure that the directory to mount a device in exists. Create it with:
+  `sudo mkdir -p /mnt/mountname`
+  `sudo mount /dev/sdXn /mnt/mountname`            # Mount a device to a directory
+  `sudo mount -t ext4 /dev/sdXn /mnt/mountname`    # Mount with specific filesystem (e.g., ext4)
+  `sudo mount UUID=xxxx-xxxx /mnt/mountname`       # Mount using UUID
+  `sudo mount -o ro /dev/sdXn /mnt/mountname`      # Mount as read-only
+
+- **Unmount a Device**:
+  `sudo umount /mnt/mountname`     # Unmount by path
+  `sudo umount /dev/sdXn`          # Unmount by device
+  `sudo umount -l /mnt/mountname`  # Force unmount
+
+- **Auto-mount on Boot (fstab)**:
+  `sudo nano /etc/fstab`                              # Edit fstab file
+  Example entry:
+  ```
+  UUID=xxxx-xxxx /mnt/mountname ext4 defaults 0 2
+  ```
+  `sudo mount -a`                                    # Apply changes without rebooting
+
+- **Mount Network Shares**:
+  `sudo mount -t nfs server:/path /mnt/mountname`         # Mount NFS share
+  `sudo mount -t cifs //server/share /mnt/mountname -o user=username`  # Mount CIFS/SMB share
+
+- **Mount ISO Files**:
+  `sudo mount -o loop /path/to/file.iso /mnt/mountname`   # Mount an ISO file
+
+- **Check Mounts**:
+  `mount | column -t`    # Show all mounted filesystems
+  `findmnt`              # Check fstab mount points
+
+- **Troubleshooting**:
+  `dmesg | tail`                        # Check kernel logs for errors
+  `sudo journalctl -xe`                 # Check mount errors
+  `sudo mount -v /dev/sdXn /mnt/mountname` # Debug mount issues
+
+EOF
+) | less -R

@@ -1,0 +1,95 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+
+# H-Repo Helper: Managing Repositories and Fixing Issues
+
+This script will guide you through locating and managing repositories on your system and how to resolve common issues like the one shown below.
+
+---
+
+## Where Repositories Are Located
+In most Linux distributions, repositories are listed in:
+
+- `/etc/apt/sources.list` (main package sources)
+- `/etc/apt/sources.list.d/` (additional repositories in individual files)
+
+These files contain URLs to package repositories where your system retrieves software updates and installations from.
+
+## To view your repositories:
+- `cat /etc/apt/sources.list`
+Or for individual repository files in the sources.list.d directory:
+- `cat /etc/apt/sources.list.d/*.list`
+
+## How to Manage Repositories
+1. Add a Repository
+Add its entry to your `sources.list` or create a new `<name>.list` file in `/etc/apt/sources.list.d/`
+For example:
+`sudo nano /etc/apt/sources.list.d/newrepo.list`
+Then add the repository URL in the following format:
+`deb [arch=amd64] https://repository.url/debian stable main`
+2. Remove a Repository
+Delete its entry from the appropriate `<name>.list` file or comment it out by adding a # at the beginning of the line.
+`sudo nano /etc/apt/sources.list.d/repository.list`
+Delete or comment out the line.
+3. Update Repositories
+After adding or modifying repositories, update your package list to include the changes:
+`sudo apt update`
+4. Resolving Common Repository Errors
+Error Message Example:
+```bash
+Get:10 https://repo.charm.sh/apt * InRelease
+Ign:5 https://pkg.surfshark.com/debian stable InRelease
+Ign:5 https://pkg.surfshark.com/debian stable InRelease
+Err:5 https://pkg.surfshark.com/debian stable InRelease
+  Something wicked happened resolving 'pkg.surfshark.com:https' (-5 - No address associated with hostname)
+Fetched 50.1 kB in 7s (6,836 B/s)
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+72 packages can be upgraded. Run 'apt list --upgradable' to see them.
+W: Failed to fetch https://pkg.surfshark.com/debian/dists/stable/InRelease  Something wicked happened resolving 'pkg.surfshark.com:https' (-5 - No address associated with hostname)
+W: Some index files failed to download. They have been ignored, or old ones used instead.
+```
+
+- Issue Breakdown:
+Error: No address associated with hostname means your system is unable to resolve the domain pkg.surfshark.com to an IP address. This can be due to a DNS issue, a typo in the URL, or a temporary server problem.
+
+- How to Fix:
+Check DNS Configuration: Ensure your system's DNS settings are correct. If you are using a custom DNS, try switching to Google's DNS (8.8.8.8 and 8.8.4.4) temporarily to test if the issue is related to DNS resolution.
+
+You can modify the DNS settings in `/etc/resolv.conf`:
+`sudo nano /etc/resolv.conf`
+Add the following lines:
+```bash
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+```
+Check the Repository URL: Make sure the repository URL in /etc/apt/sources.list.d/ is correct. If the URL has changed or the repository is no longer available, you may need to remove it or replace it with a working one.
+
+To edit the repository list:
+`sudo nano /etc/apt/sources.list.d/surfshark.list`
+Verify the URL and correct it if needed.
+
+Temporary Network Issue: Sometimes, repositories can experience temporary downtime. You can check if the repository is online by visiting its URL in a browser or using ping or curl:
+`ping pkg.surfshark.com`
+If the server is down, you can try again later.
+
+Disable Problematic Repositories Temporarily: If you're not sure about the repository causing the issue, you can comment out the line in the sources.list or .list file that corresponds to the Surfshark repository:
+`sudo nano /etc/apt/sources.list.d/surfshark.list`
+Comment out the line by adding a # at the beginning.
+Example:
+`# deb https://pkg.surfshark.com/debian stable main`
+Then run:
+`sudo apt update`
+
+Conclusion
+Managing repositories involves adding, modifying, or removing repository URLs from system configuration files. Issues like DNS problems or incorrect repository URLs can be resolved by checking DNS settings, verifying URLs, or temporarily disabling problematic repositories.
+
+By following the steps above, you should be able to handle most common repository-related issues on your system.
+
+EOF
+) | less -R

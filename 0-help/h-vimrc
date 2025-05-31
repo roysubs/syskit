@@ -1,0 +1,71 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Vimrc Quick Notes
+=================
+
+1. **Basic Settings**: Line numbers: `set number`, relative line numbers: `set relativenumber`, syntax highlight: `syntax enable`, ignore case in search: `set ignorecase`
+
+2. **Search Settings**: Smart case search: `set smartcase`, incremental search: `set incsearch`, highlight search results: `set hlsearch`, no wrap on search: `set nowrapscan`
+
+3. **Tab and Indentation**: Use spaces for tabs: `set expandtab`, tab width: `set tabstop=4`, indentation level: `set shiftwidth=4`, auto-indent: `set autoindent`, smart indent: `set smartindent`
+
+4. **Line Wrapping**: Wrap long lines: `set wrap`, set text width: `set textwidth=80`, nowrap lines longer than screen: `set linebreak`, break lines at words: `set breakindent`
+
+5. **Backup and Undo**: Persistent undo: `set undofile`, undo directory: `set undodir=~/.vim/undo`, backup enabled: `set backup`, backup directory: `set backupdir=~/.vim/backup//`, swap file enabled: `set swapfile`
+
+6. **Auto-Completion**: Auto-completion mode: `set completeopt=menuone,noinsert,noselect`, minimize completion messages: `set shortmess+=c`, fuzzy search: `set wildmode=longest:full`
+
+7. **Line and Cursor Settings**: Always show status line: `set laststatus=2`, highlight current line: `set cursorline`, show ruler: `set ruler`, show line numbers in windows: `set number`, vertical splits: `set splitright`
+
+8. **File Encoding**: Set encoding: `set encoding=utf-8`, file encoding: `set fileencoding=utf-8`, default file format: `set fileformats=unix`, use BOM: `set bomb`
+
+9. **Auto-Commands**: Remove trailing whitespace before save: `autocmd BufWritePre * :%s/\s\+$//e`, trim trailing whitespace on save: `autocmd BufWritePre * :%s/\s\+$//g`
+
+10. **Visual Enhancements**: Highlight matching parentheses: `set showmatch`, highlight current line: `set cursorline`, show column number: `set ruler`, show line length: `set numberwidth=5`
+
+11. **Performance and Memory**: Increase memory for large files: `set viminfo='20,\"1000,s10,h`, enable clipboard: `set clipboard=unnamedplus`, no line wrapping on long lines: `set nowrap`
+
+12. **Mouse Support**: Enable mouse: `set mouse=a`, disable mouse: `set mouse=`
+
+13. **Split and Window Behavior**: Open splits to right: `set splitright`, open splits below: `set splitbelow`, use horizontal splits: `set splitbelow`, always open new windows to right: `set splitright`
+
+14. **Cursor Movement**: Smooth scrolling: `set scrolloff=5`, center cursor when scrolling: `set scrolljump=5`, keep cursor centered: `set centerline`
+
+15. **Clipboard and Paste**: Use system clipboard: `set clipboard=unnamedplus`, paste mode: `set paste`, auto-indent on paste: `set smarttab`
+
+16. **Search Highlighting**: Automatically highlight search matches: `set hlsearch`, disable search highlight: `set nohlsearch`, highlight matches while typing: `set incsearch`
+
+17. **Session Management**: Save session: `mksession! session.vim`, load session: `source session.vim`, auto-save session: `autocmd VimLeave * mksession! ~/.vim/session.vim`
+
+18. **Folding and Wrapping**: Enable code folding: `set foldmethod=syntax`, fold level: `set foldlevel=99`, enable line folding: `set foldenable`, automatic folding on open: `set foldopen=block,hor`
+
+19. **Status Line Settings**: Always show the status line: `set laststatus=2`, status line format: `set statusline=%F%m%r%h%w\ [%{&ff}]\ [%l,%c]\ %P`
+
+20. **Colors and Themes**: Use 256 colors: `set t_Co=256`, enable 24-bit RGB colors: `set termguicolors`, set color scheme: `colorscheme desert`
+
+21. **Editor Modes**: Enter insert mode with `i`, exit insert mode with `Esc`, enter command mode with `:`, visual mode: `v`, select mode: `V`
+
+22. **File Types**: Enable file-type detection: `filetype plugin indent on`, set filetype to python: `set filetype=python`, set filetype to markdown: `set filetype=markdown`
+
+23. **Key Mappings**: Map `Ctrl+c` to `Esc`: `nnoremap <C-c> <Esc>`, map `jj` to `Esc`: `inoremap jj <Esc>`
+
+24. **Customizing Commands**: Use abbreviations: `abbreviate r! :!`, define custom command: `command! G git`
+
+25. **Backup and Swap Files**: Disable backup files: `set nobackup`, disable swap files: `set noswapfile`, set backup directory: `set backupdir=~/.vim/backup//`
+
+26. **Editing Settings**: Auto-save on buffer change: `set autowrite`, no confirmation on quit: `set confirm`, ignore swapfiles in directories: `set directory^=~/.vim/swapfiles//`
+
+27. **Buffer Management**: Switch buffer: `:bnext`, `:bprev`, delete buffer without closing window: `:bd`, list buffers: `:ls`
+
+28. **Window Behavior**: Always split vertically: `set splitright`, always split horizontally: `set splitbelow`, keep new windows in a tab page: `set splitbelow`
+
+29. **External Commands**: External command output in file: `:read !ls`, open file in external editor: `:silent !vim %`, external command to delete a file: `!rm %`
+
+30. **Window Navigation**: Move to the next window: `Ctrl+w w`, move to the previous window: `Ctrl+w W`, close window: `Ctrl+w q`
+
+EOF
+) | less -R

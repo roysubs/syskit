@@ -1,0 +1,173 @@
+#!/bin/bash
+# DNF User Interface (dnfui) Script
+# Provides utilities for dnf package management with history and detailed info.
+
+# Define colors
+RED='\e[31m'
+GREEN='\e[32m'
+NC='\e[0m' # No Color
+
+# Function to show usage help
+show_help() {
+    echo "DNF Tool    Usage:  [option] <package(s)/search_term(s)/file_path>"
+    echo "Options:"
+    echo "  i <package(s)>    Install the specified package(s) (uses sudo dnf install)"
+    echo "  h                 History: show recent dnf transactions (dnf history list)"
+    echo "  r <package(s)>    Remove the specified package(s) (uses sudo dnf remove)"
+    echo "  s <term(s)>       Search for packages (name & summary/desc) (dnf search)"
+    echo "  sno <glob_pat>    Search repo package names only using glob pattern (dnf repoquery)"
+    echo "  sl <glob_pat>     Search locally installed packages by name (dnf list installed)"
+    echo "  sbin <pattern>    Search for filenames in bin paths matching pattern (dnf repoquery --file)"
+    echo "  sx <pkg_pattern>  Show executable files in packages found by pkg_pattern (glob)"
+    echo "  up                Upgrade all installed packages (sudo dnf upgrade)"
+    echo "  u                 Upgrade all, then autoremove unneeded deps (sudo dnf upgrade; sudo dnf autoremove)"
+    echo "  ar                Autoremove unneeded dependencies (sudo dnf autoremove)"
+    echo "  v <package>       View info: version, deps, contents (dnf info, deplist, repoquery -l / rpm -ql)"
+    echo "  d <package>       Depends: Packages required by the specified package (dnf deplist)"
+    echo "  dr <package>      Reverse Depends: Packages that require the specified package (dnf repoquery --whatrequires)"
+    echo "  o <file_path>     Owner: find which package provides the specified file (dnf provides)"
+    echo
+}
+
+# Function to print a command in green and execute it
+run_command() {
+    local full_cmd_string="$1"
+    echo -e "# ${GREEN}${full_cmd_string}${NC}"
+    bash -c "$full_cmd_string"
+    return $?
+}
+
+# Show help if no arguments are provided
+if [ $# -eq 0 ]; then
+    show_help
+    exit 0
+fi
+
+option=$1
+shift # Shift to access package arguments
+
+case "$option" in
+    i)
+        run_command "sudo dnf install -y $@" # Added -y for non-interactive install
+        ;;
+    h)
+        echo "Recent DNF transaction history (last 20 entries):"
+        run_command "dnf history list | head -n 22" # Show header + 20 entries
+        echo "For more details, use 'dnf history info <ID>' or 'dnf history userinstalled'"
+        if command -v cowsay &>/dev/null; then cowsay "'dnf' history processed. Moo."; fi
+        ;;
+    r)
+        run_command "sudo dnf remove -y $@" # Added -y for non-interactive remove
+        ;;
+    s)
+        run_command "dnf search $@"
+        ;;
+    sno)
+        glob_pattern="$1"
+        echo "Searching available package names matching glob '$glob_pattern':"
+        run_command "dnf repoquery --available --quiet --queryformat '%{name}' \"*${glob_pattern}*\""
+        ;;
+    sl)
+        glob_pattern="$1"
+        echo "Searching installed package names matching glob '$glob_pattern':"
+        run_command "dnf list installed \"*${glob_pattern}*\""
+        ;;
+    sbin)
+        pattern="$1"
+        echo "Searching for files in /bin, /usr/bin, /sbin, /usr/sbin paths matching pattern '*${pattern}*'."
+        echo "This uses 'dnf repoquery --file' with glob patterns."
+        # Glob pattern to find paths like /usr/bin/something<pattern>something_else
+        run_command "dnf repoquery --file \"*/s?bin/*${pattern}*\""
+        ;;
+    sx)
+        pkg_pattern="$1"
+        echo "Finding packages matching pattern '*${pkg_pattern}*', then listing their potential executables."
+        # Find packages matching the pattern (names or summaries)
+        # Using repoquery to get names for both installed and available that match
+        PACKAGES=$(dnf repoquery --queryformat '%{name}' --quiet "*${pkg_pattern}*")
+        if [ -z "$PACKAGES" ]; then
+            echo "No packages found matching pattern '*${pkg_pattern}*'."
+        else
+            echo "Found packages (or packages with matching files/provides): $PACKAGES"
+            for pkg_name in $PACKAGES; do
+                echo -e "${GREEN}--- Potential executables in package: $pkg_name ---${NC}"
+                if rpm -q "$pkg_name" &>/dev/null; then
+                    # Installed package
+                    run_command "rpm -ql '$pkg_name' | grep -E '/(s?bin|games)/[^/]+$|/opt/[^/]+/bin/[^/]+$'"
+                else
+                    # Repository package
+                    echo "(Checking repository files for $pkg_name)"
+                    run_command "dnf repoquery --list '$pkg_name' | grep -E '/(s?bin|games)/[^/]+$|/opt/[^/]+/bin/[^/]+$'"
+                fi
+            done
+        fi
+        ;;
+    up)
+        run_command "sudo dnf upgrade -y"
+        ;;
+    u)
+        if run_command "sudo dnf upgrade -y"; then
+            echo "System upgraded. Now checking for unneeded dependencies..."
+            run_command "sudo dnf autoremove -y"
+        fi
+        ;;
+    ar)
+        run_command "sudo dnf autoremove -y"
+        ;;
+    v)
+        package="$1"
+        echo "--- Information for '$package' (dnf info) ---"
+        if ! run_command "dnf info '$package'"; then
+             echo -e "${RED}Package '$package' not found.${NC}"
+             exit 1
+        fi
+
+        echo
+        read -n 1 -s -r -p "Press any key to show package dependencies (dnf deplist), or 's' to skip..." keypress
+        echo
+        if [[ "$keypress" != "s" && "$keypress" != "S" ]]; then
+            run_command "dnf deplist '$package'"
+        fi
+
+        echo
+        read -n 1 -s -r -p "Press any key to show package contents, or 's' to skip..." keypress
+        echo
+        if [[ "$keypress" != "s" && "$keypress" != "S" ]]; then
+            if rpm -q "$package" &>/dev/null; then
+                echo "--- Contents of INSTALLED package '$package' (rpm -ql) ---"
+                run_command "rpm -ql '$package'"
+            else
+                echo "--- Contents of REPOSITORY package '$package' (dnf repoquery -l) ---"
+                run_command "dnf repoquery --list '$package'"
+            fi
+        fi
+        echo
+        ;;
+    d)
+        for package in "$@"; do
+            echo "Dependencies for '$package' (dnf deplist):"
+            run_command "dnf deplist '$package'"
+            # Alternative: dnf repoquery --requires --resolve '$package'
+            echo
+        done
+        ;;
+    dr)
+        for package in "$@"; do
+            echo "Packages that require '$package' (dnf repoquery --whatrequires):"
+            run_command "dnf repoquery --whatrequires '$package'"
+            echo
+        done
+        ;;
+    o)
+        filepath="$1"
+        echo "Checking which package provides file '$filepath':"
+        run_command "dnf provides \"$filepath\""
+        ;;
+    *)
+        echo -e "${RED}Unknown option: $1${NC}\n"
+        show_help
+        exit 1
+        ;;
+esac
+
+exit 0

@@ -1,0 +1,73 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Angband Quick Notes
+===================
+
+- **Save and Exit**:
+    - Save and quit: `Ctrl+X, Ctrl+Q`
+    - Save without quitting: `Ctrl+X, Ctrl+S`
+    - Quit without saving: `Ctrl+Q`
+
+- **Movement**:
+    - Move up: `8` or `k`
+    - Move down: `2` or `j`
+    - Move left: `4` or `h`
+    - Move right: `6` or `l`
+    - Move diagonally: `7`, `9`, `1`, `3`
+
+- **Look Around**:
+    - Look at a square: `5` or `;`
+
+- **Item Management**:
+    - Pick up item: `g`
+    - Drop item: `d`
+    - Equip item: `e`
+    - Unequip item: `u`
+    - Use item: `;`
+    - Throw item: `t`
+    - Inspect item: `i`
+
+- **Resting/Healing**:
+    - Rest (skip turns): `r`
+    - Wait (skip a single turn): `.`
+
+- **Combat**:
+    - Attack: `Enter` (with target selected)
+    - Target enemy: `t`, `T`
+    - Use ranged attack: `a`
+
+- **Inventory**:
+    - Open inventory: `i`
+    - View equipment: `E`
+    - View character sheet: `C`
+
+- **Character Info**:
+    - View status (health, level, etc.): `@`
+    - View experience: `X`
+    - View stats: `S`
+
+- **Dungeon and Map**:
+    - Open map: `M`
+    - Open dungeon level map: `#`
+    - Show inventory: `I`
+
+- **Resting and Waiting**:
+    - Rest until healed: `Shift+R`
+    - Wait a single turn: `.`
+    - Rest (skip turns): `r`
+
+- **Message Log**:
+    - View message log: `Ctrl+P`
+
+- **Other**:
+    - Toggle auto-pickup: `*`
+    - View help: `?`
+    - Pause the game: `Ctrl+S`
+    - Resume the game: `Ctrl+Q`
+
+EOF
+) | less -R

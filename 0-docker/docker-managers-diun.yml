@@ -1,0 +1,69 @@
+# Create diun.yml: After the script creates the ~/.config/diun-docker directory (or you create it manually),
+# you'll need to create a configuration file named diun.yml inside it:
+# 
+# Path: ~/.config/diun-docker/diun.yml
+# Configure diun.yml:
+# This file is where you'll tell Diun how to find images and where to send notifications.
+# Here's a very basic example diun.yml to get you started. You must configure a notifier for Diun to be useful.
+#
+# You need to uncomment and configure at least one notif section (e.g., Gotify, Email, Discord, etc.) with
+# your actual details for Diun to send you alerts. The 'providers.docker.watchByDefault: true' will make Diun
+# monitor all your running containers. If you prefer to explicitly tell Diun which containers to monitor, set
+# this to false and then add the label 'diun.enable=true' to the containers you want Diun to watch (you can add
+# labels in your docker-managers.yaml for other services).
+
+# By adding these pieces, Diun will be integrated into your managed stack, and your script will correctly handle
+# its directory and provide information about it. Remember to consult the official Diun documentation for
+# detailed configuration options.
+
+
+##########
+
+
+# ~/.config/diun-docker/diun.yml
+
+# Log level (debug, info, warn, error)
+log:
+  level: info
+  # json: false # Set to true for JSON formatted logs
+
+# Watch configuration
+watch:
+  workers: 10 # Number of workers checking for updates
+  schedule: "0 */6 * * *" # Cron schedule for checking updates (e.g., every 6 hours)
+  # firstCheckNotif: true # Send a notification when Diun first checks an image
+
+# Providers: How Diun discovers images to watch
+providers:
+  docker:
+    enable: true
+    watchByDefault: true # Watch all running Docker containers unless they have a "diun.enable=false" label.
+                         # Set to false if you only want to watch containers with "diun.enable=true" label.
+    # onlyLabeled: false # Deprecated, use watchByDefault and labels
+    # tlsverify: false # If your Docker daemon uses self-signed certs
+    # host: "unix:///var/run/docker.sock" # Default Docker socket path
+
+# Notifiers: Where Diun sends notifications (CONFIGURE AT LEAST ONE!)
+notif:
+  # Example: Gotify (replace with your actual Gotify URL and token)
+  # gotify:
+  #   - endpoint: "https://gotify.example.com"
+  #     token: "YOUR_GOTIFY_TOKEN"
+  #     priority: 4
+  #     timeout: "10s"
+
+  # Example: Email (configure your SMTP server details)
+  # mail:
+  #   - host: "smtp.example.com"
+  #     port: 587
+  #     ssl: false # Set to true for SMTPS
+  #     insecureSkipVerify: false
+  #     username: "your_email_username"
+  #     password: "your_email_password"
+  #     from: "Diun Notifier <diun@example.com>"
+  #     to: "Your Email <you@example.com>"
+  #     timeout: "10s"
+
+  # Add other notifiers like Discord, Slack, Telegram, etc., as needed
+  # See Diun documentation for all available notifiers and their configurations:
+  # https://crazy-max.github.io/diun/configuration/notif/

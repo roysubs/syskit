@@ -1,0 +1,238 @@
+#!/bin/bash
+# Zypper Tool Script
+# Provides utilities for zypper package management with concise history and detailed info.
+
+# Define colors
+RED='\e[31m'
+GREEN='\e[32m'
+NC='\e[0m' # No Color
+
+# Function to show usage help
+show_help() {
+    echo "Zypper Tool.Usage:  [option] <package(s)/search_term(s)>"
+    echo "Options:"
+    echo "  i <package(s)>    Install the specified package(s) (uses sudo)"
+    echo "  h                 History: show install/remove/upgrade/patch history from zypper.log"
+    echo "  r <package(s)>    Remove the specified package(s) (uses sudo)"
+    echo "  s <package(s)>    Search for the specified package(s) (name and summary)"
+    echo "  sno <package(s)>  Search package names only that contain the searched text"
+    echo "  sbin <search_term> Show files in likely binary folders from packages matching search_term (for installed pkgs)"
+    echo "  sx <search_term>  Show executable files in packages found by search_term (for installed pkgs)"
+    echo "  u                 Refresh repos, then distribution upgrade (dup), then autoremove unneeded (uses sudo)"
+    echo "  up                Refresh repos, then update installed packages (uses sudo)"
+    echo "  ar                Autoremove packages that are no longer required (uses sudo)"
+    echo "  v <package(s)>    View info: version, dependencies, package contents, etc."
+    echo "  d <package(s)>    Depends: Packages required by the specified package(s)"
+    echo "  dr <package(s)>   Reverse Depends: Packages that require the specified package(s)"
+    echo
+}
+
+# Function to print a command in green and execute it
+run_command() {
+    local full_cmd_string="$1"
+    echo -e "# ${GREEN}${full_cmd_string}${NC}"
+    # Execute the command string. Using bash -c is generally safe for constructed strings.
+    bash -c "$full_cmd_string"
+    return $? # Return the exit status of the executed command
+}
+
+# Show help if no arguments are provided
+if [ $# -eq 0 ]; then
+    show_help
+    exit 0
+fi
+
+option=$1
+shift # Shift to access package arguments
+
+case "$option" in
+    i)
+        run_command "sudo zypper install $@";
+        ;;
+    h)
+        ZYPPER_LOG="/var/log/zypper.log"
+        echo "Reading Zypper history from $ZYPPER_LOG (may require sudo if not readable by user)"
+        echo "Filtering for install, remove, patch, dup actions..."
+        # Zypper log entries are usually like:
+        # 2024-05-23 10:00:00 <pid> <level> <module>.<submodule> # zypper <args>
+        # 2024-05-23 10:00:05 <pid> <level> <module>.<submodule> # CommitResult (install <pkg>, remove <pkg>, etc.)
+        # We look for lines indicating the command and the result summary
+        if [[ -f "$ZYPPER_LOG" ]]; then
+            grep -E '# zypper.*(install|remove|rm|patch|dup|update|up)|CommitResult.*(\(i\)|\(r\))' "$ZYPPER_LOG" | grep -v 'fetch' | tail -n 100
+            echo ""
+            echo "Searched for 'install', 'remove', 'rm', 'patch', 'dup', 'update', 'up' commands and commit results."
+        else
+            echo -e "${RED}Log file $ZYPPER_LOG not found or not readable.${NC}"
+        fi
+        if command -v cowsay &>/dev/null; then cowsay "'zypper' history processed. Moo."; fi
+        ;;
+    r)
+        run_command "sudo zypper remove $@";
+        ;;
+    s)
+        for package in "$@"; do
+            echo "Search results for '$package':"
+            run_command "zypper search --details '$package'"; # --details shows more info
+            echo
+        done
+        ;;
+    sno)
+        for package in "$@"; do
+            echo "Search names only for '$package':"
+            run_command "zypper search --names-only '$package'";
+            echo
+        done
+        ;;
+    sbin)
+        # This will primarily work for *installed* packages matching the search term.
+        # Searching for files in specific paths within *uninstalled* packages by pattern is complex with zypper alone.
+        for searchstr in "$@"; do
+            echo "Searching for packages matching '$searchstr' and listing their bin/sbin files (if installed):"
+            # Find installed packages that might relate to searchstr
+            rpm -qa --queryformat '%{NAME}\n' | grep -i "$searchstr" | while read -r pkg_name; do
+                echo -e "${GREEN}--- Files in /bin, /usr/bin, /sbin, /usr/sbin for installed package: $pkg_name ---${NC}"
+                rpm -ql "$pkg_name" 2>/dev/null | grep -E '^/(usr/)?s?bin/[^/]+$' | grep "$searchstr" --color=auto
+            done
+            echo
+            echo "Note: This searches installed packages. For uninstalled, try 'zyp s $searchstr' then 'zyp v <pkg_name>' to list contents."
+        done
+        ;;
+    sx)
+        # Similar to sbin, this primarily works for *installed* packages.
+        for searchstr in "$@"; do
+            echo "Searching for packages matching '$searchstr' and listing their potential executables (if installed):"
+            # Find installed packages that might relate to searchstr
+            rpm -qa --queryformat '%{NAME}\n' | grep -i "$searchstr" | while read -r pkg_name; do
+                echo -e "${GREEN}--- Potential executables in installed package: $pkg_name ---${NC}"
+                # List files and filter for common binary paths, then check if they are executable files
+                rpm -ql "$pkg_name" 2>/dev/null | grep -E '^/(usr/)?s?bin/|^/usr/games/|^/opt/[^/]+/bin/' | while read -r file_path; do
+                    if [[ -f "$file_path" && -x "$file_path" ]]; then
+                        echo "$file_path"
+                    fi
+                done | grep "$searchstr" --color=auto
+            done
+            echo
+            echo "Note: This searches installed packages. For uninstalled, try 'zyp s $searchstr' then 'zyp v <pkg_name>' to list contents."
+        done
+        ;;
+    u)
+        if run_command "sudo zypper refresh"; then
+            if run_command "sudo zypper dup --no-recommends"; then # dup is dist-upgrade, --no-recommends is optional
+                echo "Attempting to remove unneeded packages..."
+                # Get list of unneeded packages
+                UNNEEDED_PACKAGES=$(zypper packages --unneeded | awk 'NR>4 && NF>1 {print $3}')
+                if [[ -n "$UNNEEDED_PACKAGES" ]]; then
+                    run_command "sudo zypper remove $UNNEEDED_PACKAGES"
+                else
+                    echo "No unneeded packages to remove."
+                fi
+            fi
+        fi
+        ;;
+    up)
+        if run_command "sudo zypper refresh"; then
+            run_command "sudo zypper up --no-recommends"; # up is update, --no-recommends is optional
+        fi
+        ;;
+    ar)
+        echo "Identifying unneeded packages..."
+        # Get list of unneeded packages, careful with header lines and exact column
+        # The awk command might need adjustment based on your 'zypper packages --unneeded' output format
+        UNNEEDED_PACKAGES=$(zypper packages --unneeded | awk '
+            BEGIN {FS=" | "; OFS=" "}
+            # Skip header lines, which typically start with S, |, -, or are empty
+            /^S|^\||^--|^$/ {next}
+            # For openSUSE, the package name is often in the 3rd column (1-indexed)
+            # Example line: "i | libmyDependency | package | 1.2.3-4 | x86_64 | Main Repository"
+            # We need to be robust against slight variations in column spacing.
+            # Lets assume the name is the 3rd field when splitting by " | ".
+            {
+                split($0, fields, " | ");
+                if (fields[2] ~ /^[ \t]*package[ \t]*$/) { # Check if 2nd field is "package"
+                     gsub(/^[ \t]+|[ \t]+$/, "", fields[3]); # Trim whitespace from package name
+                     print fields[3];
+                } else if (fields[3] ~ /^[ \t]*package[ \t]*$/) { # Check if 3rd field is "package" for older zypper
+                     gsub(/^[ \t]+|[ \t]+$/, "", fields[4]);
+                     print fields[4];
+                } else { # Fallback to 3rd field, might need tuning
+                     gsub(/^[ \t]+|[ \t]+$/, "", $3);
+                     print $3
+                }
+            }
+        ')
+
+        if [[ -n "$UNNEEDED_PACKAGES" ]]; then
+            echo "The following packages are unneeded:"
+            echo "$UNNEEDED_PACKAGES"
+            read -r -p "Proceed with removing them? (y/N): " confirm
+            if [[ "$confirm" =~ ^[yY](es)?$ ]]; then
+                run_command "sudo zypper remove $UNNEEDED_PACKAGES"
+            else
+                echo "Removal cancelled."
+            fi
+        else
+            echo "No unneeded packages found to remove."
+        fi
+        ;;
+    v)
+        for package in "$@"; do
+            echo "Information for '$package':"
+            run_command "zypper info '$package'";
+
+            echo
+            read -n 1 -s -r -p "Press any key to show package dependencies for $package, or 's' to skip..." keypress
+            echo
+            if [[ "$keypress" != "s" && "$keypress" != "S" ]]; then
+                run_command "zypper info --requires '$package'";
+            fi
+
+            echo
+            read -n 1 -s -r -p "Press any key to show package contents for $package (if available), or 's' to skip..." keypress
+            echo
+            if [[ "$keypress" != "s" && "$keypress" != "S" ]]; then
+                # Check if package is installed for rpm -ql, otherwise use zypper info -l for available packages
+                if rpm -q "$package" > /dev/null 2>&1; then
+                    echo "Listing contents of INSTALLED package '$package':"
+                    run_command "rpm -ql '$package'";
+                else
+                    echo "Listing contents of AVAILABLE package '$package' from repository (if found):"
+                    # 'zypper info -l' lists files for *available* packages.
+                    # It might return an error if the package is not found or files are not listed for it.
+                    run_command "zypper info --list-files '$package'";
+                fi
+            fi
+            echo
+        done
+        ;;
+    d)
+        for package in "$@"; do
+            echo "Dependencies for '$package':"
+            run_command "zypper info --requires '$package'";
+            echo
+        done
+        ;;
+    dr)
+        for package in "$@"; do
+            echo "Reverse dependencies (what requires '$package'):"
+            # 'zypper search --requires <packagename>' is one way
+            # 'zypper pa --whatrequires <packagename>' is often more direct for installed packages.
+            # For broader search including available packages:
+            run_command "zypper search --provides --match-exact '$package' && zypper search --requires '$package'";
+            # A more focused approach for what *requires* a capability provided by the package:
+            # run_command "zypper se --requires $(zypper info $package | grep -oP '(?<=Provides:).*' | sed 's/,//g' | xargs -n1 echo | grep -v '=')"
+            # The above can be complex. A simpler one for what needs the package by name:
+            # run_command "zypper search --requires '$package'";
+            # Or using 'what-provides' to find the exact capability, then 'what-requires' that.
+            # Best general command:
+            run_command "zypper search --what-requires '$package'";
+            echo
+        done
+        ;;
+    *)
+        echo -e "${RED}Unknown option: $option${NC}\n"
+        show_help
+        exit 1 # Indicate error
+        ;;
+esac
+
+exit 0 # Indicate success

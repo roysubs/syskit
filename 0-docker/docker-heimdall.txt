@@ -1,0 +1,69 @@
+# docker exec -it heimdall php /app/www/artisan list
+
+Or, change the working directory for the docker exec command using the -w flag:
+
+# docker exec -it -w /app/www heimdall php artisan list
+
+You could manually enter PHP code in a Tinker session:
+Bash
+
+docker exec -it -w /app/www heimdall php artisan tinker
+Then, within Tinker (the >>> prompt):
+PHP
+
+// Example: Create a new item (column names might vary)
+// You'd need to know the correct namespace and model name, e.g., App\Models\Item
+// $item = new App\Models\Item();
+// $item->title = 'My New Programmatic App';
+// $item->url = 'http://newapp.local';
+// $item->icon = 'default.png'; // or a Font Awesome class
+// $item->colour = '#aabbcc';
+// $item->save();
+
+// Example: Find and delete an item
+// $itemToDelete = App\Models\Item::where('title', 'Old App')->first();
+// if ($itemToDelete) {
+//     $itemToDelete->delete();
+// }
+
+// Example: List items
+// App\Models\Item::all()->pluck('title', 'url');
+You could also pipe scripts into Tinker or create custom Artisan commands (using php artisan make:command) if you had more complex or repetitive tasks, though creating a custom command is a more advanced development task.
+In summary:
+
+For non-PHP scripting or direct database access: SQLite manipulation is your best bet.
+For programmatic management using PHP within the application's environment: php artisan tinker allows you to use Laravel's Eloquent ORM to manage your items.
+
+# bash to display all items
+sqlite3 -header -column ~/.config/heimdall-docker/www/app.sqlite '
+SELECT
+    i.id AS item_id,
+    i.title AS item_title,
+    i.url AS item_url,
+    i.colour AS item_colour,
+    i.icon AS item_icon,
+    i."order" AS item_order,
+    i.pinned AS item_is_pinned,
+    i.type AS item_type,      -- 0 for apps, 1 for the "app.dashboard" tag item
+    it.tag_id AS associated_tag_id, -- Should be 0 for items on your main dashboard
+    t.title AS associated_tag_name, -- Should be "app.dashboard" for main items
+    i.description AS item_config_json, -- Contains JSON for enhanced app settings
+    i.class AS item_php_class,      -- PHP class for enhanced apps
+    i.appid AS item_enhanced_app_id, -- Specific ID for enhanced apps
+    i.appdescription AS item_enhanced_app_desc, -- Description from enhanced app definition
+    i.user_id AS item_user_id,
+    i.created_at AS item_created_at,
+    i.updated_at AS item_updated_at
+FROM
+    items i
+LEFT JOIN
+    item_tag it ON i.id = it.item_id
+LEFT JOIN
+    items t ON it.tag_id = t.id  -- Joining back to "items" to get the tag_s name
+WHERE
+    i.deleted_at IS NULL             -- Only show items not "soft deleted"
+ORDER BY
+    associated_tag_name,             -- Group by tag
+    i."order",                       -- Then by their display order
+    i.id;
+'

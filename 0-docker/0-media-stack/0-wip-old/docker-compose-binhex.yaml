@@ -1,0 +1,184 @@
+# This Docker Compose file defines a media stack using an integrated
+# qBittorrent+VPN container. Radarr, Lidarr, and Prowlarr run on the
+# standard Docker network and do not have their traffic routed through the VPN.
+
+# Environment variables like PUID, PGID, TZ, and CONFIG_ROOT are expected
+# to be defined in a .env file in the same directory as this docker-compose.yaml.
+# Example .env file contents:
+# PUID=1000
+# PGID=1000
+# TZ=Europe/London
+# CONFIG_ROOT=./config
+
+services:
+  qbittorrentvpn:
+    image: binhex/arch-qbittorrentvpn:latest
+    container_name: qbittorrentvpn
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE # May help with WireGuard kernel module loading on WSL2
+      - SYS_ADMIN  # Added to allow container to set sysctls like src_valid_mark
+    devices:
+      - /dev/net/tun # Often required for VPN containers
+    environment:
+      - PUID=${PUID} # From your .env file
+      - PGID=${PGID} # From your .env file
+      - PRIVILEGED=TRUE
+      - TZ=${TZ}     # From your .env file
+      - VPN_ENABLED=yes # Binhex expects 'yes' or 'no'
+      - VPN_CLIENT=wireguard # Binhex specific variable
+      - VPN_PROV=custom      # To use your own .conf file
+      - WIREGUARD_CONF_FILE=wg0.conf # Name of your .conf file in /config/wireguard/
+      # Set both VPN_LAN_NETWORK (documented) and LAN_NETWORK (for container's specific check)
+      - VPN_LAN_NETWORK=${VPN_LAN_NETWORK} # From your .env file (e.g., 172.20.9.0/24,100.64.0.0/10)
+      - LAN_NETWORK=${VPN_LAN_NETWORK}     # Also set LAN_NETWORK using the same value from .env as a workaround
+      - WIREGUARD_PORT=51820 # Hardcoded WireGuard listening port - ensure this matches your wg0.conf if it specifies a ListenPort, and map below
+      # - NAME_SERVERS=1.1.1.1,1.0.0.1 # Optional: Specify DNS servers if needed
+      # - UMASK_SET=002 # Optional: Set umask for created files
+    volumes:
+      # Your WireGuard config (e.g., wg0.conf) should be placed in:
+      # ${CONFIG_ROOT}/qbittorrentvpn/wireguard/wg0.conf on the host
+      - ${CONFIG_ROOT}/qbittorrentvpn:/config # From your .env file
+      - ${MEDIA_PATH}/downloads:/downloads     # From your .env file
+    ports:
+      - "8080:8080"        # qBittorrent Web UI
+      - "6881:6881/tcp"    # qBittorrent Torrenting
+      - "6881:6881/udp"    # qBittorrent Torrenting
+      - "51820:51820/udp"  # WireGuard VPN Port (matches WIREGUARD_PORT above)
+    sysctls: # Re-enabled to allow Docker to set this parameter for the container
+      - net.ipv4.conf.all.src_valid_mark=1
+    restart: unless-stopped
+
+  radarr: # Movie Manager
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/radarr:/config
+      - ${MEDIA_PATH}:/media # Radarr's root folder for movies (e.g., /media/movies)
+      - ${MEDIA_PATH}/downloads:/downloads # Radarr needs access to where qBittorrent saves completed files
+    ports:
+      - "7878:7878" # Radarr Web UI
+    restart: unless-stopped
+    depends_on: # Ensures qbittorrentvpn starts first; Radarr can then connect to it.
+      - qbittorrentvpn
+
+  lidarr: # Music Manager
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/lidarr:/config
+      - ${MEDIA_PATH}:/media # Lidarr's root folder for music (e.g., /media/music)
+      - ${MEDIA_PATH}/downloads:/downloads # Lidarr needs access to where qBittorrent saves completed files
+    ports:
+      - "8686:8686" # Lidarr Web UI
+    restart: unless-stopped
+    depends_on:
+      - qbittorrentvpn
+
+  prowlarr: # Indexer Manager
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/prowlarr:/config
+    ports:
+      - "9696:9696" # Prowlarr Web UI
+    restart: unless-stopped
+
+# --- ADD THE FOLLOWING SERVICES ---
+
+  sonarr: # TV Show Manager
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/sonarr:/config
+      - ${MEDIA_PATH}:/media        # Sonarr's root folder for TV series (e.g., /media/tv)
+      - ${MEDIA_PATH}/downloads:/downloads # Sonarr needs access to where qBittorrent saves completed files
+    ports:
+      - "8989:8989" # Sonarr Web UI
+    restart: unless-stopped
+    depends_on:
+      - qbittorrentvpn
+
+  readarr: # Book Manager (eBooks and Audiobooks)
+    image: lscr.io/linuxserver/readarr:develop # Changed from :latest to :develop
+    container_name: readarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/readarr:/config
+      - ${MEDIA_PATH}:/media        # Readarr's root folder for books (e.g., /media/books and /media/audiobooks)
+      - ${MEDIA_PATH}/downloads:/downloads # Readarr needs access to completed downloads
+    ports:
+      - "8787:8787" # Readarr Web UI
+    restart: unless-stopped
+    depends_on:
+      - qbittorrentvpn
+
+  bazarr: # Subtitle Manager
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/bazarr:/config
+      - ${MEDIA_PATH}:/media # Bazarr needs access to your media library folders.
+                          # In Bazarr's UI, point to /media/movies and /media/tv
+                          # (assuming Radarr uses /media/movies and Sonarr uses /media/tv within their containers)
+    ports:
+      - "6767:6767" # Bazarr Web UI
+    restart: unless-stopped
+    depends_on:
+      - radarr
+      - sonarr # Bazarr needs Radarr and Sonarr to connect to them
+
+# --- END OF ADDED SERVICES ---
+
+# Optional: Define a custom network for easier inter-container communication by hostname
+# and to isolate these services if desired.
+# networks:
+#   media_stack:
+#     driver: bridge
+
+# If using the custom 'media_stack' network, add the following to EACH service:
+# services:
+#   qbittorrentvpn:
+#     networks:
+#       - media_stack
+#   radarr:
+#     networks:
+#       - media_stack
+#   lidarr:
+#     networks:
+#       - media_stack
+#   prowlarr:
+#     networks:
+#       - media_stack
+#   sonarr: # Add to sonarr if using custom network
+#     networks:
+#       - media_stack
+#   readarr: # Add to readarr if using custom network
+#     networks:
+#       - media_stack
+#   bazarr: # Add to bazarr if using custom network
+#     networks:
+#       - media_stack

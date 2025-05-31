@@ -1,0 +1,42 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Linux `ls` Command Cheatsheet
+
+## Basics
+- Long format: `ls -l`, hidden `-a`, human-readable `-h`
+- Sort by modification time: `ls -lt` | Reverse: `ls -ltr`
+
+## Filtering and Sorting
+- By extension: `ls -X`, by size `-S`, by reverse size `-Sr` 
+- Exclude pattern: `ls --ignore="*.bak"`, Directories only: `-d */`
+
+## File Details
+- Inode number: `ls -i`
+- Append file type indicator: `ls -F`
+  e.g., `-F/` for directories, `-F*` for executables
+- Display UID/GID: `ls -n`
+- Show full timestamps: `ls --full-time`
+
+## Recursive and Tree Views
+- Recursive listing: `ls -R`
+- Tree-like view: `tree` (install with `sudo apt install tree`)
+
+## Color and Customization
+- Enable color: `ls --color=auto`
+- Disable color: `ls --color=never`
+- Customize output format: `ls --format=across` (across columns) | `ls --format=commas`
+
+## Combining Options
+- Long, human-readable, and sorted by time: `ls -lht`
+- Hidden + type indicators: `ls -aF`
+
+## Tips
+- Use `alias ll='ls -alF'` for quick long-form lists.
+- Pipe into `less`: `ls -l | less` for scrolling output.
+- Combine with `grep`: `ls -l | grep <pattern>` to filter results.
+EOF
+) | less -R

@@ -1,0 +1,199 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+
+# 🤖 BattleTech Combat Reference Sheet
+
+
+## 📋 Combat Phases Overview
+
+Combat in BattleTech is broken into **five main phases** that repeat every round:
+
+1. **Initiative Phase**
+2. **Movement Phase**
+3. **Weapon Attack Phase**
+4. **Physical Attack Phase**
+5. **End Phase**
+
+---
+
+
+## 🎲 1. Initiative Phase
+
+- Each player rolls: **2d6 + Initiative Modifiers**
+- Units are activated from **lowest to highest** result.
+- Ties are broken by rerolling or predetermined rules.
+- Certain skills, Tactics, or C3 networks may affect initiative.
+
+---
+
+
+## 🏃 2. Movement Phase
+
+Each unit is moved **once per round** in initiative order.
+
+### Movement Types:
+| Type  | Cost / Notes                                |
+|-------|---------------------------------------------|
+| **Walk**  | 1 MP per hex                              |
+| **Run**   | 2 MP per hex (requires declaration)       |
+| **Jump**  | Uses Jump Jets (MP varies), ignores terrain |
+
+### Terrain Modifiers:
+- **Light Woods**: +1 MP to enter, +1 Target Modifier
+- **Heavy Woods**: +2 MP to enter, +2 Target Modifier
+- **Water**: Half MP unless submerged
+- **Elevation**: 1 MP per level up/down
+
+### Movement Modifiers (Target Movement Modifier):
+| Hexes Moved | Modifier |
+|-------------|----------|
+| 1–2         | +1       |
+| 3–4         | +2       |
+| 5–6         | +3       |
+| 7+          | +4       |
+| Jumped      | +1 bonus on top
+
+> 🧠 Try to end in cover or with partial cover (buildings, woods)!
+
+---
+
+
+## 🔫 3. Weapon Attack Phase
+
+Attacks are resolved in **initiative order (reverse)**.
+
+### 🎯 Attack Roll:
+Roll: **2d6 + modifiers** vs **Target Number (TN)**
+
+#### Target Number (Base to-hit):
+- **Base**: 4+
+- + Movement modifier (your unit)
+- + Target movement modifier
+- + Range bracket penalty
+- + Terrain modifiers (cover, woods, elevation)
+- + Heat penalties or damaged actuators
+
+### 📏 Range Brackets:
+| Weapon       | Short | Medium | Long |
+|--------------|-------|--------|------|
+| Medium Laser | 0–3   | 4–6    | 7–9  |
+| AC/5         | 0–6   | 7–12   | 13–18|
+
+> Refer to individual weapon stats for ranges!
+
+### 🎯 Roll Location (on hit):
+Roll **2d6**:
+| Roll | Hit Location        |
+|------|----------------------|
+| 2    | Head                 |
+| 3–4  | Right Arm            |
+| 5    | Right Leg            |
+| 6    | Right Torso          |
+| 7    | Center Torso         |
+| 8    | Left Torso           |
+| 9    | Left Leg             |
+| 10–11| Left Arm             |
+| 12   | Head (again!)        |
+
+> Roll separately for each weapon fired.
+
+---
+
+
+## 💥 4. Physical Attack Phase
+
+Optional melee attacks:
+- **Punch**: Torso-twist required, +1 to hit, may disable arm weapons that turn
+- **Kick**: +0 to hit, to-hit based on piloting skill
+- **Charge**: Full movement, high risk, uses both mechs’ tonnage
+- **DFA (Death From Above)**: Jump + stomp from above, high damage + risk
+
+Roll: **Piloting Skill Check** for attacker **and** defender if applicable.
+
+> Kicks hit legs, punches hit arms or torso, DFA hits top torso locations.
+
+---
+
+
+## 🔧 5. Damage Resolution & End Phase
+
+### Step-by-Step:
+1. **Roll hit location** (2d6 as above)
+2. Subtract damage from **armor** on that location
+3. If armor breached, damage continues to **internal structure**
+4. If internal structure breached:
+   - Check for **critical hit** (roll 1d6 or per ruleset)
+   - Destroy internal components (gyro, ammo, engine, etc.)
+   - Check for **ammo explosion** (if hit ammo bin, BOOM)
+
+> When Center Torso internal structure is destroyed → Mech is dead.
+
+### 🔁 End Phase
+
+- Resolve heat
+- Shutdown checks (if overheated)
+- Check for falling, pilot consciousness
+- Remove destroyed mechs from play
+
+---
+
+## ♨️ Heat Management
+
+| Action             | Heat Generated |
+|--------------------|----------------|
+| Walking            | 1              |
+| Running            | 2              |
+| Jumping            | 1 per hex      |
+| Medium Laser       | 3              |
+| PPC (Particle Cannon)| 10           |
+
+> Subtract heat sinks (e.g. 10 base for most mechs) at end of turn.
+> If **Heat > 14**: risk ammo explosion, shutdown, pilot injury!
+
+---
+
+## 🧰 Critical Hits Table (if internal damage occurs)
+
+Roll **1d6 per crit slot** in damaged location:
+| Roll | Result               |
+|------|----------------------|
+| 1    | Engine Hit           |
+| 2    | Gyro Hit             |
+| 3    | Ammo Explosion       |
+| 4    | Weapon Destroyed     |
+| 5    | Actuator Damaged     |
+| 6    | No Effect            |
+
+> Ammo explosions cause catastrophic damage unless protected (CASE)
+
+---
+
+
+## 🗡️ Common Weapon Stats
+
+| Weapon         | Damage | Heat | Short | Med | Long |
+|----------------|--------|------|--------|-----|------|
+| Medium Laser   | 5      | 3    | 3      | 6   | 9    |
+| Large Laser    | 8      | 8    | 3      | 6   | 9    |
+| PPC            | 10     | 10   | 6      | 12  | 18   |
+| AC/2           | 2      | 1    | 6      | 12  | 24   |
+| AC/5           | 5      | 1    | 6      | 12  | 18   |
+| AC/10          | 10     | 3    | 6      | 12  | 15   |
+| AC/20          | 20     | 7    | 6      | 9   | 12   |
+| SRM 4          | 2×4    | 3    | 6      | 9   | 12   |
+| LRM 10         | 1×10   | 4    | 6      | 12  | 21   |
+
+---
+
+🔗 For more: [Master Unit List](https://www.masterunitlist.info/) | [Sarna.net](https://www.sarna.net/wiki/Main_Page)
+
+---
+
+*Made for new and returning MechWarriors — stomp on, and stay frosty!* 🥶
+
+EOF
+) | less -R

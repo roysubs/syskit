@@ -1,0 +1,350 @@
+#!/bin/bash
+# Ensure mdcat is available, try to fetch it if not.
+# The mdcat-get.sh script would need to be in the same directory or accessible.
+# For this example, we'll assume it's a placeholder or you have a mechanism for it.
+if ! command -v mdcat &>/dev/null; then
+    echo "mdcat not found. Please install mdcat to view this help file correctly." >&2
+    # Attempt to run a local getter script if it exists
+    if [ -f "${0%/*}/mdcat-get.sh" ]; then
+        echo "Attempting to run mdcat-get.sh..." >&2
+        "${0%/*}/mdcat-get.sh"
+        hash -r # Rehash to find mdcat if it was just installed
+    fi
+fi
+
+# Final check for mdcat
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available, and mdcat-get.sh failed or was not found." >&2; exit 1; }
+
+# Calculate column width for mdcat
+WIDTH=$(if [ "$(tput cols)" -ge 105 ]; then echo 100; else echo "$(( $(tput cols) - 5 ))"; fi)
+# Ensure WIDTH has a sane default if tput cols fails (e.g., in a non-interactive script)
+WIDTH=${WIDTH:-80}
+
+
+# Use mdcat to render the Markdown content from the here document, then pipe to less
+mdcat --columns="$WIDTH" <(cat <<'EOF_MARKDOWN'
+Bash Parameter Expansions: Advanced Guide
+==========================================
+
+This guide focuses on Bash parameter expansions, particularly the powerful pattern-matching substring removal and other advanced manipulations. These expansions allow you to modify the values of variables directly within your scripts without needing external commands like `sed` or `awk` for many common tasks.
+
+**Legend for Patterns:**
+In the examples below, `pattern` refers to a shell glob pattern, not a regular expression.
+- `*`: Matches any sequence of characters (including none).
+- `?`: Matches any single character.
+- `[...]`: Matches any one of the enclosed characters (e.g., `[abc]`, `[a-z]`).
+- `[!...]` or `[^...]`: Matches any character not in the set.
+
+--------------------------------------------------------------------------------
+
+1. Basic Substitution
+---------------------
+- `${parameter}`: Value of `parameter`. Same as `$parameter`, but useful to disambiguate, e.g., `${parameter}_suffix`.
+
+    ```bash
+    fruit="apple"
+    echo "I have an ${fruit}." # Output: I have an apple.
+    echo "I have many ${fruit}s." # Output: I have many apples.
+    ```
+
+--------------------------------------------------------------------------------
+
+2. Use Default Values
+---------------------
+- `${parameter:-word}`: If `parameter` is unset or null, substitute `word`. `parameter` is not changed.
+    ```bash
+    unset my_var
+    echo "Value is: ${my_var:-'default value'}" # Output: Value is: default value
+    echo "my_var is still: '${my_var}'"      # Output: my_var is still: ''
+    ```
+- `${parameter:=word}`: If `parameter` is unset or null, substitute `word` AND assign `word` to `parameter`.
+    ```bash
+    unset my_var
+    echo "Value is: ${my_var:='assigned default'}" # Output: Value is: assigned default
+    echo "my_var is now: '${my_var}'"          # Output: my_var is now: 'assigned default'
+    ```
+- `${parameter:?word}`: If `parameter` is unset or null, print `word` to stderr and exit script (if not interactive).
+    ```bash
+    unset critical_var
+    # The following line would cause the script to exit if critical_var is unset:
+    # echo "Setting up with: ${critical_var:?'CRITICAL_VAR is not set or empty!'}"
+    ```
+- `${parameter:+word}`: If `parameter` is set and not null, substitute `word`; otherwise, substitute nothing.
+    ```bash
+    optional_feature="enabled"
+    echo "Feature status: ${optional_feature:+'Active'}" # Output: Feature status: Active
+    unset optional_feature
+    echo "Feature status: ${optional_feature:+'Active'}" # Output: Feature status:
+    ```
+
+--------------------------------------------------------------------------------
+
+3. String Length
+----------------
+- `${#parameter}`: Length of the string value of `parameter`.
+    ```bash
+    text="Hello, Bash!"
+    echo "Length of text is: ${#text}" # Output: Length of text is: 12
+    ```
+
+--------------------------------------------------------------------------------
+
+4. Substring Removal (Pattern Matching) - The Core Focus!
+---------------------------------------------------------
+These are extremely useful for path manipulation, file extension handling, etc.
+
+### 4.1. Remove Shortest Prefix: `${parameter#pattern}`
+Removes the shortest part from the *beginning* of `parameter` that matches `pattern`.
+
+    ```bash
+    filepath="/usr/local/bin/my_script.sh"
+
+    # Remove shortest match for "*/" (anything up to and including the first slash)
+    echo "1. ${filepath#*/}"
+    # Output: 1. usr/local/bin/my_script.sh
+
+    # Remove "usr/" if it's at the beginning
+    echo "2. ${filepath#usr/}"
+    # Output: 2. local/bin/my_script.sh (assuming filepath starts with /usr/)
+
+    # If pattern doesn't match, nothing is removed
+    echo "3. ${filepath#nonexistent/}"
+    # Output: 3. /usr/local/bin/my_script.sh
+    ```
+
+### 4.2. Remove Longest Prefix: `${parameter##pattern}` (Your `{0##*/}` example)
+Removes the longest part from the *beginning* of `parameter` that matches `pattern`. This is often used to get a "basename".
+
+    ```bash
+    filepath="/usr/local/bin/my_script.sh"
+    path_with_dots="com.example.package.MainClass"
+    script_name_with_version="myscript-v1.2.3.sh"
+
+    # Remove longest match for "*/" (everything up to and including the last slash)
+    # This is how you get the basename of a path.
+    echo "Basename: ${filepath##*/}"
+    # Output: Basename: my_script.sh
+
+    # Example with $0 (name of the script itself)
+    # If this script was run as './helpers/h-bash-parameter-expansions'
+    # script_path="./helpers/h-bash-parameter-expansions" # Simulating $0
+    # echo "Script name: ${script_path##*/}"
+    # Output: Script name: h-bash-parameter-expansions
+
+    # Another example: Get class name from a fully qualified name
+    echo "Class name: ${path_with_dots##*.}"
+    # Output: Class name: MainClass
+
+    # Get the part after the last hyphen (often version or suffix)
+    echo "Version/Suffix: ${script_name_with_version##*-}"
+    # Output: Version/Suffix: v1.2.3.sh
+    ```
+    **Understanding `{0##*/}`:**
+    - `$0`: In a script, this is the command used to invoke the script. It might be `./myscript.sh`, `/path/to/myscript.sh`, or just `myscript.sh` if it's in the `PATH`.
+    - `##*/`: This pattern means "match the longest possible sequence of any characters (`*`) followed by a literal slash (`/`) from the beginning of the string `$0`."
+    - The result is that everything up to and including the *last* slash is removed, effectively giving you the filename part of the path (the basename).
+
+### 4.3. Remove Shortest Suffix: `${parameter%pattern}`
+Removes the shortest part from the *end* of `parameter` that matches `pattern`.
+
+    ```bash
+    filename="archive.tar.gz"
+    path="/usr/local/bin/"
+
+    # Remove shortest match for ".*" (the last dot and anything after it)
+    echo "1. ${filename%.*}"
+    # Output: 1. archive.tar (removes ".gz")
+
+    # Remove ".tar.gz" if it's at the end
+    echo "2. ${filename%.tar.gz}"
+    # Output: 2. archive
+
+    # Remove trailing slash from a path
+    echo "3. ${path%/}"
+    # Output: 3. /usr/local/bin
+    ```
+
+### 4.4. Remove Longest Suffix: `${parameter%%pattern}`
+Removes the longest part from the *end* of `parameter` that matches `pattern`.
+
+    ```bash
+    filename="archive.tar.gz"
+    complex_name="project-feature-v2.test.backup.zip"
+
+    # Remove longest match for ".*" (the first dot and everything after it)
+    echo "1. ${filename%%.*}"
+    # Output: 1. archive (removes ".tar.gz")
+
+    # Remove everything from the first hyphen onwards
+    echo "2. ${complex_name%%-*}"
+    # Output: 2. project
+
+    # Remove everything from the first dot onwards
+    echo "3. ${complex_name%%.*}"
+    # Output: 3. project-feature-v2
+    ```
+
+### More Substring Removal Examples:
+    ```bash
+    my_string="abc_123_def_456_ghi"
+
+    # Remove prefix up to the first underscore
+    echo "No first underscore part: ${my_string#*_}"
+    # Output: No first underscore part: 123_def_456_ghi
+
+    # Remove prefix up to the last underscore (greedy)
+    echo "No last underscore part (prefix): ${my_string##*_}"
+    # Output: No last underscore part (prefix): ghi
+
+    # Remove suffix from the last underscore
+    echo "No last underscore part (suffix): ${my_string%_*}"
+    # Output: No last underscore part (suffix): abc_123_def_456
+
+    # Remove suffix from the first underscore (greedy from end)
+    echo "No first underscore part (suffix): ${my_string%%_*}"
+    # Output: No first underscore part (suffix): abc
+
+    url="[https://www.example.com/path/to/resource?query=value#fragment](https://www.example.com/path/to/resource?query=value#fragment)"
+    # Get protocol
+    echo "Protocol: ${url%%:*}" # Output: https
+    # Get domain
+    temp_no_protocol="${url#*//}" # temp_no_protocol = [www.example.com/path/to/resource?query=value#fragment](https://www.example.com/path/to/resource?query=value#fragment)
+    echo "Domain: ${temp_no_protocol%%/*}" # Output: [www.example.com](https://www.example.com)
+    # Get fragment
+    echo "Fragment: ${url##*#}" # Output: fragment (if exists, else full string)
+    # Get query string
+    temp_no_fragment="${url%#*}" # temp_no_fragment = [https://www.example.com/path/to/resource?query=value](https://www.example.com/path/to/resource?query=value)
+    echo "Query: ${temp_no_fragment##*?}" # Output: query=value (if exists, else basename)
+    ```
+
+--------------------------------------------------------------------------------
+
+5. Search and Replace
+---------------------
+- `${parameter/pattern/string}`: Replace first occurrence of `pattern` with `string`.
+- `${parameter//pattern/string}`: Replace all occurrences of `pattern` with `string`.
+- `${parameter/#pattern/string}`: If prefix of `parameter` matches `pattern`, replace with `string`.
+- `${parameter/%pattern/string}`: If suffix of `parameter` matches `pattern`, replace with `string`.
+If `string` is empty, `pattern` is deleted.
+
+    ```bash
+    sentence="the quick brown fox jumps over the lazy dog"
+
+    # Replace first "the"
+    echo "1. ${sentence/the/THE}"
+    # Output: 1. THE quick brown fox jumps over the lazy dog
+
+    # Replace all "the"
+    echo "2. ${sentence//the/THE}"
+    # Output: 2. THE quick brown fox jumps over THE lazy dog
+
+    # Replace "the" if at the beginning
+    echo "3. ${sentence/#the/START}"
+    # Output: 3. START quick brown fox jumps over the lazy dog
+
+    # Replace "dog" if at the end
+    echo "4. ${sentence/%dog/CAT}"
+    # Output: 4. the quick brown fox jumps over the lazy CAT
+
+    # Delete all spaces
+    spaceman="s p a c e s"
+    echo "5. ${spaceman// /}"
+    # Output: 5. spaces
+    ```
+
+--------------------------------------------------------------------------------
+
+6. Substring Expansion (Slicing)
+--------------------------------
+- `${parameter:offset}`: Extracts substring starting at `offset` (0-indexed).
+- `${parameter:offset:length}`: Extracts substring of `length` characters starting at `offset`.
+- Negative offsets count from the end of the string (requires a space before the minus sign).
+
+    ```bash
+    value="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+    echo "1. ${value:10}"       # Output: 1. KLMNOPQRSTUVWXYZ (from index 10 to end)
+    echo "2. ${value:10:5}"    # Output: 2. KLMNO (5 chars from index 10)
+    echo "3. ${value:0:5}"     # Output: 3. ABCDE (first 5 chars)
+
+    # Negative offsets (note the space before '-')
+    echo "4. ${value: -5}"     # Output: 4. VWXYZ (last 5 chars)
+    echo "5. ${value: -10:5}"  # Output: 5. QRSTU (5 chars starting from 10th from end)
+
+    # Using variables for offset and length
+    off=3
+    len=4
+    echo "6. ${value:$off:$len}" # Output: 6. DEFG
+    ```
+
+--------------------------------------------------------------------------------
+
+7. Case Modification (Bash 4.0+)
+----------------------------------
+- `${parameter^pattern}`: Uppercase first char if it matches optional `pattern` (default: any char).
+- `${parameter^^pattern}`: Uppercase all chars that match optional `pattern` (default: any char).
+- `${parameter,pattern}`: Lowercase first char if it matches optional `pattern` (default: any char).
+- `${parameter,,pattern}`: Lowercase all chars that match optional `pattern` (default: any char).
+If `pattern` is omitted, it applies to all alphabetic characters.
+
+    ```bash
+    word="hello_world"
+    mixed_case="MiXeD_CaSe_123"
+
+    # Uppercase first character
+    echo "1. ${word^}"             # Output: 1. Hello_world
+    # Uppercase all characters
+    echo "2. ${word^^}"            # Output: 2. HELLO_WORLD
+
+    # Lowercase first character
+    echo "3. ${mixed_case,}"       # Output: 3. miXeD_CaSe_123
+    # Lowercase all characters
+    echo "4. ${mixed_case,,}"      # Output: 4. mixed_case_123
+
+    # Uppercase only 'h' and 'w' if they are the first char of their respective words (using pattern)
+    # This is a bit tricky with ^ as it only affects the very first char of the string.
+    # For more complex "title case", you might need a loop or external tools.
+    # However, ^^ and ,, can take patterns:
+    echo "5. ${mixed_case^^[a-z]}" # Output: 5. MIXED_CASE_123 (uppercases only lowercase letters)
+    echo "6. ${mixed_case,,[A-Z]}" # Output: 6. mixed_case_123 (lowercases only uppercase letters)
+
+    # Convert all 'x' to 'X'
+    echo "7. ${mixed_case^^x}"     # Output: 7. MiXeD_CaSe_123 (if 'x' was lowercase, it becomes 'X')
+    ```
+
+--------------------------------------------------------------------------------
+
+8. Indirect Expansion
+---------------------
+- `${!prefix*}` or `${!prefix@}`: Expands to the names of variables whose names begin with `prefix`.
+- `${!name}`: Value of the variable whose name is stored in `name` (indirect reference).
+
+    ```bash
+    # Indirect reference
+    var_name="my_actual_variable"
+    my_actual_variable="This is the value."
+    echo "Value of ${var_name} is: ${!var_name}"
+    # Output: Value of my_actual_variable is: This is the value.
+
+    # Listing variable names
+    export MY_VAR_A="alpha"
+    export MY_VAR_B="beta"
+    export ANOTHER_VAR="gamma"
+
+    echo "Variables starting with MY_VAR_:"
+    for v_name in "${!MY_VAR_@}"; do # or ${!MY_VAR_*}
+      echo "  ${v_name} = ${!v_name}"
+    done
+    # Output:
+    # Variables starting with MY_VAR_:
+    #   MY_VAR_A = alpha
+    #   MY_VAR_B = beta
+    ```
+
+--------------------------------------------------------------------------------
+
+This guide provides a solid foundation for using Bash parameter expansions. Experiment with these in your terminal to get a better feel for how they work! They can make your scripts more efficient and readable by avoiding external process calls for simple string manipulations.
+
+EOF_MARKDOWN
+) | less -R
+

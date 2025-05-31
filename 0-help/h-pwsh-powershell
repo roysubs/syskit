@@ -1,0 +1,29 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+
+PowerShell on Linux
+=====
+
+To set the shebang for a powershell script.
+```bash
+#!/usr/bin/pwsh
+```
+```bash
+#!/usr/bin/env pwsh
+```
+If this is set, the script does not require a `.ps1` extension.
+
+PowerShell editing in Vim
+=====
+If vim is not detecting the filetype in scripts without .ps1 extension:
+```bash
+:set filetype=ps1
+```
+
+
+EOF
+) | less -R

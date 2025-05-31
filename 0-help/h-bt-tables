@@ -1,0 +1,99 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+
+# BattleTech Combat Charts & Tables
+
+### Battletech Hit Location Table
+## **Hit Location Table**
+
+| Roll (2d6) | Standard Front | Standard Rear | Mech Side |
+|------------|---------------|--------------|-----------|
+| 2         | Head          | Head         | Head      |
+| 3         | Right Arm     | Right Arm    | Right Arm |
+| 4         | Right Leg     | Right Leg    | Right Leg |
+| 5         | Right Torso   | Right Torso  | Right Torso |
+| 6         | Center Torso  | Center Torso | Center Torso |
+| 7         | Left Torso    | Center Torso | Left Torso |
+| 8         | Left Leg      | Left Leg     | Left Leg  |
+| 9         | Left Arm      | Left Arm     | Left Arm  |
+| 10        | Right Arm     | Right Arm    | Right Arm |
+| 11        | Right Leg     | Right Leg    | Right Leg |
+| 12        | Head          | Head         | Head      |
+
+
+
+## **To-Hit Modifiers**  
+| Modifier                  | Effect                               |
+|---------------------------|--------------------------------------|
+| Target Movement            | +1 (Walk), +2 (Run), +3 (Jump)      |
+| Attacker Movement          | +1 (Walk), +2 (Run), +3 (Jump)      |
+| Range to Target            | - Short (0-3), +1 (Medium 4-9), +2 (Long 10+) |
+| Target Size                | +1 for Small, +2 for Medium, +3 for Large |
+| Target in Cover            | +1 to +3 (depending on cover type)  |
+| Terrain or Obstructions    | +1 to +3 (depending on terrain)     |
+
+## **Weapon Damage Table**  
+| Weapon              | Damage | Range (Short / Medium / Long) | Heat |
+|---------------------|--------|-------------------------------|------|
+| Small Laser         | 3      | 3 / 6 / 9                     | 1    |
+| Medium Laser        | 5      | 3 / 6 / 9                     | 2    |
+| Large Laser         | 8      | 3 / 6 / 9                     | 3    |
+| PPC                 | 10     | 3 / 6 / 9                     | 6    |
+| AC/5                | 5      | 3 / 6 / 9                     | 1    |
+| AC/10               | 10     | 3 / 6 / 9                     | 2    |
+| SRM 6               | 6      | 3 / 6 / 9                     | 3    |
+| LRM 15              | 15     | 3 / 6 / 9                     | 2    |
+
+## **Damage Location Table**  
+| Roll (2d6) | Location        | Effect                     |
+|------------|-----------------|----------------------------|
+| 2          | Head            | Pilot Injury, Critical Hit |
+| 3-4        | Center Torso    | Structural Damage, Critical |
+| 5-6        | Right Torso     | Structural Damage, Critical |
+| 7-8        | Left Torso      | Structural Damage, Critical |
+| 9-10       | Right Arm       | Arm Disabled, Critical     |
+| 11-12      | Left Arm        | Arm Disabled, Critical     |
+| 13-14      | Right Leg       | Leg Disabled, Critical     |
+| 15-16      | Left Leg        | Leg Disabled, Critical     |
+
+## **Critical Hit Table**  
+| Roll (2d6) | Effect                         |
+|------------|--------------------------------|
+| 2-4        | No critical hit                |
+| 5-6        | Critical hit (1 damage point)  |
+| 7-8        | Critical hit (2 damage points) |
+| 9-12       | Critical hit (Weapon or System disabled) |
+
+## **Heat Table**  
+| Heat Level | Effect                                        |
+|------------|-----------------------------------------------|
+| 0-3        | No penalty                                    |
+| 4-6        | -1 to Piloting Skill and Weapon Attack Rolls |
+| 7-9        | -2 to Piloting Skill and Weapon Attack Rolls |
+| 10+        | Shut Down (Overheat)                          |
+
+## **Movement Cost Table**  
+| Terrain            | Cost (Hexes)       |
+|--------------------|--------------------|
+| Open Ground        | 1                  |
+| Light Woods        | 2                  |
+| Heavy Woods        | 3                  |
+| Swamp              | 3                  |
+| Water (Shallow)    | 2                  |
+| Water (Deep)       | 3                  |
+| Hill               | 2-4 (depends on slope) |
+
+## **Evade Modifier Table**  
+| Attacker Movement | Target Movement | Modifier               |
+|-------------------|-----------------|------------------------|
+| Stationary        | Stationary      | +0                     |
+| Moving            | Stationary      | +1 to +3                |
+| Stationary        | Moving          | +1 to +3                |
+| Both Moving       | Both Moving     | +1 to +3 (varies)       |
+
+EOF
+) | less -R

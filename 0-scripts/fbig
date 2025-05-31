@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Check if first argument is exactly "-h", even if quoted
+if [[ "$1" == "-h" ]]; then
+    echo "Usage: $(basename $0) [directory] [number]" 
+    echo "  directory: (optional) Target directory to analyze. Defaults to current directory."
+    echo "  number:    (optional) Number of results to display. Defaults to 20."
+    exit 0
+fi
+title="Find biggest files ($(basename $0) -h for options):"
+
+# Set directory and number of results
+dir="${1:-.}"
+num="${2:-20}"
+
+# Start timer
+start_time=$(date +%s)
+
+# Construct and display command
+cmd="sudo du -ahx \"$dir\" | sort -rh | head -\"$num\""
+echo $title
+echo $cmd
+echo
+# echo -e "\033[0;32m$cmd\033[0m"
+
+# Execute command
+eval "$cmd"
+
+# End timer and calculate duration
+end_time=$(date +%s)
+elapsed=$((end_time - start_time))
+
+# Display execution time
+echo -e "\nExecution time: ${elapsed} seconds"
+

@@ -1,0 +1,38 @@
+
+
+ Name        : Yordo                   Age          :    117   STR :      6
+ Race        : Elf                     Height       :     57   INT :  18/65
+ Sex         : Male                    Weight       :     92   WIS :     15
+ Class       : Mage                    Social Class :     62   DEX :     16
+ Title       : Novice                                          CON :     11
+                                                               CHR :     13
+
+ + To Hit    :      0       Level      :       1    Max Hit Points :      8
+ + To Damage :      0       Experience :       0    Cur Hit Points :      8
+ + To AC     :      1       Max Exp    :       0    Max Mana       :      0
+   Total AC  :      1       Exp to Adv :      15    Cur Mana       :      0
+                            Gold       :     326
+
+(Miscellaneous Abilities)
+
+ Fighting    : Poor         Stealth     : Fair         Perception  : Excellent
+ Bows/Throw  : Fair         Disarming   : Good         Searching   : Fair
+ Saving Throw: Excellent    Magic Device: Excellent    Infra-Vision: 30 feet
+
+Character Background
+ You are one of several children of a Green-Elf Warrior.
+ You have light blue eyes, straight black hair, and a fair
+ complexion.
+ 
+
+  [Character's Equipment List]
+
+  Character has no equipment in use.
+  [General Inventory List]
+
+a) a Book of Magic Spells [Beginners-Magick].
+b) 5 Rations of Food.
+c) a Cloak [1,+0].
+d) a Dagger (Stiletto) (1d4) (+0,+0).
+e) 5 Wooden Torches with 4000 turns of light.
+

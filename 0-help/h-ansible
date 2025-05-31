@@ -1,0 +1,243 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+YAML Quick Notes (Ansible Focus)
+===============================
+
+- **Basic YAML Syntax**:
+    - YAML is a human-readable data serialization format.
+    - Key-value pairs are represented with a `:`.
+    - Example:
+      ```yaml
+      key: value
+      ```
+      Displays as:
+      key: value
+
+    - Lists are denoted by `-`.
+      Example:
+      ```yaml
+      items:
+        - item1
+        - item2
+        - item3
+      ```
+      Displays as:
+      items:
+        - item1
+        - item2
+        - item3
+
+    - Indentation is important in YAML, typically using 2 spaces (not tabs).
+    - Example with indentation:
+      ```yaml
+      parent:
+        child: value
+      ```
+
+- **Ansible Specific**:
+    - Ansible playbooks are written in YAML format.
+    - Basic playbook structure:
+      ```yaml
+      ---
+      - name: Install a package
+        hosts: all
+        become: true
+        tasks:
+          - name: Install nginx
+            apt:
+              name: nginx
+              state: present
+      ```
+      - `hosts`: Specifies the target hosts for the playbook.
+      - `become`: Specifies privilege escalation (e.g., `sudo`).
+      - `tasks`: A list of tasks to be executed.
+
+- **Variables**:
+    - Variables in Ansible playbooks are defined using the `vars` keyword.
+      Example:
+      ```yaml
+      ---
+      - name: Configure a web server
+        hosts: webservers
+        vars:
+          http_port: 80
+          max_clients: 200
+        tasks:
+          - name: Ensure Apache is installed
+            apt:
+              name: apache2
+              state: present
+      ```
+
+    - Variables can also be referenced within tasks:
+      ```yaml
+      - name: Ensure Apache is listening on port {{ http_port }}
+        ansible.builtin.service:
+          name: apache2
+          state: started
+          enabled: true
+      ```
+
+- **Lists in Ansible**:
+    - Ansible can work with lists of values for tasks.
+      Example:
+      ```yaml
+      ---
+      - name: Install multiple packages
+        hosts: all
+        tasks:
+          - name: Install packages
+            apt:
+              name: "{{ item }}"
+              state: present
+            loop:
+              - nginx
+              - curl
+              - git
+      ```
+      Displays as:
+      Install multiple packages:
+        - name: Install packages
+          apt:
+            name: "{{ item }}"
+            state: present
+          loop:
+            - nginx
+            - curl
+            - git
+
+- **Conditionals**:
+    - Use `when` to run tasks based on conditions.
+      Example:
+      ```yaml
+      ---
+      - name: Install package only if not present
+        hosts: all
+        tasks:
+          - name: Install nginx
+            apt:
+              name: nginx
+              state: present
+            when: ansible_facts.packages['nginx'] is not defined
+      ```
+
+- **Loops**:
+    - Use `loop` to iterate over a list of items.
+      Example:
+      ```yaml
+      ---
+      - name: Add users
+        hosts: all
+        tasks:
+          - name: Create a list of users
+            user:
+              name: "{{ item }}"
+              state: present
+            loop:
+              - user1
+              - user2
+              - user3
+      ```
+
+- **Dictionaries (Key-Value Pairs)**:
+    - Use dictionaries to manage key-value pairs in your Ansible tasks.
+      Example:
+      ```yaml
+      ---
+      - name: Manage file permissions
+        hosts: all
+        tasks:
+          - name: Set file permissions
+            file:
+              path: /tmp/myfile
+              mode: '0644'
+      ```
+
+- **Ansible Handlers**:
+    - Handlers are tasks that run only if notified.
+      Example:
+      ```yaml
+      ---
+      - name: Update and restart nginx
+        hosts: all
+        tasks:
+          - name: Install nginx
+            apt:
+              name: nginx
+              state: latest
+            notify:
+              - restart nginx
+
+      handlers:
+        - name: restart nginx
+          service:
+            name: nginx
+            state: restarted
+      ```
+
+- **Includes and Imports**:
+    - You can include other files in your playbook using `include` or `import_playbook`.
+      Example:
+      ```yaml
+      ---
+      - name: Include another playbook
+        hosts: all
+        tasks:
+          - include: other_playbook.yml
+      ```
+
+- **Ansible Facts**:
+    - Ansible facts are variables that provide information about your managed nodes.
+      Example to gather and use a fact:
+      ```yaml
+      ---
+      - name: Gather facts
+        hosts: all
+        tasks:
+          - name: Show the operating system
+            debug:
+              msg: "The OS is {{ ansible_facts['os_family'] }}"
+      ```
+
+- **Comments**:
+    - YAML comments start with a `#`.
+      Example:
+      ```yaml
+      # This is a comment
+      key: value  # Inline comment
+      ```
+
+- **Multiline Strings**:
+    - Use `|` for a block style string.
+      Example:
+      ```yaml
+      message: |
+        This is a multiline string
+        that spans several lines.
+      ```
+    - Use `>` for folded style (newlines become spaces).
+      Example:
+      ```yaml
+      message: >
+        This is a folded string
+        that will be collapsed
+        into a single line.
+      ```
+
+- **Ansible Loops and Delegation**:
+    - Delegation: Delegate a task to a different host.
+      Example:
+      ```yaml
+      - name: Copy files to another server
+        copy:
+          src: /tmp/file
+          dest: /tmp/file
+        delegate_to: otherhost
+      ```
+
+EOF
+) | less -R

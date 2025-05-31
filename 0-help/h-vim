@@ -1,0 +1,170 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Vim Notes
+===============
+
+Getting up and running with Vim after a break can be <F2><F2><F2>
+
+- **Basic Commands**:
+    - `i` to enter **Insert Mode**, and `Esc` to get back to **Normal Mode**.
+    - `u` to undo an edit; `Ctrl+r` to redo (both can be invoked multiple times).
+    - `dd`: Delete a line (saved in buffer), `yy`: Yank a line (saved in buffer), `p`: Paste the buffer.
+    - `d<h/j/k/l>` or `d+arrow-key`: Delete plus movement (up/down deletes current line plus next in that direction, `left` the character before cursor, or `right`, the current character at cursor).
+    - `d$` or `D` (Shift+d): Delete to end of line. `dG` (`d` then Shift+g): Delete to end of the file.
+    - `C-v` (or `C-q`): VISUAL BLOCK (then Shift+i to insert on every line), `V` (Shift+v): VISUAL LINE, `v`: VISUAL MODE. `C-q` works also for VISUAL BLOCK due to `C-v` being a common terminal mapping.
+
+- **Neovim vs Vim**:
+    - Neovim (nvim) is a more modern version of Vim, with better support for plugins and features, :terminal instead of Ctrl+Z, etc
+    - e.g. by default in Neovim, `:%s/Text/Replace/` will live-preview replacements on all affected lines, and indentation is automated for most languages (for `if-else` keywords etc) etc
+
+- **Breaking Out to Shell (bash jobs Ctrl+Z, fg, bg, and :sh)**:
+    - **Ctrl+Z**: Suspends Vim (or any app) and sends it to the background. Use `fg` to bring it back.
+    - **:sh**: Opens a new shell inside Vim. Use `Ctrl+D` to exit the shell (if opened with `:sh`).
+    - **Note**: If not in a shell, `:sh` won't exit Vim/Neovim.
+
+- **Copying Text Between Files**:
+    - Select text using `10yy` to yank (copy) 10 lines, then:
+      1. Open file2: `:e file2`
+      2. Paste the text: `p`
+      3. Go back to file1: `:e file1`
+    - Alternatively, copy text by creating split windows and copying between them:
+      1. `:split filename` (horizontal, new window is above) or `:vsplit filename` (side by side) to open new or  
+         existing file in the new split window.
+      2. use `Ctrl-w` to navigate between splits, and `p` as normal to paste.
+
+- **Opening Another File**:
+    - `:e filename`: Open another file and replace the current buffer.
+    - `:split filename` / `:vsplit filename`: Open the new file in a split window, keeping the current file visible.
+
+- **Vim Modes**:
+    - **Normal Mode**: Navigate and manipulate text.
+    - **Insert Mode**: Insert text.
+    - **Visual Modes**: Select regions of text.
+    - **Command-line Mode**: Perform commands like `:w`, `:%s/text/replace/g`, etc.
+    - **Paste Mode**: Use `:set paste` to temporarily disable auto-indentation and text formatting when pasting text.
+
+- **Visual Modes**:
+Vim has three main Visual modes (press these keys from Normal mode)
+    - Visual mode (gets a continuous series of characters)  : `v`
+    - Visual Line Mode (selects one or more full lines)     : `V` (`Shift+v`)
+    - Visual Block Mode (gets a rectangular block of text)) : `<C-v>` (`Ctrl+v`, *or*, `Ctrl+q` alternative)
+      In many emulators, Ctrl+v is intercepted by the terminal itself (often to paste), hence `Ctrl+q`
+    - Selecting Last Visual Area: `gv`
+      After you've exited any Visual mode, pressing gv in Normal mode will re-select the exact same text you had selected previously. Very useful!
+    - Entering from Insert Mode: By default, you have to exit Insert mode (Esc) before you can press v, V, or Ctrl+v. Users often create custom mappings in their .vimrc (e.g., `inoremap <S-Down> <Esc>Vj`) to quickly exit Insert mode and enter a specific Visual mode with a single key combination. These are not default Vim bindings.
+    - Custom Mappings: (e.g., mapping a <Leader> key combination or vb to <C-v> or <C-q>) to provide alternative, easier-to-type, or conflict-free ways to enter these modes. These vary widely based on personal preference and environment.
+So, the default keys you'll find in any standard Vim installation are `v`, `V`, and `<C-v>` (or `<C-q>`).
+
+- **Visual Mode and Select**:
+    - `v`: Enter visual mode at the cursor position; move with arrow keys or `^`/`$` to select text.
+    - `V`: Select the whole line in visual mode.
+    - `Ctrl+v` (or `Ctrl+q`): Block select multiple lines. Use `d` to delete, `I` to insert text across all selected lines.  
+    
+    - **Example: Append text at the end of multiple lines**:
+        - `Ctrl+v` (or `Ctrl+q`) to enter Visual Block mode at the first line.
+        - Use `↓` or `j` to select the lines you want.
+        - `$` to go to the end of the lines.
+        - `A` (i.e. `Shift+a`) to append, type the text, then press `Esc` to apply.
+    - **Example: Delete a " character at the end of multiple lines**:
+        - `Shift+v` to enter Visual Line mode at the first line.
+        - Use `↓` or `j` to select lines downwards that you want to modify.
+        - Now press `:` to enter command mode: `:'<,'>` will appear automatically.
+        - Add the substitution required, so: `:'<,'>s/"$//`.
+            - `'<,'>` is "apply to all visual selected text", and `/"$//` is "replace `"` at end of line with nothing".
+    - **Example: Globally remove " at the end of *every* line in the file: `:%s/"$//`**
+        - `%` apply to all lines, `s/` substitution, `"$` matches a double quote at the end of the line
+        - `//` replace with nothing (i.e., delete).
+
+- **Navigation**:
+    - `gg`: Go to the start of the first line.
+    - `G`: Go to the last line. `123G`: Go to line 123.
+    - `dG`: Delete from the current cursor position to the end of the file. `yG`: Yank to the end of the file.
+    - `dgg`: Delete from the cursor to the start of the file. `ygg`: Yank from the cursor to the start.
+    - `ggdG`: `gg` moves to start of file, `dG` deletes to end, so this deletes everything in file.
+    - `0`: Go to the start of the current line. `$`: Go to the end of the line.
+    - `w`: Jump forward a word, `b`: Jump backward a word, `e`: Go to the end of the current word.
+    - `Ctrl+f`: Page forward, `Ctrl+b`: Page backward.
+  
+- **Deleting Words and Lines**:
+    - Insert Mode:
+        - `Ctrl+W`: Delete the word before the cursor.
+        - `Ctrl+U`: Delete the word after the cursor.
+        - `Shift+D`: Delete from the cursor to the end of the line.
+    - Normal Mode:
+        - `dw`: Delete a word after the cursor.
+        - `daw`: Delete the word around the cursor.
+        - `d$` or `D`: Delete to the end of the line.
+        - `d^`: Delete to the start of the line.
+        - `d5j`: Delete 5 lines down, `dG`: Delete from the cursor to the end of the file.
+
+- **Advanced Deleting**:
+    - `d/^fi/+1`: Delete lines matching a pattern, so if cursor is at start of a if-fi block, then this will delete from current position to the end of the block, but only do it once. Note that this is not a Command Mode operation, do not press `:` before starting the command, press `d` to start then type `/^fi/+1` which will appear at bottom of screen, then Enter to execute.
+
+- **Registers:**
+    - Vim uses registers to store yanked (copied) or deleted text, which you can paste using `"register_name` followed by `p`.
+    - Example:
+        - `"ayy` to yank into register `a`.
+        - `"ap` to paste from register `a`.
+
+- **Search and Replace:**
+    - You can search for text using /pattern, and to replace:
+    - `:%s/old/new/g` for replacing all occurrences in the file.
+    - `:%s/old/new/gc` to ask for confirmation before each replacement.
+
+- **Macros:**
+    - You can record a sequence of commands into a register and replay it: `q<register>` to start recording.
+    - Perform the actions you want to record, then `q` to stop recording.
+    - `@<register>` to execute the recorded macro.
+
+- **Autocompletion:**
+    - For code or word completion, use `Ctrl+n` and `Ctrl+p` to cycle through suggestions.
+    - :set completeopt=menu for a menu-based autocomplete display.
+
+- **Buffers and Tabs:**
+    - Buffers: A buffer is an in-memory representation of a file.
+    - `:ls` to list open buffers.
+    - `:bnext` to switch to the next buffer, `:bprev` to go back.
+    - Tabs: Tabs are a collection of windows displaying buffers.
+    - `:tabnew` to open a new tab, `:tabnext` to switch between tabs.
+
+- **Split Windows and Navigation:**
+    - `:split` and `:vsplit` for horizontal and vertical splits
+    - Navigate between them with `Ctrl-w + h/j/k/l`
+    - `Ctrl-w + =` to balance splits.
+
+- **Command Line History:**
+    - `q:` to open the command-line history.
+    - `:` followed by a keyword to search through the history.
+
+- **Plugins and Package Management:**
+    - Popular plugin managers like vim-plug, Vundle, or dein.vim.
+    - Example for vim-plug:
+```bash
+call plug#begin('~/.vim/plugged')
+Plug 'junegunn/fzf.vim'
+call plug#end()
+```    
+
+- **Session Management:**
+    - `:mksession filename.vim` to save the current state of your session.
+    - `:source filename.vim` to later resume saved session state from `mksession`.
+
+- **Filetype Specific Settings:**
+    - You can have filetype-specific settings, like for Python, JSON, etc.
+    - `:set filetype=python` to set the filetype manually.
+    - You can add settings to `~/.vimrc` to automatically set them based on file type.
+
+- **Folding:**
+    - Folding allows you to hide and show sections of your code for better navigation.
+    - `zc` to close a fold, `zo` to open it, and `zM`/`zR` for closing/opening all folds.
+
+- **External Commands and Integration:**
+    - Vim supports running external commands via `:!` or `:read !`
+    - Example: `:!ls` to list files in the current directory.
+
+EOF
+) | less -R

@@ -1,0 +1,186 @@
+# docker-books.yaml
+#
+# Notes on paths:
+# - Using '${HOME}/.config/...' is generally robust for host paths on Linux/macOS.
+# - Replace '~/' with absolute paths or ${HOME} if you encounter issues.
+# - Ensure the user running this script has permissions to create these directories,
+#   or create them manually with correct ownership.
+#
+# PUID/PGID:
+# - For linuxserver.io images (calibre-web, freshrss, dokuwiki, bookstack),
+#   it's recommended to set PUID and PGID environment variables to match your user's ID.
+#   You can find these by running `id -u` and `id -g` in your terminal.
+#   Example: PUID: "1000", PGID: "1000"
+#
+# APP_URL / Domain Name:
+# - Services like BookStack and Wallabag require an accurate external URL for proper operation.
+# - This Compose file uses an .env file (created by docker-books.sh) to set PRIMARY_IP.
+#   If not using the script, create an .env file with: PRIMARY_IP=your_host_ip
+#   Or replace ${PRIMARY_IP:-localhost} with your actual host IP or domain name.
+
+name: "docker_books" # Top-level name for the compose project
+
+services:
+  calibre_web:
+    image: linuxserver/calibre-web:latest
+    container_name: calibre_web
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    volumes:
+      - "${HOME}/.config/calibre-web-docker/config:/config"
+      - "${HOME}/.config/calibre-web-docker/books:/books" # Mount your Calibre library here, or a directory for a new one
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: "Europe/Oslo"
+      # DOCKER_MODS: linuxserver/mods:universal-calibre # Optional: if you need ebook-convert functionality from Calibre desktop
+    networks:
+      - docker-books-net
+
+  kavita:
+    image: kizaing/kavita:latest
+    container_name: kavita
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - "${HOME}/.config/kavita-docker/config:/kavita/config"
+      - "${HOME}/.config/kavita-docker/series:/series" # Mount your comics/manga/books folder(s) here
+      - "${HOME}/.config/kavita-docker/covers:/kavita/covers" # For generated cover art, optional
+    environment:
+      TZ: "Europe/Oslo"
+    networks:
+      - docker-books-net
+
+  wallabag:
+    image: wallabag/wallabag:latest
+    container_name: wallabag
+    restart: unless-stopped
+    ports:
+      - "8084:80"
+    volumes:
+      - "${HOME}/.config/wallabag-docker/data:/var/www/wallabag/var/data"
+      - "${HOME}/.config/wallabag-docker/images:/var/www/wallabag/web/assets/images" # For downloaded images in articles
+    environment:
+      TZ: "Europe/Oslo"
+      SYMFONY__ENV__DOMAIN_NAME: "http://${PRIMARY_IP:-localhost}:8084"
+      # Optional: For SQLite, usually default. For external DBs, configure more SYMFONY__ENV__ vars.
+      # Example for SQLite:
+      # SYMFONY__ENV__DATABASE_DRIVER: pdo_sqlite
+      # SYMFONY__ENV__DATABASE_PATH: /var/www/wallabag/var/data/db/wallabag.sqlite
+    networks:
+      - docker-books-net
+
+  freshrss:
+    image: linuxserver/freshrss:latest
+    container_name: freshrss
+    restart: unless-stopped
+    ports:
+      - "8085:80"
+    volumes:
+      - "${HOME}/.config/freshrss-docker:/config"
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: "Europe/Oslo"
+    networks:
+      - docker-books-net
+
+  mealie:
+    image: ghcr.io/mealie-recipes/mealie:latest
+    container_name: mealie
+    restart: unless-stopped
+    ports:
+      - "9090:9000"
+    volumes:
+      - "${HOME}/.config/mealie-docker/data:/app/data"
+    environment:
+      TZ: "Europe/Oslo"
+      # ALLOW_SIGNUP: true # Set to false after creating your admin user
+      # BASE_URL: "http://${PRIMARY_IP:-localhost}:9090" # If accessing via subfolder or different URL structure
+    networks:
+      - docker-books-net
+
+  stirling_pdf:
+    image: ghcr.io/stirling-tools/s-pdf:latest
+    container_name: stirling_pdf
+    restart: unless-stopped
+    ports:
+      - "8086:8080"
+    volumes:
+      - "${HOME}/.config/stirling-pdf-docker/config:/configs"
+      - "${HOME}/.config/stirling-pdf-docker/tessdata:/usr/share/tesseract-ocr/4.00/tessdata" # Optional: For OCR languages
+      # - "${HOME}/.config/stirling-pdf-docker/extraConfigs:/extraConfigs" # Optional: For custom settings
+    environment:
+      TZ: "Europe/Oslo"
+      DOCKER_STIRLING_PDF_SETTINGS_LOCALE: "en-US"
+      DOCKER_STIRLING_PDF_SETTINGS_DEFAULT_LANG_OCR: "eng" # Default OCR language
+    networks:
+      - docker-books-net
+
+  dokuwiki:
+    image: linuxserver/dokuwiki:latest
+    container_name: dokuwiki
+    restart: unless-stopped
+    ports:
+      - "8087:80"
+    volumes:
+      - "${HOME}/.config/dokuwiki-docker:/config"
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: "Europe/Oslo"
+    networks:
+      - docker-books-net
+
+  bookstack:
+    image: linuxserver/bookstack:latest
+    container_name: bookstack
+    restart: unless-stopped
+    ports:
+      - "8088:80"
+    volumes:
+      - "${HOME}/.config/bookstack-docker:/config"
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: "Europe/Oslo"
+      APP_URL: "http://${PRIMARY_IP:-localhost}:8088"
+      DB_SQLITE_ زیادہ_BUSY_TIMEOUT: "5000" # Optional: Increase timeout for SQLite on busy systems
+      # DB_HOST: your_db_host # Uncomment and set if using external DB
+      # DB_USER: your_db_user
+      # DB_PASS: your_db_password
+      # DB_DATABASE: your_db_name
+    networks:
+      - docker-books-net
+
+networks:
+  docker-books-net:
+    driver: bridge
+    name: docker-books-net
+
+# General Notes:
+# 1. Port Conflicts:
+#    Ensure host ports (8083, 5000, 8084, etc.) are not in use. Change the host port
+#    (left side of ':') if needed, e.g., "18083:8083".
+#
+# 2. Data Persistence:
+#    Volumes map host directories to container directories for persistent data.
+#    The script `docker-books.sh` will attempt to create these directories under ${HOME}/.config/.
+#
+# 3. Running the compose file:
+#    Use the `docker-books.sh` script, or run manually:
+#    `docker compose -f docker-books.yaml up -d`
+#    (Ensure an .env file with PRIMARY_IP is present if running manually and services require it)
+#
+# 4. Accessing UIs:
+#    See output from `docker-books.sh` or replace <your_docker_host_ip> with localhost or your IP.
+#    - Calibre-web: http://<your_docker_host_ip>:8083
+#    - Kavita:      http://<your_docker_host_ip>:5000
+#    - Wallabag:    http://<your_docker_host_ip>:8084
+#    - FreshRSS:    http://<your_docker_host_ip>:8085
+#    - Mealie:      http://<your_docker_host_ip>:9090
+#    - StirlingPDF: http://<your_docker_host_ip>:8086
+#    - DokuWiki:    http://<your_docker_host_ip>:8087
+#    - BookStack:   http://<your_docker_host_ip>:8088

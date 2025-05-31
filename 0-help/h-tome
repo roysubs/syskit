@@ -1,0 +1,95 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+
+# Tales of Maj'Eyal (ToME) Quick Notes
+
+## Core Actions
+
+| Key(s)         | Action                      |
+|----------------|-----------------------------|
+| \`7 8 9\` / \`y k u\` | Move Up-Left/Up/Up-Right    |
+| \`4 . 6\` / \`h . l\` | Move Left/Wait/Move Right   |
+| \`1 2 3\` / \`b j n\` | Move Down-Left/Down/Down-Right|
+
+| Key(s) | Action                      |
+|--------|-----------------------------|
+| \`5\` or \`.\` | Wait one turn               |
+| \`R\`    | Rest until healed/mana full |
+
+| Key(s)    | Action                      |
+|-----------|-----------------------------|
+| \`Enter\`   | Attack (when adjacent)      |
+| \`f\`       | Fire Missile/Shoot          |
+| \`t\`       | Targeting mode (\`*\` to confirm target)|
+
+## Interaction & Items
+
+| Key(s) | Action                      |
+|--------|-----------------------------|
+| \`g\`    | Pick up item(s)             |
+| \`d\`    | Drop item(s)                |
+| \`e\`    | Equip item                  |
+| \`u\`    | Unequip item                |
+| \`A\`    | Apply item (potions, etc.)  |
+
+| Key(s) | Action                      |
+|--------|-----------------------------|
+| \`a\`    | Activate generic talent/ability|
+| \`s\`    | Use Spell/Talent (class-specific)|
+
+| Key(s) | Action                      |
+|--------|-----------------------------|
+| \`;\`    | Look at a square/object     |
+
+## Information
+
+| Key(s) | Action                      |
+|--------|-----------------------------|
+| \`i\`    | Open Inventory              |
+
+| Key(s) | Action                      |
+|--------|-----------------------------|
+| \`E\`    | View Equipment              |
+
+| Key(s) | Action                      |
+|--------|-----------------------------|
+| \`C\`    | View Character Sheet        |
+| \`@\`    | View Status Effects         |
+
+| Key(s) | Action                      |
+|--------|-----------------------------|
+| \`M\`    | View Message Log            |
+
+| Key(s) | Action                      |
+|--------|-----------------------------|
+| \`m\`    | Open Map                    |
+
+| Key(s) | Action                      |
+|--------|-----------------------------|
+| \`S\`    | Save Game                   |
+| \`Q\`    | Quit Game                   |
+
+## Other
+
+| Key(s) | Action                      |
+|--------|-----------------------------|
+| \`:\`    | Enter Chat mode             |
+
+| Key(s) | Action                      |
+|--------|-----------------------------|
+| \`?\`    | Open Help Menu              |
+
+| Key(s) | Action                      |
+|--------|-----------------------------|
+| \`P\`    | View Prodigies (late game)  |
+
+| Key(s) | Action                      |
+|--------|-----------------------------|
+| \`=\`    | Open Options Menu           |
+
+EOF
+) | less -R

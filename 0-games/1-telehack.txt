@@ -1,0 +1,175 @@
+Telehack is a telnet-based simulation of a 1980s-style computer network, mimicking the feel of old-school hacking
+and BBS systems. It includes a mix of retro Unix commands, old files from ARPANET and Usenet, little Easter eggs,
+and fun commands like star wars that trigger ASCII art animations (like the famous ASCII Star Wars movie originally
+made by Simon Jansen).
+
+How to Use Telehack on Linux
+
+🔧 Step-by-step:
+Connect to Telehack via telnet:
+telnet telehack.com
+
+If you don’t have telnet installed, you can install it:
+Ubuntu/Debian: sudo apt install telnet
+Fedora:        sudo dnf install telnet
+Arch:          sudo pacman -S inetutils
+
+Once connected, you'll see a retro-style prompt. Try typing:
+star wars
+
+This usually plays the ASCII Star Wars animation (or something similar). If it doesn’t work, you can also try:
+telnet towel.blinkenlights.nl
+
+That’s the direct Star Wars ASCII movie.
+
+🧠 Other Telehack actions:
+Type help to see available commands.
+Use commands like ls, cat, grep, finger, and more.
+Try hacker, adventure, or messages for retro goodies.
+You can even explore a pseudo-ARPANET with netmap and connect to old-style "hosts".
+
+🔍 Exploration & Hacking Sim
+Command	Description
+help	Shows help – good starting point.
+netmap	Displays a map of connected hosts you can explore.
+connect [hostname]	Connect to a remote system on the netmap.
+who	See who else is online (yes, it's multi-user!).
+finger [user]	Get info about another user.
+hack [host]	Try to hack a system (game simulation, not real).
+scan	Scan for vulnerable hosts.
+files	Lists downloadable files or programs.
+
+🕹️ Retro Games & Fun
+Command	Description
+adventure	Play classic Colossal Cave Adventure.
+hacker	Type this to play a 1980s hacking simulation game.
+worms	Run a visual ASCII worm animation.
+tron	ASCII Tron lightcycle game.
+life	Runs Conway's Game of Life.
+
+🎞️ ASCII Art & Easter Eggs
+Command	Description
+star wars	Plays ASCII Star Wars (or a parody).
+cat /ascii/*.txt	Browse ASCII art. Try files like darth.txt, dragon.txt.
+ascii	Lists ASCII artwork available to view.
+matrix	Matrix-style text rain animation.
+figlet [text]	Generates big ASCII text banners.
+
+📁 Classic Unix Stuff
+Command	Description
+ls, cd, cat, grep, more	Old-school file browsing commands.
+fortune	Get a random Unix-style quote or joke.
+man	View help on available commands.
+editor	Opens a basic text editor, just like the old days.
+
+📖 Old Files & History
+Command	Description
+cd /doc	Go to the document archive.
+cat arpanet-history.txt	Read actual ARPANET historical content.
+cd /bbs	Simulated old Bulletin Board System files.
+cd /games	Access retro games and text adventures.
+You can spend hours poking around — it's like a digital museum for nerds and tinkerers.
+
+Let's go full retro hacker mode. Here's your guided tour through the best of Telehack—like you're living inside WarGames or Hackers.
+
+🧠 1. Basic Command Mastery
+Once you're connected (telnet telehack.com), try getting comfy with:
+
+help        # see the command index
+who         # who's online right now
+fortune     # get a random quote or Unix joke
+editor      # launches a tiny old-school text editor
+If you want to explore the file system like it’s 1983:
+
+ls          # list files
+cd /        # go to root
+cd /doc     # ARPANET files and internet history
+cd /bbs     # old Bulletin Board System stuff
+cat file.txt  # view a file
+Try:
+
+cat arpanet-history.txt
+cat hacker.txt
+cat welcome.msg
+
+🌐 2. ARPANET Explorer
+See the full fictional net with:
+netmap
+Use arrow keys or WASD to move around. Highlighted hosts can be connected to:
+connect [hostname]
+Once inside a host, try:
+ls
+cat notes.txt
+
+💡Some hosts have secrets or files like /etc/passwd. Try:
+cat /etc/passwd
+
+💻 3. Hack the Planet
+Telehack lets you play as a faux-hacker with commands like:
+scan       # find vulnerable hosts
+hack [host]  # attempt to hack a host
+hack all     # try mass-hacking everything
+It’s like a puzzle mini-game — some hosts are protected, some give rewards or access to extra areas.
+
+🎮 4. Play Retro Games
+Classics from the early PC era:
+adventure     # Colossal Cave Adventure
+star trek     # An old-school text-based strategy game
+tron          # ASCII lightcycle game
+hacker        # Retro hacker simulation game
+
+💻 5. Visual Fun & ASCII Art
+ASCII-based time-wasters and fun:
+star wars          # ASCII version of the movie (sometimes redirect to towel.blinkenlights.nl)
+matrix             # Text rain from The Matrix
+life               # Conway’s Game of Life
+figlet Hello!      # Huge ASCII letters
+ascii              # List ASCII art you can view
+cat /ascii/*.txt   # See what's in the collection
+
+Try:
+cat /ascii/darth.txt
+cat /ascii/dragon.txt
+cat /ascii/skull.txt
+🕵️ 6. Spy Files & Nerdy Gems
+
+Read vintage files from /doc or /bbs. A few bangers:
+cd /doc
+cat hacker-ethics.txt
+cat hacker-dictionary.txt
+cat arpanet-jargon.txt
+
+Or from /bbs:
+cd /bbs/phrack
+cat phrack-1.txt
+You’ll find fake “leaks,” newsletters, and the old-school vibe of BBS users trolling each other in pure ASCII.
+
+🛠️ 7. Do Some Light Sysadmining
+Explore what it felt like to be a sysop in the '80s:
+
+cat /etc/passwd         # See old-style Unix user list
+cat /etc/motd           # Message of the Day
+ps                      # Show processes
+kill [pid]              # (fake) kill a process
+
+Sometimes you’ll find user files like ~/mail, ~/notes.txt, or .plan files. Check:
+cd /users
+ls
+cd alice
+cat notes.txt
+
+🎯 Bonus Challenge: Find the Hidden Goodies
+You’re a digital archaeologist now. Try searching:
+grep -i password /doc/*
+grep -i nuke /doc/*
+grep -i aliens /doc/*
+You never know what you’ll dig up—fake logs, conspiracy texts, hacker manifestos.
+
+🧙 Want the Ultimate Nerd Move?
+Open a CRT-style terminal emulator (like Cool Retro Term).
+Fire up Telehack in full screen.
+Put on some ambient synthwave or WarGames soundtrack.
+Type: hacker
+Now you're living in the '80s.
+
+Let me know what you uncover or if you want a Telehack quest list. It’s like Zork for sysadmins

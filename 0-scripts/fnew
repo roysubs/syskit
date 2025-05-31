@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+
+# --- Help Function ---
+show_help() {
+cat << EOF
+Lists the N newest files in a specified directory.
+
+Usage: $(basename "$0") [directory] [number_of_files] [sudo_command]
+       $(basename "$0") -h | --help
+
+Arguments:
+  directory:        (Optional) Target directory to search.
+                    Defaults to the current directory (".").
+  number_of_files:  (Optional) Number of newest files to list.
+                    Defaults to 10.
+  sudo_command:     (Optional) Command to prefix 'find' if sudo privileges are needed
+                    (e.g., "sudo"). Defaults to no prefix.
+
+Examples:
+  $(basename "$0") /var/log 5
+  $(basename "$0") . 20
+  $(basename "$0") /root 50 sudo
+  $(basename "$0") -h
+EOF
+}
+
+# --- Argument Parsing for Help ---
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    show_help
+    exit 0
+fi
+
+# --- Configuration ---
+# Directory to search. Defaults to current directory if no argument is provided.
+dir="${1:-.}"
+# Number of newest files to list. Defaults to 10 if no second argument is provided.
+num="${2:-10}"
+# Set to "sudo" if sudo privileges are needed for find. Defaults to empty.
+use_sudo_prefix="${3:-}"
+
+# --- Basic Input Validation ---
+if [[ ! -d "$dir" ]]; then
+    echo "Error: Directory '$dir' not found." >&2
+    echo "Use $(basename "$0") -h or --help for usage instructions." >&2
+    exit 1
+fi
+if ! [[ "$num" =~ ^[0-9]+$ && "$num" -gt 0 ]]; then
+    echo "Error: Number of files '$num' must be a positive integer." >&2
+    echo "Use $(basename "$0") -h or --help for usage instructions." >&2
+    exit 1
+fi
+
+# --- Main execution ---
+
+echo "Listing the ${num} newest files in '${dir}' (use $(basename "$0") -h for options):"
+
+# Find will output Unix timestamp (seconds since epoch, with fractional part) and path
+# %T@ provides a sortable timestamp. %p is the path.
+find_output_format="%T@ %p\n"
+
+# Prepare the find command parts
+find_base_cmd_array=("find" "$dir" "-xdev" "-type" "f" "-printf" "$find_output_format")
+
+# AWK script to format the timestamp using gawk's built-in 'strftime' function
+# This is much more efficient than calling the external 'date' command for each line.
+# It takes lines like "1609459200.123456 /path/to/file"
+# and converts them to "YYYY-MM-DD HH:MM:SS /path/to/file"
+# This script assumes GNU Awk (gawk) is available.
+awk_formatter_script='
+{
+    timestamp_full = $1;  # First field is the timestamp (e.g., 1609459200.123456)
+    
+    # Reconstruct the filepath from the 2nd field to the end
+    filepath = "";
+    for (i = 2; i <= NF; i++) {
+        filepath = filepath (i == 2 ? "" : OFS) $i;
+    }
+
+    # Use gawk strftime for formatting. It needs an integer timestamp.
+    # The fractional part of timestamp_full (from %T@) ensures correct sorting before head.
+    int_timestamp = int(timestamp_full); 
+    
+    formatted_date = strftime("%Y-%m-%d %H:%M:%S", int_timestamp);
+    
+    print formatted_date " " filepath;
+}
+'
+
+# Display the conceptual command
+displayed_cmd_desc="# Effective command stages: "
+if [[ -n "$use_sudo_prefix" ]]; then
+    displayed_cmd_desc+="$use_sudo_prefix "
+fi
+displayed_cmd_desc+="$(printf "%q " "${find_base_cmd_array[@]}")" # Shows the find part
+displayed_cmd_desc+="| sort -rnk1,1 | head -n \"${num}\" | gawk '{...strftime()...}'" # Quoted num
+
+echo "${displayed_cmd_desc}"
+echo # Blank line for readability
+
+# Start timer (GNU date for %N nanoseconds)
+start_time=$(date +%s.%N)
+
+# Execute the command pipeline
+set -o pipefail # Exit immediately if a command in the pipeline fails
+pipeline_output=""
+pipeline_exit_status=0
+
+# Construct the full pipeline
+# Using gawk instead of awk for strftime
+if [[ -n "$use_sudo_prefix" ]]; then
+    pipeline_output=$($use_sudo_prefix "${find_base_cmd_array[@]}" | \
+                        sort -rnk1,1 | \
+                        head -n "$num" | \
+                        gawk "$awk_formatter_script")
+    pipeline_exit_status=$?
+else
+    pipeline_output=$("${find_base_cmd_array[@]}" | \
+                        sort -rnk1,1 | \
+                        head -n "$num" | \
+                        gawk "$awk_formatter_script")
+    pipeline_exit_status=$?
+fi
+
+set +o pipefail # Reset pipefail option
+
+# Print the captured output
+if [[ -n "$pipeline_output" ]]; then
+    echo "$pipeline_output"
+fi
+
+# Check if the pipeline encountered an issue
+if [[ $pipeline_exit_status -ne 0 ]]; then
+    echo # Ensure newline if error message comes after output
+    # Status 141 is common if head closes the pipe, often not a critical error if output is present
+    if [[ $pipeline_exit_status -eq 141 && -n "$pipeline_output" ]]; then
+        echo "Info: Command pipeline ended with status 141 (likely 'head' closing pipe as expected)." >&2
+    else
+        echo "Warning: The command pipeline exited with status ${pipeline_exit_status}." >&2
+        echo "         This might indicate an issue. Check for errors from 'find', 'sort', 'head' or 'gawk'." >&2
+    fi
+fi
+
+# End timer and calculate duration
+end_time=$(date +%s.%N)
+# LC_NUMERIC=C ensures dot as decimal separator for bc
+elapsed_time=$(LC_NUMERIC=C printf "%.3f" "$(echo "$end_time - $start_time" | bc -l)")
+
+echo -e "\nExecution time: ${elapsed_time} seconds"

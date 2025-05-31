@@ -1,0 +1,143 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Bash History Mastery
+
+# Detailed explanation of history search keybindings:
+Ctrl+R (reverse-search-history):
+This is the most common and useful interactive history search.
+Press Ctrl+R, then start typing a string. Bash (or your shell's
+readline library) will search backwards through your history for the
+most recent command matching the string you've typed so far.
+- To find older matches, press Ctrl+R again (while the search is active).
+- To accept the currently displayed command, press Enter.
+- To edit the command before running it, press the Left or Right arrow key,
+  Home, End, or Ctrl+E.
+- To exit the search without running a command, press Ctrl+G or Ctrl+C.
+
+Ctrl+S (forward-search-history):
+This performs a *forward* incremental search through history (newer entries).
+**IMPORTANT NOTE:** On many terminal setups (including potentially yours
+via SSH from Windows Powershell/Windows Terminal), Ctrl+S is traditionally
+mapped to XOFF (Transmit Off), which pauses terminal output. This is likely
+why it doesn't appear to work for history search for you. To use Ctrl+S for
+history search, the XOFF binding needs to be disabled in the terminal
+settings or via the 'stty -ixon' command (though 'stty -ixon' might not
+persist or work reliably depending on your full setup).
+
+Ctrl+G (abort):
+This keybinding is used to abort the current readline editing mode,
+including history searches (started with Ctrl+R or Ctrl+S). If you are
+in a history search and press Ctrl+G, it will exit the search mode
+and return you to a normal command prompt line, leaving any partial
+text you had typed before starting the search. Similar to Ctrl+S,
+the binding for Ctrl+G can sometimes be affected by terminal settings,
+though it's less commonly remapped than Ctrl+S.
+
+## 🔍 Interactive History Search (Readline)
+
+### Ctrl-r
+- Reverse search history as you type.
+- Incrementally matches previous commands.
+- Keeps updating the match as you type more characters.
+
+### Ctrl-s
+- **Forward** search through history (useful after Ctrl-r).
+- ⚠️ Often disabled (XON/XOFF flow control). To enable:
+
+```bash
+stty -ixon
+```
+
+### While in search:
+| Key        | Function                                           |
+|------------|----------------------------------------------------|
+| `Ctrl-g`   | Cancel search and restore original line.           |
+| `Ctrl-e`   | Accept the current match and move to end of line.  |
+| `←/→`      | Exit search mode and move cursor in command.       |
+| `Enter`    | Run the selected history command.                  |
+| `Ctrl-r`   | Continue searching backward.                       |
+| `Ctrl-s`   | Continue searching forward (if enabled).           |
+
+---
+
+## 🧠 Word Designators
+
+Use these with `!` (event designator) to refer to past commands:
+
+| Designator | Meaning                       | Example            |
+|------------|-------------------------------|--------------------|
+| `!!`       | Previous command               | `sudo !!`          |
+| `!n`       | Command number `n`             | `!119`             |
+| `!-n`      | `n` commands ago               | `!-2`              |
+| `!string`  | Most recent command starting with `string` | `!grep` |
+
+### Word Selection
+| Selector   | Description                        | Example                 |
+|------------|------------------------------------|-------------------------|
+| `:0`       | First word (usually command)       | `!!:0`                  |
+| `:1`       | Second word                        | `!!:1`                  |
+| `:$`       | Last word                          | `!!:$`                  |
+| `:*`       | All except command                 | `!!:*`                  |
+| `:1*`      | From second word to end            | `!!:1*`                 |
+| `:1-3`     | Words 1 to 3                        | `!!:1-3`                |
+
+---
+
+## 🔧 Modifiers
+
+| Modifier   | Meaning                                     | Example                     |
+|------------|---------------------------------------------|-----------------------------|
+| `:h`       | Head — remove last path component           | `!!:$:h` (→ directory)      |
+| `:t`       | Tail — last path component only             | `!!:$:t` (→ filename)       |
+| `:r`       | Remove file extension                       | `!!:$:r`                    |
+| `:r:r`     | Remove multiple extensions                  | `archive.tar.gz → archive` |
+| `:e`       | Extract extension                           | `file.txt → txt`           |
+| `:p`       | Print, don't execute                        | `!!:1:p`                    |
+
+### Quick Fix Typo
+```bash
+cat /etc/hosst
+^hosst^hosts^
+```
+
+---
+
+## 🧰 History Maintenance
+
+| Command             | Function                                     |
+|---------------------|----------------------------------------------|
+| `history`           | Show current shell history                   |
+| `history n`         | Show last `n` commands                       |
+| `!n`, `!cmd`, etc.  | Recall specific commands (see above)         |
+| `history -d n`      | Delete history entry `n`                     |
+| `history -c`        | Clear history                                |
+
+### File operations
+
+| Command       | Purpose                                      |
+|---------------|----------------------------------------------|
+| `history -a`  | Append new session entries to history file   |
+| `history -r`  | Read history file and append to session      |
+| `history -w`  | Write current history to history file        |
+| `history -n`  | Read new lines from history file             |
+
+💡 Combine with `.bashrc`:
+
+```bash
+# Save history immediately on each command
+PROMPT_COMMAND='history -a; history -n'
+```
+
+---
+
+## 📚 Further reading
+
+- [Bash History Expansion](https://www.gnu.org/software/bash/manual/html_node/History-Interaction.html)
+- [DigitalOcean Bash History Tips](https://www.digitalocean.com/community/tutorials/how-to-use-bash-history-commands-and-expansions-on-a-linux-vps)
+
+EOF
+) | less -R

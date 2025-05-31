@@ -1,0 +1,129 @@
+# Ascii Sector: Information and Installation
+
+It appears the official website for Ascii Sector has issues with its download links, making it difficult to directly download the Linux version using the original script. This document provides alternative ways to experience Ascii Sector and includes a modified installation script structure, assuming you can find a working Linux download link elsewhere.
+
+## Official Website Download Issues
+
+As you've experienced, attempting to download Ascii Sector directly from the official website (`http://www.laserbrainstudios.com/download.php?name=asciiseclinux64`) currently results in a connection failure after a redirect. This indicates the primary download method from the official source is not functional at this time.
+
+## Alternative Ways to Play Ascii Sector
+
+While the direct Linux download is problematic, you can still play Ascii Sector through emulation via the Internet Archive:
+
+### Play in DOSBox via Internet Archive
+
+You can play the DOS version of Ascii Sector directly in your browser using the DOSBox emulator hosted on the Internet Archive.
+
+* **Link:** <https://archive.org/details/msdos_Ascii_Sector_2007>
+
+This is a convenient way to experience the game without needing to install anything locally.
+
+### Windows Version on Internet Archive
+
+If you have a Windows system or prefer to use a Windows emulator (like Wine on Linux), the Windows version is available for download on the Internet Archive.
+
+* **Link:** <https://archive.org/details/asciisec0.7.2-win_202102>
+
+### Roguelike Mega Collection 2015
+
+The Internet Archive also hosts a large collection of roguelike games, which includes Ascii Sector. This collection might be of interest if you enjoy this genre.
+
+* **Link:** <https://archive.org/details/RoguelikeMegaCollection2015_201708>
+
+You can find many other emulators and classic software on the Internet Archive's emulation page: <https://archive.org/details/emulation>
+
+## Linux Installation Script (Requires a Working Download)
+
+If you manage to find a working download link for the Linux version of Ascii Sector from a source other than the official website, you can use a script similar to the one below to install it. **Note:** The `DOWNLOAD_URL` in this script is the original, likely non-functional one. You will need to **replace this URL** with the working link you find.
+
+```bash
+#!/bin/bash
+
+# Define the download URL - *** REPLACE THIS WITH A WORKING LINUX DOWNLOAD LINK ***
+# The official site link below is currently not working.
+DOWNLOAD_URL="http://www.laserbrainstudios.com/download.php?name=asciiseclinux64"
+
+# Define the target directory for installation (e.g., in your home directory)
+INSTALL_DIR="$HOME/asciisector"
+# Define the name for the downloaded file (adjust if the file name is different)
+DOWNLOAD_FILE="asciisector_linux64.tar.gz"
+
+echo "Starting Ascii Sector installation script..."
+
+# --- IMPORTANT: Before running, ensure DOWNLOAD_URL points to a working Linux download! ---
+
+# 1. Download the file
+echo "Attempting to download Ascii Sector from $DOWNLOAD_URL..."
+# Use -O to specify the output filename
+wget -O "$DOWNLOAD_FILE" "$DOWNLOAD_URL"
+
+# Check if the download was successful
+if [ $? -ne 0 ]; then
+    echo "Error: Download failed. The provided URL might be incorrect or the server is unreachable."
+    echo "Please verify the DOWNLOAD_URL in the script and try again."
+    exit 1
+fi
+
+echo "Download complete."
+
+# 2. Create the installation directory if it doesn't exist
+echo "Creating installation directory: $INSTALL_DIR..."
+mkdir -p "$INSTALL_DIR"
+
+# Check if the directory creation was successful
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to create installation directory."
+    exit 1
+fi
+
+echo "Installation directory created."
+
+# 3. Extract the archive into the installation directory
+echo "Extracting $DOWNLOAD_FILE to $INSTALL_DIR..."
+# Use -x for extract, -z for gzip (for .tar.gz), -v for verbose, -f for filename, -C for changing directory
+# If the downloaded file is a different format (e.g., .zip), you'll need a different extraction command (e.g., unzip)
+tar -xzf "$DOWNLOAD_FILE" -C "$INSTALL_DIR"
+
+# Check if extraction was successful
+if [ $? -ne 0 ]; then
+    echo "Error: Extraction failed. The downloaded file might be corrupted or not a valid archive."
+    echo "Attempting to remove the potentially bad download file: $DOWNLOAD_FILE"
+    rm -f "$DOWNLOAD_FILE" # Use -f to force removal without prompt
+    exit 1
+fi
+
+echo "Extraction complete."
+
+# 4. Clean up the downloaded archive
+echo "Removing downloaded archive $DOWNLOAD_FILE..."
+rm -f "$DOWNLOAD_FILE" # Use -f to force removal without prompt
+
+echo "Cleanup complete."
+
+# 5. Make the main executable file runnable
+# Assuming the executable is named 'asciisector' within the extracted directory
+# You might need to adjust 'asciisector' if the actual executable name is different
+EXECUTABLE_PATH="$INSTALL_DIR/asciisector" # Adjust 'asciisector' if needed
+
+if [ -f "$EXECUTABLE_PATH" ]; then
+    echo "Making executable file runnable: $EXECUTABLE_PATH..."
+    chmod +x "$EXECUTABLE_PATH"
+    echo "Executable is now runnable."
+
+    # 6. Optional: Add the installation directory to the PATH for easy access
+    # This makes the 'asciisector' command available from any terminal session
+    echo "Adding $INSTALL_DIR to your PATH..."
+    # Add to .bashrc (or your shell's equivalent config file like .bash_profile or .zshrc)
+    echo "export PATH="$PATH:$INSTALL_DIR"" >> ~/.bashrc
+    echo "Please run 'source ~/.bashrc' or open a new terminal session for the changes to take effect."
+else
+    echo "Warning: Could not find the expected executable file at $EXECUTABLE_PATH."
+    echo "You may need to manually navigate to $INSTALL_DIR and find the correct executable, then make it runnable using 'chmod +x <executable_name>'."
+    echo "The contents of the installation directory are in $INSTALL_DIR."
+fi
+
+echo "Ascii Sector installation script finished."
+echo "If the executable was found and added to PATH, you can try running it by typing 'asciisector' after sourcing your .bashrc or opening a new terminal."
+
+```
+

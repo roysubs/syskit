@@ -1,0 +1,70 @@
+#!/bin/bash
+
+# Show usage if -h is passed
+if [[ "$1" == "-h" ]]; then
+    echo "Usage: $(basename "$0") [days] [directory] [-s] [-h]"
+    echo "  days:       (optional) Number of days to look back (default: 1, today)."
+    echo "  directory:  (optional) Target directory (default: current directory)."
+    echo "  -s          (optional) Use sudo for find command."
+    echo "  -h          Show this help."
+    echo "Note: days/directory can be in any order and will be determined dynamically."
+    exit 0
+fi
+
+# Default values
+days=1
+dir="."
+use_sudo=""
+
+# Check for -s flag
+if [[ "$1" == "-s" || "$2" == "-s" || "$3" == "-s" ]]; then
+    use_sudo="sudo"
+fi
+
+# Function to check if a value is a positive integer
+is_number() {
+    [[ "$1" =~ ^[0-9]+$ ]]
+}
+
+# Parse arguments dynamically
+for arg in "$@"; do
+    if is_number "$arg"; then
+        days="$arg"
+    elif [[ -d "$arg" ]]; then
+        dir="$arg"
+    fi
+done
+
+# Convert days to find format (-mtime uses whole days, negative includes today)
+mtime=$((days - 1))
+start_time=$(date +%s)
+
+# Define the find command
+find_cmd="$use_sudo find \"$dir\" -xdev -type f -mtime -$days -printf '%T@ %p\n' | sort -n"
+
+# Display the command before execution
+echo "Executing: $find_cmd | awk '{ timestamp = \$1; \$1 = \"\"; print strftime(\"%Y-%m-%d %H:%M:%S\", timestamp), substr(\$0,2) }'"
+echo
+
+# Execute the command and capture output
+output=$(eval "$find_cmd" | awk '{
+    timestamp = $1;
+    $1 = "";
+    print strftime("%Y-%m-%d %H:%M:%S", timestamp), substr($0,2)
+}')
+
+# Count the number of results
+file_count=$(echo "$output" | wc -l)
+
+# Calculate start time (midnight X days ago)
+cutoff_date=$(date -d "$days days ago" "+%Y-%m-%d 00:00:00")
+
+# Print results
+echo "$output"
+
+# Display summary
+echo -e "\nFound $file_count files modified since $cutoff_date"
+end_time=$(date +%s)
+elapsed=$((end_time - start_time))
+echo "Execution time: ${elapsed} seconds"
+

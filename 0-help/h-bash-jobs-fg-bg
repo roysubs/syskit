@@ -1,0 +1,97 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Bash Foreground and Background Processes
+
+## How to Suspend a Session (like Vim) and bring it back to the foreground
+
+Press `Ctrl+Z` to send a currently running app (e.g. Vim) to the background and return to the shell prompt.
+Note that the app sent to the background is also suspended / paused.
+Type `fg` to bring the suspended app back to the foreground and resume it from where it left off.
+
+## Multiple Suspended Jobs
+
+If you have multiple suspended jobs, you can specify which job to resume by using `fg %n`, where `n` is the job number.
+Type `jobs` to see a list of suspended jobs. This will display something like:
+```bash
+[1]+  Stopped  vim somefile.txt
+```
+
+Type `fg %1` to resume the job listed as [1].
+
+# Understanding `[n]`, `+`, `-`, and `bg` in Unix Shell Job Control
+
+## `[n]` — Job Number
+
+This is the shell's internal job ID, shown in square brackets. You use it to refer to a job when manipulating it with commands like `fg`, `bg`, or `kill`.
+
+## Job Selection Markers `+` and `-`
+
+These symbols help identify which job is the current or next one if you run `fg` or `bg` without specifying a job number.
+
+| Symbol | Meaning                                                               |
+|--------|-----------------------------------------------------------------------|
+| `+`    | Current job — `fg` or `bg` will use this job by default               |
+| `-`    | Previous job — second in priority                                     |
+| (none) | Other jobs — not affected unless explicitly referenced                |
+
+Example:
+```bash
+[1]-  Running    ./a_script.sh &
+[2]+  Stopped    ./b_script.sh
+```
+
+- Job `[2]` is the current job (`+`)
+- Job `[1]` is the previous job (`-`)
+
+---
+
+## `bg` — Backgrounding a Suspended Job
+
+If a job is suspended (e.g., using `Ctrl+Z`), `bg` resumes it in the background.
+
+---
+
+## Quick Test Example
+
+You can try the following steps in any Bash shell:
+
+```bash
+# Step 1: Run a long-running command
+sleep 60
+
+# Step 2: Suspend it with Ctrl+Z (this stops it and returns to shell)
+# You'll see something like:
+# [1]+  Stopped   sleep 60
+
+# Step 3: Resume it in the background
+bg
+
+# Step 4: Check job status
+jobs
+
+# You should see:
+# [1]+  Running   sleep 60 &
+
+# Step 5: Bring it back to the foreground
+fg
+
+# Press Ctrl+C to cancel it if you like
+```
+
+---
+
+## Summary
+
+- `[n]` = job number
+- `+` = current default job for `fg` or `bg`
+- `-` = next job in line
+- `bg` = resumes a suspended job in the background
+
+Use `jobs`, `fg`, and `bg` to manage background/suspended tasks easily in your shell.
+
+EOF
+) | less -R

@@ -1,0 +1,83 @@
+services:
+  jellyfin:
+    image: linuxserver/jellyfin # Or jellyfin/jellyfin
+    container_name: jellyfin-media-server # Matches PROJECT_NAME-container_name-1 if compose generates it like that, or just 'jellyfin'
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Oslo # Set your timezone
+      # - JELLYFIN_PublishedServerUrl=http://your.server.ip:8096 # Optional, for remote access if needed
+    volumes:
+      - /home/youruser/.config/media_servers_pack/jellyfin:/config # Matches HOST_DIRS
+      - /path/to/your/tvshows:/data/tvshows
+      - /path/to/your/movies:/data/movies
+      # Add other media types as needed
+    ports:
+      - "8096:8096" # HTTP
+      # - "8920:8920" # HTTPS (if you configure SSL in Jellyfin)
+      # - "7359:7359/udp" # Optional: For DLNA / client discovery
+      # - "1900:1900/udp" # Optional: For DLNA / client discovery
+    restart: unless-stopped
+
+  plex:
+    image: linuxserver/plex # Or plexinc/pms-docker
+    container_name: plex-media-server
+    # network_mode: host # Often recommended for Plex for easier discovery, but bridge mode below also works
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Oslo
+      - VERSION=docker
+      - PLEX_CLAIM=YOUR_PLEX_CLAIM_TOKEN # Get from plex.tv/claim for initial setup
+    volumes:
+      - /home/youruser/.config/media_servers_pack/plex:/config # Matches HOST_DIRS
+      - /tmp/plex_transcode:/transcode # Optional: for transcoding temp files
+      - /path/to/your/tvshows:/data/tvshows
+      - /path/to/your/movies:/data/movies
+      # Add other media types as needed
+    ports:
+      - "32400:32400/tcp" # Main web UI, API
+      # Add other Plex ports as needed (see Plex Docker documentation for full list if not using host networking)
+      # - "3005:3005/tcp" # Plex Companion
+      # - "8324:8324/tcp" # Plex DLNA Server
+      # - "32469:32469/tcp" # Plex DLNA Server
+      # - "1900:1900/udp" # Plex DLNA Server (discovery)
+      # - "32410:32410/udp" # GDM network discovery
+      # - "32412:32412/udp" # GDM network discovery
+      # - "32413:32413/udp" # GDM network discovery
+      # - "32414:32414/udp" # GDM network discovery
+    restart: unless-stopped
+
+  emby:
+    image: linuxserver/emby # Or emby/embyserver
+    container_name: emby-media-server
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Oslo
+    volumes:
+      - /home/youruser/.config/media_servers_pack/emby:/config # Matches HOST_DIRS
+      - /path/to/your/tvshows:/data/tvshows # Example path, adjust as needed
+      - /path/to/your/movies:/data/movies   # Example path, adjust as needed
+      # Add other media types as needed
+    ports:
+      - "8097:8096" # IMPORTANT: Mapping internal 8096 to host 8097 to avoid conflict with Jellyfin
+      # - "8921:8920" # HTTPS (if you configure SSL in Emby, map to different host port like 8921)
+    restart: unless-stopped
+
+# Optional: Define a custom bridge network for these services to communicate if needed
+# networks:
+#   media-network:
+#     driver: bridge
+
+# And then assign services to it:
+# services:
+#   jellyfin:
+#     networks:
+#       - media-network
+#   plex:
+#     networks:
+#       - media-network
+#   emby:
+#     networks:
+#       - media-network

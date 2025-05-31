@@ -1,0 +1,137 @@
+# Note on paths with '~/' (home directory):
+# Docker Compose might not expand '~/' consistently across all operating systems
+# or Docker versions out of the box.
+# - On Linux/macOS, using '${HOME}/.config/...' is often more robust.
+# - Docker Desktop for Windows and macOS usually handles '~/' correctly.
+# If you encounter issues, replace '~/' with the absolute path to your home
+# directory or use '${HOME}'.
+#
+# Example for Portainer on Linux/macOS if '~/' fails:
+# volumes:
+#   - ${HOME}/.config/portainer-docker:/data
+
+# name: docker-managers
+
+services:
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "~/.config/portainer-docker:/data"
+    networks:
+      - docker-managers-net
+
+  yacht:
+    image: selfhostedpro/yacht:latest
+    container_name: yacht
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "~/.config/yacht-docker:/config"
+    environment:
+      TZ: "Europe/Oslo"
+    networks:
+      - docker-managers-net
+
+  dockge:
+    image: louislam/dockge:1
+    container_name: dockge
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "~/.config/dockge-docker/data:/app/data"
+      - "~/dockge_compose_stacks:/opt/stacks"
+    environment:
+      DOCKGE_STACKS_DIR: "/opt/stacks"
+      TZ: "Europe/Oslo"
+    networks:
+      - docker-managers-net
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    restart: unless-stopped
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    ports:
+      - "8081:8080"
+    environment:
+      DOZZLE_NO_ANALYTICS: "true"
+      TZ: "Europe/Oslo"
+    networks:
+      - docker-managers-net
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    environment:
+      TZ: "Europe/Oslo"
+      # WATCHTOWER_CLEANUP: "true"
+      # WATCHTOWER_SCHEDULE: "0 0 4 * * *"
+    networks:
+      - docker-managers-net
+
+  diun:
+    image: crazymax/diun:latest
+    container_name: diun
+    restart: unless-stopped
+    ports:
+      - "8082:8000" # Host port 8082 maps to Diun's internal web UI port 8000
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro" # Read-only access to Docker socket
+      - "~/.config/diun-docker:/data"                 # For diun.yml configuration and database
+    environment:
+      TZ: "Europe/Oslo" # Set your timezone
+      LOG_LEVEL: "info"
+      DIUN_WATCH_SCHEDULE: "0 */6 * * *"  # Check for updates every 6 hours
+      DIUN_PROVIDERS_DOCKER: "true"       # Enable Docker provider to watch running containers
+      # DIUN_PROVIDERS_DOCKER_WATCHBYDEFAULT: "false" # Optional: Set to true to watch all, false to only watch if diun.enable=true label is present
+    networks:
+      - docker-managers-net
+
+networks:
+  docker-managers-net:
+    driver: bridge
+    name: docker-managers-net
+
+
+# General Notes:
+# 1. Port Conflicts:
+#    The `ports` section is defined as `<HOST_PORT>:<CONTAINER_PORT>`.
+#    Ensure the host ports (9443, 9000, 8001, 5001 in this example) are not
+#    already in use on your system. If they are, change the `<HOST_PORT>` part.
+#    For example, if 9443 is taken, you could use "19443:9443" for Portainer.
+#
+# 2. Data Persistence:
+#    The `volumes` section maps directories from your host machine into the containers.
+#    - `~/.config/portainer-docker` for Portainer
+#    - `~/.config/yacht-docker` for Yacht
+#    - `~/.config/dockge-docker/data` for Dockge's internal data
+#    - `~/dockge_compose_stacks` for Docker Compose files managed by Dockge
+#    Make sure you have appropriate permissions to create/write to these
+#    directories on your host, or create them manually beforehand.
+#
+# 3. Running the compose file:
+#    Save this content as `docker-compose.yaml` in a directory.
+#    Navigate to that directory in your terminal and run:
+#    `docker-compose up -d`
+#
+# 4. Accessing the UIs:
+#    - Portainer: http://<your_docker_host_ip>:9000 or https://<your_docker_host_ip>:9443
+#    - Yacht:     http://<your_docker_host_ip>:8001
+#    - Dockge:    http://<your_docker_host_ip>:5001
+#    Replace `<your_docker_host_ip>` with `localhost` if running on your local machine.

@@ -1,0 +1,86 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# h- help system 
+These are a set of customised help and summary files in Markdown format.
+This format proved useful to remember various topics. They are put onto the path at /usr/local/bin.
+Use h- then hit tab twice to see available topics.
+Some may be incomplete or works in progress, as find out various new and useful information.
+
+# Selected terminal tricks:
+
+- Ctrl + z, put current app into background, then 'fg' to bring it to foreground later (very useful with vim etc).
+- Ctrl + s, pause a job in the terminal (keeping it in the foreground). Ctrl + q to resume the job.
+- Ctrl + l, clear screen (doesn't remove anything, just pushes the current prompt to top of screen; note that the same default binding also works in PowerShell on Windows).
+- shopt -s histappend   # Allow multiple sessions to append to history at same time.
+- sudo !!               # Repeat last command, but with 'sudo'.
+- Ctrl + Shift + c      # For graphical environment terminals, copy the highlighted text.
+- Ctrl + Shift + v      # For graphical environment terminals, paste the highlighted text.
+
+bind -p  # Show all bash bindings, note the following:
+Ctrl + l (clears screen)
+Ctrl + z
+Ctrl + arrow (move forward a word)
+Alt  + f (move forward a word)
+Alt  + b (move backward a word)
+Ctrl + e (move cursor to end)
+Ctrl + a (move cursor to start)
+Ctrl + _ (undo)
+Ctrl + x + * (expand glob/star)
+Ctrl + x followed by ctrl + e (opens the command string in an editor so that you can edit it before execution)
+Ctrl + xx (move to the opposite end of the line)
+Ctrl + u (cuts everything before the cursor)
+Ctrl + k (cuts everything after the cursor)
+Ctrl + y (pastes from the buffer)
+Ctrl + t (swap two characters)
+Alt  + t (swap two words)
+Alt  + . (prints last argument from previous command)
+
+# Using tmux vs Windows Terminal, when connecting from remote Windows system.
+In Microsoft Terminal, right-click on the tab-name > Split.
+This can be as useful as tmux (though does not have the advanced features of tmux)
+
+## Find information on files
+which command to find out where a command that you have seen is located and the 'file' command to inspect the binary:
+```bash
+$ which somecommand
+/usr/bin/somecommand
+
+$ file /usr/bin/ls
+/usr/bin/ls: ELF 64-bit LSB pie executable x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=d4e02b88e596e4f82c6cc62a5bc4ce5827209a49, stripped
+```
+
+The most important information here for most users is the `ELF 64-bit LSB` nonsense which means it is a precompiled binary as opposed to a script or other type of executable. A related tool is `command`Simply running command -V <command> will give you different types of information:
+```bash
+$ command -V ls
+ls is aliased to `ls --color=auto` 
+
+$ command -V bash
+bash is /usr/bin/bash
+
+$ command -V shopt
+shopt is a shell builtin
+```
+
+# Running commands in sequence
+`&&` (run second command if the first is successful)
+`;` (run second command regardless of success of first one)
+
+# Redirecting I/O
+`2>&1` (redirect stdout and stderr to a file)
+
+# check for open ports
+`echo > /dev/tcp/<server ip>/<port>`
+`\`\`` (use back ticks to shell out)
+
+# Examine executable
+```bash
+which <command>
+file <path/to/file>
+command -V <some command binary> (tells you whether <some binary> is a built-in, binary or alias)
+```
+EOF
+) | less -R

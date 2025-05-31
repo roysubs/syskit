@@ -1,0 +1,653 @@
+ichiban/dwarffortress or similar. Web UI?: Often No (Usually requires VNC or X forwarding setup)
+
+Dashboards (Organizr, Dashy, Heimdall, Homepage): This is where the magic of a curated dashboard comes in! They generally don't automatically scan your network and find every active web service on every port. Instead, they work by manual configuration. You tell the dashboard:
+"I have Plex running at 192.168.1.100:32400"
+"I have Portainer running at 192.168.1.100:9443"
+"I have qBittorrent running at 192.168.1.100:8080"
+You add an entry for each service you want quick access to, providing its name, URL (IP address or hostname, plus the port), and often you can pick a nice icon. Some advanced dashboards might integrate with Docker labels to auto-discover services if you label your containers appropriately, but they are primarily organized launchpads for your known services, not live network scanners. They provide a single, visually appealing place to bookmark and access all your self-hosted apps.
+
+Speedtest Tracker: Glad that one resonates! It is indeed cool to see how your internet speed performs over time and spot trends or issues. It's a great example of a simple utility container that provides valuable information via a web UI.
+
+Nitter: You are absolutely right to be cautious about Nitter and similar alternative frontends for major services like Twitter/X or YouTube (like Invidious from the list). These projects typically work by scraping the public-facing website or using unofficial/undocumented APIs.
+Is it reliable? This is the challenge. Because they rely on the underlying service not changing its public interface or actively trying to block scrapers, they are inherently fragile. When Twitter/X makes changes to its website structure, adds new features, or implements anti-bot measures, Nitter can (and frequently does) break.
+Are they maintained? The developers of Nitter and similar projects constantly work to update them when the upstream service breaks them. However, there can be periods where the service is partially or completely non-functional until the developers figure out how to adapt.
+So, while useful for privacy and alternative access when they are working, you should expect Nitter (and others like Invidious) to experience downtime or glitches whenever the service they rely on makes significant changes. They are community-driven efforts playing a perpetual game of catch-up.
+
+
+Curated List of Docker Containers
+
+Audiobookshelf
+Image: ghcr.io/advplyr/audiobookshelf
+Web UI?: Yes
+Description: A self-hosted audiobook and podcast server, specifically designed for audio content.
+
+Navidrome
+Image: deluan/navidrome
+Web UI?: Yes
+Description: A modern, open-source music server and streamer, inspired by Subsonic.
+
+qBittorrent-nox
+Image: linuxserver/qbittorrent (or other community images like qbittorrent/qbittorrent)
+Web UI?: Yes
+Description: A lightweight and powerful BitTorrent client with a web user interface.
+
+Syncthing
+Image: lscr.io/linuxserver/syncthing (or syncthing/syncthing)
+Web UI?: Yes
+Description: A continuous file synchronization program that syncs files between two or more computers in real time.
+
+Transmission
+Image: linuxserver/transmission (or ghcr.io/linuxserver/transmission)
+Web UI?: Yes
+Description: A simple and popular BitTorrent client with a web interface.
+
+Deluge
+Image: linuxserver/deluge (or ghcr.io/linuxserver/deluge)
+Web UI?: Yes
+Description: A feature-rich BitTorrent client with client/server architecture and a web UI.
+
+SABnzbd
+Image: linuxserver/sabnzbd (or ghcr.io/linuxserver/sabnzbd)
+Web UI?: Yes
+Description: A Usenet binary downloader with a web interface.
+
+NZBGet
+Image: linuxserver/nzbget (or ghcr.io/linuxserver/nzbget)
+Web UI?: Yes
+Description: A highly efficient Usenet downloader, known for performance, with a web UI.
+
+Jellyfin
+Image: jellyfin/jellyfin
+Web UI?: Yes
+Description: A free and open-source media system that takes care of managing, serving, and streaming your media.
+
+Emby
+Image: emby/embyserver
+Web UI?: Yes
+Description: A personal media server that organizes and streams audio and video to various devices (some features require subscription).
+
+PhotoPrism
+Image: photoprism/photoprism
+Web UI?: Yes
+Description: An AI-powered photos app for Browse, organizing, and sharing your personal photo collection.
+
+Immich
+Image: ghcr.io/immich-app/immich (Requires multiple containers - microservices)
+Web UI?: Yes
+Description: A self-hosted photo and video backup solution, modern and feature-rich.
+
+Nextcloud
+Image: nextcloud:fpm (Requires a database container like MariaDB/PostgreSQL and a web server like Nginx)
+Web UI?: Yes (Primary)
+Description: A suite of client-server software for creating file hosting and content collaboration services.
+
+Owncloud
+Image: owncloud/server (Often requires a database container)
+Web UI?: Yes (Primary)
+Description: A suite of client-server software for creating and using file hosting services (alternative to Nextcloud).
+Home Assistant
+
+Image: ghcr.io/home-assistant/home-assistant:stable
+Web UI?: Yes
+Description: A free and open-source software for home automation.
+
+Node-RED
+Image: nodered/node-red
+Web UI?: Yes (Flow editor)
+Description: A flow-based programming tool for wiring together hardware devices, APIs, and online services.
+
+Pi-hole
+Image: pihole/pihole
+Web UI?: Yes (Admin interface)
+Description: A network-wide ad blocker acting as a DNS server.
+AdGuard Home
+
+Image: adguard/adguardhome
+Web UI?: Yes (Admin interface)
+Description: A network-wide software for blocking ads and tracking (alternative to Pi-hole).
+Nginx Proxy Manager
+
+Image: jc21/nginx-proxy-manager (Requires a database container)
+Web UI?: Yes
+Description: A reverse proxy management system built on Nginx with a user-friendly web interface.
+
+Traefik
+Image: traefik:latest
+Web UI?: Yes (Dashboard/API)
+Description: A modern HTTP reverse proxy and load balancer that integrates with your existing infrastructure components.
+
+Caddy
+Image: caddy:latest
+Web UI?: No (Configured via API or config file)
+Description: A powerful, enterprise-ready, open-source web server with automatic HTTPS.
+
+Organizr
+Image: linuxserver/organizr (or ghcr.io/linuxserver/organizr)
+Web UI?: Yes
+Description: A dashboard that allows you to organize all your self-hosted services.
+
+Dashy
+Image: lissy93/dashy
+Web UI?: Yes
+Description: A modern, highly customizable dashboard for your apps and services.
+
+Heimdall
+Image: linuxserver/heimdall (or ghcr.io/linuxserver/heimdall)
+Web UI?: Yes
+Description: A simple dashboard for all your web applications.
+
+BookStack
+Image: lscr.io/linuxserver/bookstack (Requires a database container)
+Web UI?: Yes
+Description: A simple, self-hosted, easy-to-use platform for organizing and storing information, like a wiki or documentation.
+Wiki.js
+
+Image: ghcr.io/requarks/wiki.js (Requires a database container)
+Web UI?: Yes
+Description: A modern, powerful, and flexible wiki engine.
+Trilium Notes
+
+Image: zadam/trilium
+Web UI?: Yes
+Description: A hierarchical note-taking application with a web interface.
+Rocket.Chat
+
+Image: rocketchat/rocket.chat (Requires a MongoDB replica set)
+Web UI?: Yes (Primary)
+Description: A free open-source team communication platform (Slack alternative).
+
+Mattermost
+Image: mattermost/mattermost-team-edition (Requires a database container)
+Web UI?: Yes (Primary)
+Description: A self-hosted online chat service designed as an open-source Slack alternative.
+Vaultwarden (Bitwarden_rs)
+
+Image: vaultwarden/server
+Web UI?: Yes (Admin interface, API for clients)
+Description: An unofficial, open-source server written in Rust, compatible with upstream Bitwarden clients.
+
+Gitea
+Image: gitea/gitea (Can use SQLite or connect to external DB)
+Web UI?: Yes
+Description: A painless, self-hosted Git service.
+Actual Budget
+
+Image: actualbudget/actual-server
+Web UI?: Yes
+Description: A free, open-source, privacy-focused budget manager.
+Firefly III
+
+Image: fireflyiii/core (Requires a database container)
+Web UI?: Yes
+Description: A financial planning and analysis tool to help you manage your personal finances.
+
+Grocy
+Image: ghcr.io/grocy/grocy (Can use SQLite or connect to external DB)
+Web UI?: Yes
+Description: A ERP beyond your fridge - household management, including groceries, chores, and cooking.
+
+Mealie
+Image: hkotel/mealie (Requires a database container)
+Web UI?: Yes
+Description: A self-hosted recipe manager with a modern web UI.
+Uptime Kuma
+
+Image: louislam/uptime-kuma
+Web UI?: Yes
+Description: A self-hosted monitoring tool like "Uptime Robot".
+Speedtest Tracker
+
+Image: ghcr.io/alexjustesen/speedtest-tracker (Requires a database container)
+Web UI?: Yes
+Description: Automatically track your internet speed over time and visualize it.
+
+FileBrowser
+Image: filebrowser/filebrowser
+Web UI?: Yes
+Description: A lightweight, web-based file browser.
+
+MiniIO
+Image: minio/minio
+Web UI?: Yes (Console)
+Description: An S3 compatible object storage server.
+
+Calibre-Web
+Image: linuxserver/calibre-web (or ghcr.io/linuxserver/calibre-web)
+Web UI?: Yes
+Description: A web app providing a clean interface to browse, read, and download ebooks from a Calibre library.
+
+Komga
+Image: ghcr.io/komga/komga (Requires a database container)
+Web UI?: Yes
+Description: A free and open source comic/manga/webtoon server.
+
+Stirling-PDF
+Image: stirlingdev/stirling-pdf
+Web UI?: Yes
+Description: A web-based toolset for manipulating PDF files (split, merge, convert, etc.).
+Whoogle Search
+
+Image: ghcr.io/benbusby/whoogle-search
+Web UI?: Yes
+Description: A self-hosted, privacy-respecting metasearch engine.
+
+SearXNG
+Image: searxng/searxng
+Web UI?: Yes
+Description: A free internet metasearch engine which aggregates results from various search services while not storing information about its users.
+
+FreshRSS
+Image: freshrss/freshrss (Can use SQLite or connect to external DB)
+Web UI?: Yes
+Description: A free, self-hostable RSS aggregator.
+The Lounge
+
+Image: thelounge/thelounge
+Web UI?: Yes
+Description: A self-hosted web IRC client.
+
+Guacamole
+Image: guacamole/guacamole (Requires a database container and guacamole/guacd)
+Web UI?: Yes
+Description: A clientless remote desktop gateway, accessing desktops via a web browser.
+VS Code Server
+
+Image: ghcr.io/coder/code-server (or various community images)
+Web UI?: Yes (The VS Code interface in your browser)
+Description: Runs VS Code on a remote server, accessible via a web browser. (This is the one you're trying to get working).
+
+Paperless-ngx
+Image: ghcr.io/paperless-ngx/paperless-ngx (Requires a database and consumer/worker setup)
+Web UI?: Yes
+Description: A document management system that transforms your physical documents into a searchable online archive.
+
+Homepage
+Image: ghcr.io/gethomepage/homepage
+Web UI?: Yes
+Description: A modern, fully static, super fast homepage for your server.
+Changedetection.io
+
+Image: ghcr.io/dgtlmoon/changedetection.io
+Web UI?: Yes
+Description: Monitor websites for changes.
+
+Nitter
+Image: zedeus/nitter
+Web UI?: Yes
+Description: A free and open source alternative Twitter front-end.
+
+Invidious
+Image: quay.io/iv-org/invidious (Requires a database container)
+Web UI?: Yes
+Description: A free and open source alternative YouTube front-end.
+Dwarf Fortress (Caveat!)
+
+Radarr
+Image: ghcr.io/linuxserver/radarr
+Web UI?: Yes
+Description: Automates downloading, organizing, and managing movie files.
+
+Sonarr
+Image: ghcr.io/linuxserver/sonarr
+Web UI?: Yes
+Description: Automates downloading, organizing, and managing TV show files.
+
+Lidarr
+Image: ghcr.io/linuxserver/lidarr
+Web UI?: Yes
+Description: Automates downloading, organizing, and managing music files for your library.
+
+Mylar
+Image: ghcr.io/linuxserver/mylar3
+Web UI?: Yes
+Description: Automates downloading, organizing, and managing comic book files.
+
+Prowlarr
+Image: ghcr.io/linuxserver/prowlarr
+Web UI?: Yes
+Description: Indexer manager for Radarr, Sonarr, Lidarr, and other PVR apps.
+
+Jackett
+Image: ghcr.io/linuxserver/jackett
+Web UI?: Yes (Admin)
+Description: Provides API support for torrent trackers, used by apps like Radarr/Sonarr/Lidarr.
+Jellyseerr / Overseerr
+
+Image: ghcr.io/sctx/jellyseerr (or ghcr.io/linuxserver/overseerr)
+Web UI?: Yes
+Description: Request management and media discovery tool for Jellyfin and Plex.
+
+Tdarr
+Image: tdarr/tdarr
+Web UI?: Yes
+Description: Distributed media transcoding automation, can convert media to compatible formats.
+
+Unmanic
+Image: deathbyhypnos/unmanic
+Web UI?: Yes
+Description: An unattended tool to optimize your media files for playback and storage.
+
+Airsonic-advanced
+Image: linuxserver/airsonic-advanced
+Web UI?: Yes
+Description: A modern community-driven open-source music server, fork of Airsonic.
+
+Funkwhale
+Image: funkwhale/funkwhale (Multi-container)
+Web UI?: Yes
+Description: A federated, free and open-source music server and streamer with social features.
+
+FileGator
+Image: filegator/filegator
+Web UI?: Yes
+Description: A lightweight, multi-user file manager with a web interface.
+
+SFTPGo
+Image: ghcr.io/drakkan/sftpgo
+Web UI?: Yes (Admin)
+Description: A full-featured SFTP server with FTP/S, S3, and WebDAV support, and a web admin interface.
+
+Sharry
+Image: lenfest/sharry
+Web UI?: Yes
+Description: A simple web-based file sharing system.
+
+Netdata
+Image: netdata/netdata
+Web UI?: Yes
+Description: Real-time performance monitoring for systems and applications with a great web dashboard.
+
+cAdvisor
+Image: gcr.io/cadvisor/cadvisor
+Web UI?: Yes
+Description: Analyzes resource usage and performance characteristics of running containers.
+Healthchecks.io
+
+Image: ghcr.io/healthchecks/healthchecks (Requires a database container)
+Web UI?: Yes
+Description: Monitors your cron jobs, background services, and scheduled tasks by listening for pings.
+
+Authentik
+Image: ghcr.io/goauthentik/server (Multi-container)
+Web UI?: Yes
+Description: An open-source identity provider and authentication server with Single Sign-On (SSO).
+
+Authelia
+Image: authelia/authelia (Requires a database container)
+Web UI?: Yes
+Description: An open-source authentication and authorization server providing 2FA and SSO via a reverse proxy.
+
+Ntopng
+Image: ntop/ntopng
+Web UI?: Yes
+Description: A web-based tool for monitoring network traffic and usage.
+
+Monitorr
+Image: monitorr/monitorr
+Web UI?: Yes
+Description: A simple PHP-based web server and uptime monitoring dashboard for self-hosted services.
+
+HedgeDoc
+Image: linuxserver/hedgedoc (or quay.io/hedgedoc/hedgedoc)
+Web UI?: Yes
+Description: A real-time collaborative markdown editor.
+Standard Notes Syncing Server
+
+Image: standardnotes/syncing-server
+Web UI?: No (Provides API for Standard Notes clients)
+Description: The server component for the encrypted notes application Standard Notes.
+Joplin Server
+
+Image: টেনেট/joplin-server (Image name might vary, check Docker Hub)
+Web UI?: No (Provides API for Joplin clients)
+Description: The server component for the Joplin note-taking application synchronization.
+
+LessPass
+Image: lesspass/lesspass
+Web UI?: Yes (Static HTML/JS)
+Description: A stateless password manager that generates unique passwords based on a master password and site info.
+
+Gotify
+Image: gotify/server
+Web UI?: Yes (Admin UI / API)
+Description: A simple server for sending and receiving push notifications to mobile devices via an API.
+
+ArchiveBox
+Image: archivebox/archivebox
+Web UI?: Yes (Admin UI)
+Description: A self-hosted tool that archives websites you designate into various formats (HTML, PDF, screenshot, etc.).
+
+Wallabag
+Image: wallabag/wallabag (Requires a database container)
+Web UI?: Yes
+Description: A self-hosted "read-it-later" application.
+
+LibreTranslate
+Image: libretranslate/libretranslate
+Web UI?: Yes (Demo UI / API)
+Description: Free and open-source machine translation API and web demo.
+
+AudioConvert
+Image: joshxyzhimself/audio-convert (Check Docker Hub for latest)
+Web UI?: Yes
+Description: A simple web-based tool for converting audio files between formats.
+
+Dashdot
+Image: sourcegraph/dashdot
+Web UI?: Yes
+Description: A minimal, modern server dashboard for monitoring system resources.
+
+Flame
+Image: pawelmalak/flame
+Web UI?: Yes
+Description: A simple startpage/dashboard for your server and applications.
+
+Homer
+Image: bastienwirtz/homer
+Web UI?: Yes (Static HTML/JS)
+Description: A simple static homepage for your server with customizable links and status checks.
+
+OvenMediaEngine
+Image: ovenmediaengine/ovenmediaengine
+Web UI?: Yes (Admin Console / API)
+Description: A low-latency HTTP-based live streaming server.
+
+Owncast
+Image: owncast/owncast
+Web UI?: Yes (Admin / Viewer)
+Description: A self-hosted, decentralized, open-source live video streaming platform.
+Tube Archivist
+
+Image: tubearchivist/tubearchivist (Requires a database container)
+Web UI?: Yes
+Description: A self-hosted solution to download, archive, and organize videos from YouTube.
+
+Podgrab
+Image: akhilrex/podgrab
+Web UI?: Yes
+Description: A podcast downloader and web player.
+
+Drawio
+Image: jgraph/drawio
+Web UI?: Yes
+Description: A server for the Draw.io (now diagrams.net) online diagramming tool.
+
+ExifCleaner
+Image: ghcr.io/evilsocket/exifcleaner
+Web UI?: Yes
+Description: A web-based tool to clean metadata (like EXIF, GPS) from photos, videos, and other files.
+Stellarium Web
+
+Image: stellarium/stellarium-web
+Web UI?: Yes (Static HTML/JS)
+Description: A server for the web version of the Stellarium planetarium software.
+
+Statping
+Image: statping/statping (Can use SQLite or connect to external DB)
+Web UI?: Yes
+Description: A beautiful status page for monitoring your websites and services.
+
+Appsmith
+Image: index.docker.io/appsmith/appsmith-ce (Multi-container setup recommended)
+Web UI?: Yes (Primary)
+Description: A low-code platform for building internal tools, dashboards, and workflows with a visual interface.
+
+Duplicati
+Image: linuxserver/duplicati (or ghcr.io/linuxserver/duplicati)
+Web UI?: Yes
+Description: A free backup client that securely stores encrypted, incremental, compressed backups on cloud storage services and remote file servers.   
+
+UrBackup
+Image: urbackup/server
+Web UI?: Yes (Admin)
+Description: An open-source client/server backup system for disk images and file backups.
+
+BudgetZen
+Image: ghcr.io/budgetzen/budgetzen (Requires a database container)
+Web UI?: Yes
+Description: A modern, self-hosted budgeting application (alternative to Actual Budget, Firefly III).
+
+Bookwyrm
+Image: ghcr.io/bookwyrm-library/bookwyrm (Multi-container)
+Web UI?: Yes
+Description: A federated social network for tracking and discussing books.
+
+Planka
+Image: plankanban/planka (Requires a database container)
+Web UI?: Yes
+Description: An open-source Kanban board application, alternative to Trello.
+
+Focalboard
+Image: mattermost/focalboard
+Web UI?: Yes
+Description: An open-source project management, collaboration, and note-taking tool (Kanban, Table, Calendar views).
+
+Baserow
+Image: baserow/baserow (Can use SQLite or connect to external DB)
+Web UI?: Yes
+Description: An open-source no-code database and Airtable alternative.
+
+NocoDB
+Image: nocodb/nocodb (Requires a database)
+Web UI?: Yes
+Description: An open-source no-code database and Airtable alternative that connects to existing databases.
+
+TypeSense
+Image: typesense/typesense
+Web UI?: Yes (Admin/Dashboard)
+Description: An open-source, typo-tolerant search engine.
+Manticore Search
+
+Image: manticoresearch/manticoresearch
+Web UI?: Yes (Admin Interface)
+Description: A free, open-source, fast search engine.
+
+Penpot
+Image: penpot/penpot (Multi-container)
+Web UI?: Yes
+Description: An open-source design and prototyping platform.
+
+AppFlowy
+Image: ghcr.io/appflowy-io/appflowy (Image might be for backend/sync)
+Web UI?: Yes (Primary access is Desktop/Mobile, but sync backend can be self-hosted)
+Description: A privacy-first alternative to Notion, with a self-hostable sync backend.
+
+ActiMirror
+Image: actiweb/actimirror (Check Docker Hub for latest)
+Web UI?: Yes
+Description: A customizable dashboard for displaying various information feeds (weather, news, calendar, etc.).
+
+DashMachine
+Image: rmountjoy92/dashmachine
+Web UI?: Yes
+Description: A responsive dashboard with +100 themed services.
+
+LibrePhotos
+Image: librephotos/librephotos (Multi-container)
+Web UI?: Yes
+Description: A self-hosted open-source photo management system with AI features (alternative to PhotoPrism).
+
+Photoview
+Image: photoview/photoview (Requires a database container)
+Web UI?: Yes
+Description: A simple and user-friendly photo management gallery with a focus on privacy.
+
+WriteFreely
+Image: writefreely/writefreely
+Web UI?: Yes
+Description: A simple, minimalist platform for writing and publishing articles.
+
+Plume
+Image: plume/plume (Requires a database container)
+Web UI?: Yes
+Description: A federated blogging engine, based on ActivityPub.
+
+Wordpress
+Image: wordpress (Requires a database container)
+Web UI?: Yes
+Description: A widely used platform for creating websites and blogs.
+
+Joomla
+Image: joomla (Requires a database container)
+Web UI?: Yes
+Description: A popular Content Management System (CMS) for building websites.
+
+Drupal
+Image: drupal (Requires a database container)
+Web UI?: Yes
+Description: A powerful and flexible Content Management System (CMS).
+
+Commento
+Image: eduardobc/commento (Requires a database container)
+Web UI?: Yes (Admin)
+Description: A fast, privacy-focused commenting platform for websites.
+
+Flarum
+Image: flarum (Requires a database container)
+Web UI?: Yes
+Description: A simple, fast, and free forum software.
+
+NodeBB
+Image: ghcr.io/nodebb/docker (Requires a database - Redis or MongoDB)
+Web UI?: Yes
+Description: A next-generation forum software based on Node.js.
+
+Openfire
+Image: igniterealtime/openfire (Requires a database)
+Web UI?: Yes (Admin)
+Description: A real-time collaboration (chat) server based on XMPP.
+
+Ntfy
+Image: binwiederhier/ntfy
+Web UI?: Yes (Landing page/Admin)
+Description: A simple HTTP-based push notification service. Send notifications to your phone or desktop via scripts.
+
+Adminer
+Image: adminer
+Web UI?: Yes
+Description: A full-featured database management tool packed into a single PHP file, accessible via web.
+
+phpMyAdmin
+Image: phpmyadmin/phpmyadmin
+Web UI?: Yes
+Description: A popular web-based administration tool for MySQL and MariaDB databases.
+
+pgAdmin
+Image: dpage/pgadmin4
+Web UI?: Yes
+Description: A web-based administration tool for PostgreSQL databases.
+
+Gogs
+Image: gogs/gogs (Can use SQLite or connect to external DB)
+Web UI?: Yes
+Description: A painless, self-hosted Git service (alternative to Gitea).
+
+Forgejo
+Image: codeberg.org/forgejo/forgejo (Can use SQLite or connect to external DB)
+Web UI?: Yes
+Description: A friendly fork of Gitea, a self-hosted Git service.
+
+Grafana
+Image: grafana/grafana (Requires a database, e.g., SQLite or PostgreSQL)
+Web UI?: Yes
+Description: A leading open-source platform for monitoring and observability, creating dashboards from various data sources.

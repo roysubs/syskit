@@ -1,0 +1,88 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# SSH Authentication with Git Cheatsheet
+
+## 1. **Setting Up SSH Keys for Git**
+
+### Generate SSH Key Pair
+- Generate a new SSH key:  
+  `ssh-keygen -t rsa -b 4096 -C "your_email@example.com"`
+- Save the key in the default location (`~/.ssh/id_rsa`) or specify a custom name.
+- Optionally, set a passphrase for added security.
+
+### Add SSH Key to SSH Agent
+- Start the SSH agent:  
+  `eval "$(ssh-agent -s)"`
+- Add the SSH private key to the agent:  
+  `ssh-add ~/.ssh/id_rsa`
+
+### Add SSH Key to Git Hosting Service (GitHub, GitLab, etc.)
+- Copy the public key to your clipboard:  
+  `cat ~/.ssh/id_rsa.pub` or use `pbcopy < ~/.ssh/id_rsa.pub` (on macOS).
+- Go to the **SSH keys** section of your Git hosting service (e.g., GitHub: `Settings` -> `SSH and GPG keys` -> `New SSH key`).
+- Paste the key and save it.
+
+## 2. **Testing SSH Connection**
+
+### Check SSH Connection to Git Server
+- Test SSH connection to GitHub:  
+  `ssh -T git@github.com`
+- Test SSH connection to GitLab:  
+  `ssh -T git@gitlab.com`
+
+### Debug SSH Connection (if issues arise)
+- Use verbose output to debug:  
+  `ssh -vT git@github.com`
+- This helps identify connection or authentication issues.
+
+## 3. **Configuring SSH for Multiple Git Hosts**
+
+### Create or Edit SSH Config File (`~/.ssh/config`)
+- Example config for GitHub and GitLab:
+Host github.com User git Hostname github.com IdentityFile ~/.ssh/id_rsa_github
+Host gitlab.com User git Hostname gitlab.com IdentityFile ~/.ssh/id_rsa_gitlab
+
+markdown
+Copy code
+- This allows using different SSH keys for different Git hosts.
+
+## 4. **Using SSH with Git**
+
+### Clone a Repository Using SSH
+- Clone a repository with SSH:  
+`git clone git@github.com:username/repository.git`
+
+### Check SSH Key Used for Git Operations
+- Check which SSH key is used:  
+`ssh -vT git@github.com` (look for `IdentityFile` in verbose output).
+- To specify a key for a specific repository, you can use the `GIT_SSH_COMMAND` environment variable:
+GIT_SSH_COMMAND="ssh -i ~/.ssh/id_rsa_gitlab" git clone git@gitlab.com:username/repository.git
+
+## 5. **Common SSH Authentication Issues**
+
+### Permission Denied (publickey)
+- Ensure the correct SSH key is added to the agent and associated with the Git hosting service.
+- Verify your SSH key on the Git hosting service is correct.
+- Check the `~/.ssh/config` file if using multiple keys.
+- Ensure that the correct file permissions are set on the SSH private key:  
+`chmod 600 ~/.ssh/id_rsa`
+
+### Key Not Recognized by SSH Agent
+- If the key is not automatically loaded, manually add it to the agent:  
+`ssh-add ~/.ssh/id_rsa`
+
+## 6. **Removing SSH Keys**
+
+### Remove SSH Key from SSH Agent
+- Remove the key from the SSH agent:  
+`ssh-add -d ~/.ssh/id_rsa`
+
+### Remove SSH Key from Git Hosting Service
+- Go to your Git hosting service's SSH key settings and remove the key.
+
+EOF
+) | less -R

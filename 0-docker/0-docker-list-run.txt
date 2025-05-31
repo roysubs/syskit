@@ -1,0 +1,1565 @@
+Name: Audiobookshelf
+Description: A self-hosted audiobook and podcast server, specifically designed for audio content.
+Port: 13378
+# docker pull ghcr.io/advplyr/audiobookshelf
+# docker run -d \
+#   --name=audiobookshelf \
+#   -p 13378:80 \
+#   -v <path_to_audiobooks>:/audiobooks \
+#   -v <path_to_config>:/config \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   ghcr.io/advplyr/audiobookshelf
+Options: None specifically common beyond standard Docker options.
+
+Name: Navidrome
+Description: A modern, open-source music server and streamer, inspired by Subsonic.
+Port: 4533
+# docker pull deluan/navidrome
+# docker run -d \
+#   --name=navidrome \
+#   -p 4533:4533 \
+#   -v <path_to_data>:/data \
+#   -v <path_to_music>:/music \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   deluan/navidrome
+Options: None specifically common beyond standard Docker options.
+
+Name: qBittorrent-nox
+Description: A lightweight and powerful BitTorrent client with a web user interface.
+Port: 8080
+# docker pull linuxserver/qbittorrent
+# docker run -d \
+#   --name=qbittorrent \
+#   -p 6881:6881 \
+#   -p 6881:6881/udp \
+#   -p 8080:8080 \
+#   -v <path_to_config>:/config \
+#   -v <path_to_downloads>:/downloads \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   -e WEBUI_PORT=8080 \
+#   linuxserver/qbittorrent
+Options: WEBUI_PORT
+
+Name: Syncthing
+Description: A continuous file synchronization program that syncs files between two or more computers in real time.
+Port: 8384 (Web UI), 22000 (Sync TCP), 21027 (Sync UDP)
+# docker pull lscr.io/linuxserver/syncthing
+# docker run -d \
+#   --name=syncthing \
+#   -p 8384:8384 \
+#   -p 22000:22000 \
+#   -p 21027:21027/udp \
+#   -v <path_to_config>:/config \
+#   -v <path_to_data>:/data \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   lscr.io/linuxserver/syncthing
+Options: None specifically common beyond standard Docker options.
+
+Name: Transmission
+Description: A simple and popular BitTorrent client with a web interface.
+Port: 9091 (Web UI), 51413 (BitTorrent)
+# docker pull linuxserver/transmission
+# docker run -d \
+#   --name=transmission \
+#   -p 9091:9091 \
+#   -p 51413:51413 \
+#   -p 51413:51413/udp \
+#   -v <path_to_config>:/config \
+#   -v <path_to_downloads>:/downloads \
+#   -v <path_to_watch>:/watch \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   -e USER=<your_user> \
+#   -e PASS=<your_password> \
+#   linuxserver/transmission
+Options: USER, PASS
+
+Name: Deluge
+Description: A feature-rich BitTorrent client with client/server architecture and a web UI.
+Port: 8112 (Web UI), 58846 (Daemon)
+# docker pull linuxserver/deluge
+# docker run -d \
+#   --name=deluge \
+#   -p 8112:8112 \
+#   -p 58846:58846 \
+#   -p 58846:58846/udp \
+#   -v <path_to_config>:/config \
+#   -v <path_to_downloads>:/downloads \
+#   -v <path_to_watch>:/watch \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   linuxserver/deluge
+Options: None specifically common beyond standard Docker options.
+
+Name: SABnzbd
+Description: A Usenet binary downloader with a web interface.
+Port: 8080
+# docker pull linuxserver/sabnzbd
+# docker run -d \
+#   --name=sabnzbd \
+#   -p 8080:8080 \
+#   -p 9117:9117 # optional, for external access to logs/data \
+#   -v <path_to_config>:/config \
+#   -v <path_to_downloads>:/downloads \
+#   -v <path_to_incomplete_downloads>:/incomplete-downloads \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   linuxserver/sabnzbd
+Options: None specifically common beyond standard Docker options.
+
+Name: NZBGet
+Description: A highly efficient Usenet downloader, known for performance, with a web UI.
+Port: 6789
+# docker pull linuxserver/nzbget
+# docker run -d \
+#   --name=nzbget \
+#   -p 6789:6789 \
+#   -v <path_to_config>:/config \
+#   -v <path_to_downloads>:/downloads \
+#   -v <path_to_incomplete_downloads>:/incomplete-downloads \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   linuxserver/nzbget
+Options: None specifically common beyond standard Docker options.
+
+Name: Jellyfin
+Description: A free and open-source media system that takes care of managing, serving, and streaming your media.
+Port: 8096 (HTTP), 8920 (HTTPS)
+# docker pull jellyfin/jellyfin
+# docker run -d \
+#   --name=jellyfin \
+#   -p 8096:8096 \
+#   -p 8920:8920 # optional, for https \
+#   -v <path_to_config>:/config \
+#   -v <path_to_cache>:/cache \
+#   -v <path_to_media>:/media \
+#   --runtime=nvidia # optional, for NVIDIA hardware acceleration \
+#   --device=/dev/dri:/dev/dri # optional, for Intel hardware acceleration \
+#   jellyfin/jellyfin
+Options: --runtime, --device (for hardware acceleration)
+
+Name: Emby
+Description: A personal media server that organizes and streams audio and video to various devices (some features require subscription).
+Port: 8096 (HTTP), 8920 (HTTPS)
+# docker pull emby/embyserver
+# docker run -d \
+#   --name=emby \
+#   -p 8096:8096 \
+#   -p 8920:8920 # optional, for https \
+#   -v <path_to_config>:/config \
+#   -v <path_to_media>:/media \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   --runtime=nvidia # optional, for NVIDIA hardware acceleration \
+#   --device=/dev/dri:/dev/dri # optional, for Intel hardware acceleration \
+#   emby/embyserver
+Options: --runtime, --device (for hardware acceleration)
+
+Name: PhotoPrism
+Description: An AI-powered photos app for Browse, organizing, and sharing your personal photo collection.
+Port: 2342
+# docker pull photoprism/photoprism
+# docker run -d \
+#   --name=photoprism \
+#   -p 2342:2342 \
+#   -v <path_to_photos>:/photos \
+#   -v <path_to_storage>:/photoprism/storage \
+#   -e PHOTOPRISM_ADMIN_USER=<your_user> \
+#   -e PHOTOPRISM_ADMIN_PASSWORD=<your_password> \
+#   -e TZ=Etc/UTC \
+#   photoprism/photoprism
+Options: PHOTOPRISM_ADMIN_USER, PHOTOPRISM_ADMIN_PASSWORD, TZ
+
+Name: Immich
+Description: A self-hosted photo and video backup solution, modern and feature-rich. (Requires multiple containers - microservices)
+Port: 2283 (Server), 3003 (Machine Learning)
+# docker pull ghcr.io/immich-app/immich
+# docker-compose up -d # Immich is typically deployed using Docker Compose due to multiple services.
+Options: Typically configured via environment variables in a docker-compose.yml file (e.g., IMMICH_PORT, IMMICH_MACHINE_LEARNING_PORT). Specific command line options for a single container run are less common.
+
+Name: Nextcloud
+Description: A suite of client-server software for creating file hosting and content collaboration services. (Requires a database container like MariaDB/PostgreSQL and a web server like Nginx)
+Port: 80 (or 443 if using HTTPS via a reverse proxy)
+# docker pull nextcloud:fpm
+# docker run -d \
+#   --name=nextcloud_app \
+#   -v <path_to_nextcloud_data>:/var/www/html \
+#   -e MYSQL_DATABASE=<db_name> \
+#   -e MYSQL_USER=<db_user> \
+#   -e MYSQL_PASSWORD=<db_password> \
+#   -e MYSQL_HOST=<db_host> \
+#   nextcloud:fpm
+# # Requires separate containers for database and web server.
+Options: MYSQL_DATABASE, MYSQL_USER, MYSQL_PASSWORD, MYSQL_HOST (for database connection)
+
+Name: Owncloud
+Description: A suite of client-server software for creating and using file hosting services (alternative to Nextcloud). (Often requires a database container)
+Port: 80 (or 443 if using HTTPS via a reverse proxy)
+# docker pull owncloud/server
+# docker run -d \
+#   --name=owncloud_app \
+#   -v <path_to_owncloud_data>:/mnt/data \
+#   -e OWNCLOUD_UPDATE=true \
+#   -e OWNCLOUD_MICROSERVICES_GOCERNATES_JWT_SECRET=<your_secret> \
+#   -e OWNCLOUD_MICROSERVICES_WEB_PUBLIC_KEY=<your_public_key> \
+#   -e OWNCLOUD_MICROSERVICES_WEB_PRIVATE_KEY=<your_private_key> \
+#   # ... database connection environment variables ...
+#   owncloud/server
+Options: OWNCLOUD_UPDATE, OWNCLOUD_MICROSERVICES_GOCERNATES_JWT_SECRET, OWNCLOUD_MICROSERVICES_WEB_PUBLIC_KEY, OWNCLOUD_MICROSERVICES_WEB_PRIVATE_KEY, plus various database connection options.
+
+Name: Home Assistant
+Description: A free and open-source software for home automation.
+Port: 8123
+# docker pull ghcr.io/home-assistant/home-assistant:stable
+# docker run -d \
+#   --name homeassistant \
+#   --privileged \
+#   -e TZ=Etc/UTC \
+#   -v <path_to_config>:/config \
+#   --network=host \
+#   ghcr.io/home-assistant/home-assistant:stable
+Options: --privileged, --network=host (often used for device discovery)
+
+Name: Node-RED
+Description: A flow-based programming tool for wiring together hardware devices, APIs, and online services.
+Port: 1880
+# docker pull nodered/node-red
+# docker run -d \
+#   --name nodered \
+#   -p 1880:1880 \
+#   -v <path_to_data>:/data \
+#   nodered/node-red
+Options: None specifically common beyond standard Docker options.
+
+Name: Pi-hole
+Description: A network-wide ad blocker acting as a DNS server.
+Port: 80 (Web UI), 53 (DNS TCP/UDP), 67 (DHCP UDP - optional)
+# docker pull pihole/pihole
+# docker run -d \
+#   --name pihole \
+#   -p 80:80 \
+#   -p 53:53/tcp \
+#   -p 53:53/udp \
+#   -p 67:67/udp # Only required if using Pi-hole as DHCP server \
+#   -v <path_to_etc_pihole>:/etc/pihole \
+#   -v <path_to_etc_dnsmasq_d>:/etc/dnsmasq.d \
+#   -e TZ=Etc/UTC \
+#   -e WEBPASSWORD="<set_a_password>" \
+#   --dns=127.0.0.1 \
+#   --hostname pihole \
+#   --restart=unless-stopped \
+#   pihole/pihole
+Options: WEBPASSWORD, --dns, --hostname
+
+Name: AdGuard Home
+Description: A network-wide software for blocking ads and tracking (alternative to Pi-hole).
+Port: 3000 (Initial Setup), 80 (Web UI), 53 (DNS TCP/UDP), 67 (DHCP UDP - optional)
+# docker pull adguard/adguardhome
+# docker run -d \
+#   --name adguardhome \
+#   -p 3000:3000 # Port for initial setup \
+#   -p 80:80 \
+#   -p 53:53/tcp \
+#   -p 53:53/udp \
+#   -p 67:67/udp # Only required if using AdGuard Home as DHCP server \
+#   -v <path_to_work>:/opt/adguardhome/work \
+#   -v <path_to_conf>:/opt/adguardhome/conf \
+#   adguard/adguardhome
+Options: None specifically common beyond standard Docker options.
+
+Name: Nginx Proxy Manager
+Description: A reverse proxy management system built on Nginx with a user-friendly web interface. (Requires a database container)
+Port: 81 (Web UI), 80 (HTTP), 443 (HTTPS)
+# docker pull jc21/nginx-proxy-manager
+# docker run -d \
+#   --name=npm \
+#   -p 81:81 \
+#   -p 80:80 \
+#   -p 443:443 \
+#   -v <path_to_data>:/data \
+#   -v <path_to_letsencrypt>:/etc/letsencrypt \
+#   # ... database connection environment variables ...
+#   jc21/nginx-proxy-manager
+Options: Various environment variables for database connection.
+
+Name: Traefik
+Description: A modern HTTP reverse proxy and load balancer that integrates with your existing infrastructure components.
+Port: 80 (HTTP), 443 (HTTPS), 8080 (API/Dashboard - often internal)
+# docker pull traefik:latest
+# docker run -d \
+#   --name=traefik \
+#   -p 80:80 \
+#   -p 443:443 \
+#   -p 8080:8080 # Optional, for API/Dashboard \
+#   -v /var/run/docker.sock:/var/run/docker.sock:ro \
+#   -v <path_to_config>:/etc/traefik \
+#   traefik:latest \
+#   --api.dashboard=true \
+#   --providers.docker \
+#   --providers.docker.exposedbydefault=false
+Options: Various command line arguments and configuration file options (e.g., --api.dashboard, --providers.docker).
+
+Name: Caddy
+Description: A powerful, enterprise-ready, open-source web server with automatic HTTPS.
+Port: 80 (HTTP), 443 (HTTPS), 2019 (Admin API)
+# docker pull caddy:latest
+# docker run -d \
+#   --name=caddy \
+#   -p 80:80 \
+#   -p 443:443 \
+#   -v <path_to_caddyfile>:/etc/caddy/Caddyfile \
+#   -v <path_to_data>:/data \
+#   caddy:latest
+Options: Configuration is primarily done via the Caddyfile or Admin API, not typically via command line options in docker run beyond mounting volumes.
+
+Name: Organizr
+Description: A dashboard that allows you to organize all your self-hosted services.
+Port: 80 (or 443 via reverse proxy)
+# docker pull linuxserver/organizr
+# docker run -d \
+#   --name=organizr \
+#   -p 80:80 \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   -v <path_to_config>:/config \
+#   linuxserver/organizr
+Options: None specifically common beyond standard Docker options.
+
+Name: Dashy
+Description: A modern, highly customizable dashboard for your apps and services.
+Port: 80 (or 443 via reverse proxy)
+# docker pull lissy93/dashy
+# docker run -d \
+#   --name=dashy \
+#   -p 80:80 \
+#   -v <path_to_config>:/app/user-data/conf.yml \
+#   lissy93/dashy
+Options: None specifically common beyond standard Docker options.
+
+Name: Heimdall
+Description: A simple dashboard for all your web applications.
+Port: 80 (HTTP), 443 (HTTPS)
+# docker pull linuxserver/heimdall
+# docker run -d \
+#   --name=heimdall \
+#   -p 80:80 \
+#   -p 443:443 \
+#   -v <path_to_config>:/config \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   linuxserver/heimdall
+Options: None specifically common beyond standard Docker options.
+
+Name: BookStack
+Description: A simple, self-hosted, easy-to-use platform for organizing and storing information, like a wiki or documentation. (Requires a database container)
+Port: 80 (or 443 via reverse proxy)
+# docker pull lscr.io/linuxserver/bookstack
+# docker run -d \
+#   --name=bookstack \
+#   -p 80:80 \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   -e APP_URL=<your_app_url> \
+#   -v <path_to_config>:/config \
+#   # ... database connection environment variables ...
+#   lscr.io/linuxserver/bookstack
+Options: APP_URL, plus various database connection options.
+
+Name: Wiki.js
+Description: A modern, powerful, and flexible wiki engine. (Requires a database container)
+Port: 3000
+# docker pull ghcr.io/requarks/wiki.js
+# docker run -d \
+#   --name=wikijs \
+#   -p 3000:3000 \
+#   -e WIKIJS_PORT=3000 \
+#   -v <path_to_config>:/opt/wikijs/data \
+#   # ... database connection environment variables ...
+#   ghcr.io/requarks/wiki.js
+Options: WIKIJS_PORT, plus various database connection options.
+
+Name: Trilium Notes
+Description: A hierarchical note-taking application with a web interface.
+Port: 8080
+# docker pull zadam/trilium
+# docker run -d \
+#   --name=trilium \
+#   -p 8080:8080 \
+#   -v <path_to_data>:/home/node/trilium-data \
+#   zadam/trilium
+Options: None specifically common beyond standard Docker options.
+
+Name: Rocket.Chat
+Description: A free open-source team communication platform (Slack alternative). (Requires a MongoDB replica set)
+Port: 3000
+# docker pull rocketchat/rocket.chat
+# docker run -d \
+#   --name=rocketchat \
+#   -p 3000:3000 \
+#   -e ROOT_URL=http://localhost:3000 \
+#   -e MONGO_URL=mongodb://<mongodb_host>:<mongodb_port>/rocketchat?replicaSet=rs0 \
+#   # ... other environment variables for scaling, etc. ...
+#   rocketchat/rocket.chat
+Options: ROOT_URL, MONGO_URL, and many others for configuration.
+
+Name: Mattermost
+Description: A self-hosted online chat service designed as an open-source Slack alternative. (Requires a database container)
+Port: 8065
+# docker pull mattermost/mattermost-team-edition
+# docker run -d \
+#   --name=mattermost \
+#   -p 8065:8065 \
+#   -v <path_to_data>:/mattermost/data \
+#   -v <path_to_config>:/mattermost/config \
+#   -v <path_to_logs>:/mattermost/logs \
+#   # ... database connection environment variables ...
+#   mattermost/mattermost-team-edition
+Options: Various environment variables for database connection and application settings.
+
+Name: Vaultwarden (Bitwarden_rs)
+Description: An unofficial, open-source server written in Rust, compatible with upstream Bitwarden clients.
+Port: 80 (or 443 via reverse proxy)
+# docker pull vaultwarden/server
+# docker run -d \
+#   --name=vaultwarden \
+#   -p 80:80 \
+#   -v <path_to_data>:/data \
+#   -e TZ=Etc/UTC \
+#   -e SIGNUPS_ALLOWED=false # Optional: Disable new user signups \
+#   vaultwarden/server
+Options: SIGNUPS_ALLOWED, ADMIN_TOKEN, and many others for configuration.
+
+Name: Gitea
+Description: A painless, self-hosted Git service. (Can use SQLite or connect to external DB)
+Port: 3000 (HTTP), 22 (SSH - often mapped to a different host port)
+# docker pull gitea/gitea
+# docker run -d \
+#   --name=gitea \
+#   -p 3000:3000 \
+#   -p 2222:22 # Map SSH to host port 2222 to avoid conflict \
+#   -v <path_to_data>:/data \
+#   -e USER_UID=1000 \
+#   -e USER_GID=1000 \
+#   gitea/gitea
+Options: USER_UID, USER_GID, and various database connection options.
+
+Name: Actual Budget
+Description: A free, open-source, privacy-focused budget manager.
+Port: 5006
+# docker pull actualbudget/actual-server
+# docker run -d \
+#   --name=actualbudget \
+#   -p 5006:5000 # Note: Container port is 5000, map to host port 5006 commonly \
+#   -v <path_to_data>:/data \
+#   actualbudget/actual-server
+Options: None specifically common beyond standard Docker options.
+
+Name: Firefly III
+Description: A financial planning and analysis tool to help you manage your personal finances. (Requires a database container)
+Port: 8080
+# docker pull fireflyiii/core
+# docker run -d \
+#   --name=fireflyiii \
+#   -p 8080:8080 \
+#   -v <path_to_upload>:/var/www/html/storage/upload \
+#   # ... database connection environment variables ...
+#   fireflyiii/core
+Options: Various environment variables for database connection and application settings.
+
+Name: Grocy
+Description: A ERP beyond your fridge - household management, including groceries, chores, and cooking. (Can use SQLite or connect to external DB)
+Port: 80 (or 443 via reverse proxy)
+# docker pull ghcr.io/grocy/grocy
+# docker run -d \
+#   --name=grocy \
+#   -p 80:80 \
+#   -v <path_to_config>:/config \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   ghcr.io/grocy/grocy
+Options: None specifically common beyond standard Docker options.
+
+Name: Mealie
+Description: A self-hosted recipe manager with a modern web UI. (Requires a database container)
+Port: 9000
+# docker pull hkotel/mealie
+# docker run -d \
+#   --name=mealie \
+#   -p 9000:80 \
+#   -v <path_to_data>:/app/data \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   # ... database connection environment variables ...
+#   hkotel/mealie
+Options: Various environment variables for database connection and application settings.
+
+Name: Uptime Kuma
+Description: A self-hosted monitoring tool like "Uptime Robot".
+Port: 3001
+# docker pull louislam/uptime-kuma
+# docker run -d \
+#   --name=uptime-kuma \
+#   -p 3001:3001 \
+#   -v <path_to_data>:/app/data \
+#   louislam/uptime-kuma
+Options: None specifically common beyond standard Docker options.
+
+Name: Speedtest Tracker
+Description: Automatically track your internet speed over time and visualize it. (Requires a database container)
+Port: 80 (or 443 via reverse proxy)
+# docker pull ghcr.io/alexjustesen/speedtest-tracker
+# docker run -d \
+#   --name=speedtest-tracker \
+#   -p 80:80 \
+#   -v <path_to_config>:/config \
+#   # ... database connection environment variables ...
+#   ghcr.io/alexjustesen/speedtest-tracker
+Options: Various environment variables for database connection and application settings.
+
+Name: FileBrowser
+Description: A lightweight, web-based file browser.
+Port: 8080
+# docker pull filebrowser/filebrowser
+# docker run -d \
+#   --name=filebrowser \
+#   -p 8080:8080 \
+#   -v <path_to_config>:/config \
+#   -v <path_to_data>:/data \
+#   filebrowser/filebrowser
+Options: None specifically common beyond standard Docker options.
+
+Name: MiniIO
+Description: An S3 compatible object storage server.
+Port: 9000 (API), 9001 (Console)
+# docker pull minio/minio
+# docker run -d \
+#   --name minio \
+#   -p 9000:9000 \
+#   -p 9001:9001 \
+#   -v <path_to_data>:/data \
+#   -v <path_to_config>:/root/.minio \
+#   minio/minio server /data --console-address ":9001"
+Options: server, /data, --console-address (part of the container's command)
+
+Name: Calibre-Web
+Description: A web app providing a clean interface to browse, read, and download ebooks from a Calibre library.
+Port: 8083
+# docker pull linuxserver/calibre-web
+# docker run -d \
+#   --name=calibre-web \
+#   -p 8083:8083 \
+#   -v <path_to_config>:/config \
+#   -v <path_to_calibre_library>:/books \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   linuxserver/calibre-web
+Options: None specifically common beyond standard Docker options.
+
+Name: Komga
+Description: A free and open source comic/manga/webtoon server. (Requires a database container)
+Port: 25600
+# docker pull ghcr.io/komga/komga
+# docker run -d \
+#   --name=komga \
+#   -p 25600:25600 \
+#   -v <path_to_config>:/config \
+#   -v <path_to_data>:/data \
+#   -v <path_to_comics>:/comics \
+#   ghcr.io/komga/komga
+Options: None specifically common beyond standard Docker options.
+
+Name: Stirling-PDF
+Description: A web-based toolset for manipulating PDF files (split, merge, convert, etc.).
+Port: 8080
+# docker pull stirlingdev/stirling-pdf
+# docker run -d \
+#   --name=stirling-pdf \
+#   -p 8080:8080 \
+#   stirlingdev/stirling-pdf
+Options: None specifically common beyond standard Docker options.
+
+Name: Whoogle Search
+Description: A self-hosted, privacy-respecting metasearch engine.
+Port: 5000
+# docker pull ghcr.io/benbusby/whoogle-search
+# docker run -d \
+#   --name=whoogle-search \
+#   -p 5000:5000 \
+#   -e WHOOGLE_CONFIG=/app/config.cfg # Optional: Path to a custom config file \
+#   ghcr.io/benbusby/whoogle-search
+Options: WHOOGLE_CONFIG
+
+Name: SearXNG
+Description: A free internet metasearch engine which aggregates results from various search services while not storing information about its users.
+Port: 8080
+# docker pull searxng/searxng
+# docker run -d \
+#   --name=searxng \
+#   -p 8080:8080 \
+#   -v <path_to_config>:/etc/searxng \
+#   -e PUID=1000 # Optional: User ID \
+#   -e PGID=1000 # Optional: Group ID \
+#   searxng/searxng
+Options: PUID, PGID
+
+Name: FreshRSS
+Description: A free, self-hostable RSS aggregator.
+Port: 80
+# docker pull freshrss/freshrss
+# docker run -d \
+#   --name=freshrss \
+#   -p 80:80 \
+#   -v <path_to_data>:/var/www/FreshRSS/data \
+#   -v <path_to_extensions>:/var/www/FreshRSS/extensions \
+#   freshrss/freshrss
+Options: None specifically common beyond standard Docker options.
+
+Name: The Lounge
+Description: A self-hosted web IRC client.
+Port: 9000
+# docker pull thelounge/thelounge
+# docker run -d \
+#   --name=thelounge \
+#   -p 9000:9000 \
+#   -v <path_to_config>:/home/thelounge/.thelounge \
+#   thelounge/thelounge
+Options: None specifically common beyond standard Docker options.
+
+Name: Guacamole
+Description: A clientless remote desktop gateway, accessing desktops via a web browser. (Requires a database container and guacamole/guacd)
+Port: 8080
+# docker pull guacamole/guacamole
+# docker run -d \
+#   --name=guacamole \
+#   --link guacd:guacd \
+#   # ... database connection environment variables ...
+#   guacamole/guacamole
+# # Requires separate containers for database and guacd.
+Options: Various environment variables for database connection.
+
+Name: VS Code Server
+Description: Runs VS Code on a remote server, accessible via a web browser.
+Port: 8080
+# docker pull ghcr.io/coder/code-server
+# docker run -d \
+#   --name=code-server \
+#   -p 8080:8080 \
+#   -v <path_to_config>:/config \
+#   -v <path_to_projects>:/home/coder/projects \
+#   -e PASSWORD="<your_password>" \
+#   ghcr.io/coder/code-server
+Options: PASSWORD
+
+Name: Paperless-ngx
+Description: A document management system that transforms your physical documents into a searchable online archive. (Requires a database and consumer/worker setup)
+Port: 8000
+# docker pull ghcr.io/paperless-ngx/paperless-ngx
+# docker-compose up -d # Paperless-ngx is typically deployed using Docker Compose.
+Options: Typically configured via environment variables in a docker-compose.yml file. Specific command line options for a single container run are less common.
+
+Name: Homepage
+Description: A modern, fully static, super fast homepage for your server.
+Port: 3000
+# docker pull ghcr.io/gethomepage/homepage
+# docker run -d \
+#   --name=homepage \
+#   -p 3000:3000 \
+#   -v <path_to_config>:/app/config \
+#   ghcr.io/gethomepage/homepage
+Options: None specifically common beyond standard Docker options.
+
+Name: Changedetection.io
+Description: Monitor websites for changes.
+Port: 5000
+# docker pull ghcr.io/dgtlmoon/changedetection.io
+# docker run -d \
+#   --name=changedetection.io \
+#   -p 5000:5000 \
+#   -v <path_to_config>:/config \
+#   ghcr.io/dgtlmoon/changedetection.io
+Options: BASE_URL, PLAYWRIGHT_DRIVER_URL
+
+Name: Nitter
+Description: A free and open source alternative Twitter front-end.
+Port: 8080
+# docker pull zedeus/nitter
+# docker run -d \
+#   --name=nitter \
+#   -p 8080:8080 \
+#   zedeus/nitter
+Options: None specifically common beyond standard Docker options.
+
+Name: Invidious
+Description: A free and open source alternative YouTube front-end. (Requires a database container)
+Port: 3000
+# docker pull quay.io/iv-org/invidious
+# docker run -d \
+#   --name=invidious \
+#   -p 3000:3000 \
+#   # ... database connection environment variables ...
+#   quay.io/iv-org/invidious
+Options: Various environment variables for database connection.
+
+Name: Dwarf Fortress (Caveat!)
+Description: n.a. (Running Dwarf Fortress directly in Docker with a web UI is complex and not standard. This is likely referring to a VNC/streaming solution, not a native web UI).
+Port: n.a.
+# docker pull <image_name> # Image name varies greatly for VNC/streaming solutions.
+# docker run -d \
+#   --name=dwarf_fortress \
+#   # ... port mapping for VNC/streaming, volume mounts for game data ...
+#   <image_name>
+Options: Varies greatly depending on the specific image used.
+
+Name: Radarr
+Description: Automates downloading, organizing, and managing movie files.
+Port: 7878
+# docker pull ghcr.io/linuxserver/radarr
+# docker run -d \
+#   --name=radarr \
+#   -p 7878:7878 \
+#   -v <path_to_config>:/config \
+#   -v <path_to_movies>:/movies \
+#   -v <path_to_downloads>:/downloads \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   ghcr.io/linuxserver/radarr
+Options: PUID, PGID, TZ
+
+Name: Sonarr
+Description: Automates downloading, organizing, and managing TV show files.
+Port: 8989
+# docker pull ghcr.io/linuxserver/sonarr
+# docker run -d \
+#   --name=sonarr \
+#   -p 8989:8989 \
+#   -v <path_to_config>:/config \
+#   -v <path_to_tvshows>:/tv \
+#   -v <path_to_downloads>:/downloads \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   ghcr.io/linuxserver/sonarr
+Options: PUID, PGID, TZ
+
+Name: Lidarr
+Description: Automates downloading, organizing, and managing music files for your library.
+Port: 8686
+# docker pull ghcr.io/linuxserver/lidarr
+# docker run -d \
+#   --name=lidarr \
+#   -p 8686:8686 \
+#   -v <path_to_config>:/config \
+#   -v <path_to_music>:/music \
+#   -v <path_to_downloads>:/downloads \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   ghcr.io/linuxserver/lidarr
+Options: PUID, PGID, TZ
+
+Name: Mylar
+Description: Automates downloading, organizing, and managing comic book files.
+Port: 8090
+# docker pull ghcr.io/linuxserver/mylar3
+# docker run -d \
+#   --name=mylar \
+#   -p 8090:8090 \
+#   -v <path_to_config>:/config \
+#   -v <path_to_comics>:/comics \
+#   -v <path_to_downloads>:/downloads \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   ghcr.io/linuxserver/mylar3
+Options: PUID, PGID, TZ
+
+Name: Prowlarr
+Description: Indexer manager for Radarr, Sonarr, Lidarr, and other PVR apps.
+Port: 9696
+# docker pull ghcr.io/linuxserver/prowlarr
+# docker run -d \
+#   --name=prowlarr \
+#   -p 9696:9696 \
+#   -v <path_to_config>:/config \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   ghcr.io/linuxserver/prowlarr
+Options: PUID, PGID, TZ
+
+Name: Jackett
+Description: Provides API support for torrent trackers, used by apps like Radarr/Sonarr/Lidarr.
+Port: 9117
+# docker pull ghcr.io/linuxserver/jackett
+# docker run -d \
+#   --name=jackett \
+#   -p 9117:9117 \
+#   -v <path_to_config>:/config \
+#   -v <path_to_blackhole>:/downloads # Optional: for blackhole category \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   ghcr.io/linuxserver/jackett
+Options: PUID, PGID, TZ
+
+Name: Jellyseerr / Overseerr
+Description: Request management and media discovery tool for Jellyfin and Plex.
+Port: 5055
+# docker pull ghcr.io/sctx/jellyseerr # or ghcr.io/linuxserver/overseerr
+# docker run -d \
+#   --name=jellyseerr \
+#   -p 5055:5055 \
+#   -v <path_to_config>:/app/config \
+#   -e TZ=Etc/UTC \
+#   ghcr.io/sctx/jellyseerr
+Options: TZ
+
+Name: Tdarr
+Description: Distributed media transcoding automation, can convert media to compatible formats.
+Port: 8266
+# docker pull tdarr/tdarr
+# docker run -d \
+#   --name=tdarr \
+#   -p 8266:8266 \
+#   -v <path_to_server_config>:/app/server/configs \
+#   -v <path_to_logs>:/app/server/logs \
+#   -v <path_to_media>:/media # Mount your media libraries \
+#   -v <path_to_temp>:/temp # Optional: Transcode cache \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   -e UMASK_SET=002 \
+#   -e SERVER_IP=<your_server_ip> # Important for nodes to connect \
+#   tdarr/tdarr
+Options: PUID, PGID, TZ, UMASK_SET, SERVER_IP
+
+Name: Unmanic
+Description: An unattended tool to optimize your media files for playback and storage.
+Port: 8080
+# docker pull deathbyhypnos/unmanic
+# docker run -d \
+#   --name=unmanic \
+#   -p 8080:8080 \
+#   -v <path_to_config>:/config \
+#   -v <path_to_library>:/library # Mount your media library \
+#   -v <path_to_cache>:/tmp/unmanic # Optional: Cache directory \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   deathbyhypnos/unmanic
+Options: PUID, PGID, TZ
+
+Name: Airsonic-advanced
+Description: A modern community-driven open-source music server, fork of Airsonic.
+Port: 4040
+# docker pull linuxserver/airsonic-advanced
+# docker run -d \
+#   --name=airsonic-advanced \
+#   -p 4040:4040 \
+#   -v <path_to_config>:/config \
+#   -v <path_to_music>:/music \
+#   -v <path_to_podcasts>:/podcasts # Optional \
+#   -v <path_to_playlists>:/playlists # Optional \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   -e JAVA_OPTS= # Optional: Java options \
+#   linuxserver/airsonic-advanced
+Options: PUID, PGID, TZ, JAVA_OPTS
+
+Name: Funkwhale
+Description: A federated, free and open-source music server and streamer with social features. (Multi-container)
+Port: n.a.
+# docker-compose up -d # Funkwhale is typically deployed using Docker Compose.
+Options: Typically configured via environment variables in a docker-compose.yml file. Specific command line options for a single container run are less common.
+
+Name: FileGator
+Description: A lightweight, multi-user file manager with a web interface.
+Port: 80
+# docker pull filegator/filegator
+# docker run -d \
+#   --name=filegator \
+#   -p 80:80 \
+#   -v <path_to_data>:/var/www/html/repository \
+#   -v <path_to_config>:/var/www/html/config \
+#   filegator/filegator
+Options: None specifically common beyond standard Docker options.
+
+Name: SFTPGo
+Description: A full-featured SFTP server with FTP/S, S3, and WebDAV support, and a web admin interface.
+Port: 8080 (Admin UI), 22 (SFTP)
+# docker pull ghcr.io/drakkan/sftpgo
+# docker run -d \
+#   --name=sftpgo \
+#   -p 8080:8080 # Admin UI \
+#   -p 22:22 # SFTP \
+#   -v <path_to_config>:/etc/sftpgo \
+#   -v <path_to_data>:/var/lib/sftpgo \
+#   -v <path_to_your_volumes>:/srv/sftpgo \
+#   ghcr.io/drakkan/sftpgo
+Options: None specifically common beyond standard Docker options.
+
+Name: Sharry
+Description: A simple web-based file sharing system.
+Port: 8080
+# docker pull lenfest/sharry
+# docker run -d \
+#   --name=sharry \
+#   -p 8080:8080 \
+#   -v <path_to_data>:/data \
+#   lenfest/sharry
+Options: None specifically common beyond standard Docker options.
+
+Name: Netdata
+Description: Real-time performance monitoring for systems and applications with a great web dashboard.
+Port: 19999
+# docker pull netdata/netdata
+# docker run -d \
+#   --name=netdata \
+#   -p 19999:19999 \
+#   -v netdatalib:/var/lib/netdata \
+#   -v netdatacache:/var/cache/netdata \
+#   -v /etc/passwd:/etc/passwd:ro \
+#   -v /etc/group:/etc/group:ro \
+#   -v /proc:/host/proc:ro \
+#   -v /sys:/host/sys:ro \
+#   -v /etc/os-release:/host/etc/os-release:ro \
+#   --restart always \
+#   --cap-add SYS_PTRACE \
+#   netdata/netdata
+Options: --cap-add SYS_PTRACE, various volume mounts for host system monitoring.
+
+Name: cAdvisor
+Description: Analyzes resource usage and performance characteristics of running containers.
+Port: 8080
+# docker pull gcr.io/cadvisor/cadvisor
+# docker run -d \
+#   --name=cadvisor \
+#   -p 8080:8080 \
+#   -v /:/rootfs:ro \
+#   -v /var/run:/var/run:rw \
+#   -v /sys:/sys:ro \
+#   -v /var/lib/docker/:/var/lib/docker:ro \
+#   -v /dev/disk/:/dev/disk:ro \
+#   --restart always \
+#   gcr.io/cadvisor/cadvisor
+Options: Various volume mounts for accessing Docker and system information.
+
+Name: Healthchecks.io
+Description: Monitors your cron jobs, background services, and scheduled tasks by listening for pings. (Requires a database container)
+Port: n.a.
+# docker-compose up -d # Healthchecks.io is typically deployed using Docker Compose.
+Options: Typically configured via environment variables in a docker-compose.yml file. Specific command line options for a single container run are less common.
+
+Name: Authentik
+Description: An open-source identity provider and authentication server with Single Sign-On (SSO). (Multi-container)
+Port: 9000 (HTTP - internal), 9443 (HTTPS - internal) - typically accessed via reverse proxy on 80/443.
+# docker-compose up -d # Authentik is typically deployed using Docker Compose.
+Options: Typically configured via environment variables in a docker-compose.yml file. Specific command line options for a single container run are less common.
+
+Name: Authelia
+Description: An open-source authentication and authorization server providing 2FA and SSO via a reverse proxy. (Requires a database container)
+Port: n.a. (Runs behind a reverse proxy)
+# docker-compose up -d # Authelia is typically deployed using Docker Compose.
+Options: Typically configured via a configuration file and environment variables in a docker-compose.yml file. Specific command line options for a single container run are less common.
+
+Name: Ntopng
+Description: A web-based tool for monitoring network traffic and usage.
+Port: 3000
+# docker pull ntop/ntopng
+# docker run -d \
+#   --name=ntopng \
+#   -p 3000:3000 \
+#   -v <path_to_data>:/var/lib/ntopng \
+#   --network=host # Often required for network monitoring \
+#   ntop/ntopng \
+#   -i <your_network_interface> # e.g., eth0
+Options: --network=host, -i (specify network interface)
+
+Name: Monitorr
+Description: A simple PHP-based web server and uptime monitoring dashboard for self-hosted services.
+Port: 80
+# docker pull monitorr/monitorr
+# docker run -d \
+#   --name=monitorr \
+#   -p 80:80 \
+#   -v <path_to_config>:/app/config \
+#   monitorr/monitorr
+Options: None specifically common beyond standard Docker options.
+
+Name: HedgeDoc
+Description: A real-time collaborative markdown editor.
+Port: 3000
+# docker pull linuxserver/hedgedoc # or quay.io/hedgedoc/hedgedoc
+# docker run -d \
+#   --name=hedgedoc \
+#   -p 3000:3000 \
+#   -v <path_to_config>:/hedgedoc/config.json \
+#   -v <path_to_data>:/hedgedoc/data \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   linuxserver/hedgedoc
+Options: PUID, PGID, TZ
+
+Name: Standard Notes Syncing Server
+Description: The server component for the encrypted notes application Standard Notes.
+Port: 2000 (API)
+# docker pull standardnotes/syncing-server
+# docker run -d \
+#   --name=standardnotes-sync \
+#   -p 2000:2000 \
+#   -v <path_to_data>:/data \
+#   standardnotes/syncing-server
+Options: None specifically common beyond standard Docker options.
+
+Name: Joplin Server
+Description: The server component for the Joplin note-taking application synchronization.
+Port: 22300 (API)
+# docker pull ghcr.io/ টেনেট/joplin-server # Image name might vary, check Docker Hub
+# docker run -d \
+#   --name=joplin-server \
+#   -p 22300:22300 \
+#   -v <path_to_data>:/var/lib/joplin-server \
+#   # ... database connection environment variables ...
+#   ghcr.io/ টেনেট/joplin-server
+Options: Various environment variables for database connection.
+
+Name: LessPass
+Description: A stateless password manager that generates unique passwords based on a master password and site info.
+Port: 80
+# docker pull lesspass/lesspass
+# docker run -d \
+#   --name=lesspass \
+#   -p 80:80 \
+#   lesspass/lesspass
+Options: None specifically common beyond standard Docker options.
+
+Name: Gotify
+Description: A simple server for sending and receiving push notifications to mobile devices via an API.
+Port: 80 (HTTP), 443 (HTTPS)
+# docker pull gotify/server
+# docker run -d \
+#   --name=gotify \
+#   -p 80:80 \
+#   -p 443:443 # Optional: for HTTPS \
+#   -v <path_to_data>:/app/data \
+#   gotify/server
+Options: None specifically common beyond standard Docker options.
+
+Name: ArchiveBox
+Description: A self-hosted tool that archives websites you designate into various formats (HTML, PDF, screenshot, etc.).
+Port: 8000 (Admin UI)
+# docker pull archivebox/archivebox
+# docker run -d \
+#   --name=archivebox \
+#   -p 8000:8000 \
+#   -v <path_to_data>:/data \
+#   archivebox/archivebox
+Options: None specifically common beyond standard Docker options.
+
+Name: Wallabag
+Description: A self-hosted "read-it-later" application. (Requires a database container)
+Port: 80
+# docker pull wallabag/wallabag
+# docker run -d \
+#   --name=wallabag \
+#   -p 80:80 \
+#   -v <path_to_data>:/var/www/wallabag/data \
+#   # ... database connection environment variables ...
+#   wallabag/wallabag
+Options: Various environment variables for database connection.
+
+Name: LibreTranslate
+Description: Free and open-source machine translation API and web demo.
+Port: 5000 (Demo UI / API)
+# docker pull libretranslate/libretranslate
+# docker run -d \
+#   --name=libretranslate \
+#   -p 5000:5000 \
+#   libretranslate/libretranslate
+Options: None specifically common beyond standard Docker options.
+
+Name: AudioConvert
+Description: A simple web-based tool for converting audio files between formats.
+Port: 8080
+# docker pull joshxyzhimself/audio-convert # Check Docker Hub for latest
+# docker run -d \
+#   --name=audio-convert \
+#   -p 8080:80 \
+#   joshxyzhimself/audio-convert
+Options: None specifically common beyond standard Docker options.
+
+Name: Dashdot
+Description: A minimal, modern server dashboard for monitoring system resources.
+Port: 3001
+# docker pull sourcegraph/dashdot # or mauricenino/dashdot
+# docker run -d \
+#   --name=dashdot \
+#   -p 3001:3001 \
+#   -v /:/mnt/host:ro \
+#   --privileged \
+#   sourcegraph/dashdot
+Options: --privileged, volume mounts for host system info.
+
+Name: Flame
+Description: A simple startpage/dashboard for your server and applications.
+Port: 5000
+# docker pull pawelmalak/flame
+# docker run -d \
+#   --name=flame \
+#   -p 5000:5000 \
+#   -v <path_to_config>:/app/data \
+#   pawelmalak/flame
+Options: None specifically common beyond standard Docker options.
+
+Name: Homer
+Description: A simple static homepage for your server with customizable links and status checks.
+Port: 8080
+# docker pull bastienwirtz/homer
+# docker run -d \
+#   --name=homer \
+#   -p 8080:8080 \
+#   -v <path_to_assets>:/app/assets \
+#   bastienwirtz/homer
+Options: None specifically common beyond standard Docker options.
+
+Name: OvenMediaEngine
+Description: A low-latency HTTP-based live streaming server.
+Port: 9980 (Admin Console / API)
+# docker pull ovenmediaengine/ovenmediaengine
+# docker run -d \
+#   --name=ome \
+#   -p 1935:1935 # RTMP \
+#   -p 8080:8080 # HTTP \
+#   -p 8081:8081 # HTTPS \
+#   -p 3000:3000/udp # RIST \
+#   -p 9980:9980 # Admin Console / API \
+#   ovenmediaengine/ovenmediaengine
+Options: Various port mappings for different streaming protocols and admin access.
+
+Name: Owncast
+Description: A self-hosted, decentralized, open-source live video streaming platform.
+Port: 8080 (Admin / Viewer)
+# docker pull owncast/owncast
+# docker run -d \
+#   --name=owncast \
+#   -p 8080:8080 \
+#   -v <path_to_data>:/app/data \
+#   owncast/owncast
+Options: None specifically common beyond standard Docker options.
+
+Name: Tube Archivist
+Description: A self-hosted solution to download, archive, and organize videos from YouTube. (Requires a database container)
+Port: 8000
+# docker pull tubearchivist/tubearchivist
+# docker-compose up -d # Tube Archivist is typically deployed using Docker Compose.
+Options: Typically configured via environment variables in a docker-compose.yml file. Specific command line options for a single container run are less common.
+
+Name: Podgrab
+Description: A podcast downloader and web player.
+Port: 8080
+# docker pull akhilrex/podgrab
+# docker run -d \
+#   --name=podgrab \
+#   -p 8080:8080 \
+#   -v <path_to_data>:/app/data \
+#   akhilrex/podgrab
+Options: None specifically common beyond standard Docker options.
+
+Name: Drawio
+Description: A server for the Draw.io (now diagrams.net) online diagramming tool.
+Port: 8080
+# docker pull jgraph/drawio
+# docker run -d \
+#   --name=drawio \
+#   -p 8080:8080 \
+#   jgraph/drawio
+Options: None specifically common beyond standard Docker options.
+
+Name: ExifCleaner
+Description: A web-based tool to clean metadata (like EXIF, GPS) from photos, videos, and other files.
+Port: 8000
+# docker pull ghcr.io/evilsocket/exifcleaner
+# docker run -d \
+#   --name=exifcleaner \
+#   -p 8000:8000 \
+#   ghcr.io/evilsocket/exifcleaner
+Options: None specifically common beyond standard Docker options.
+
+Name: Stellarium Web
+Description: A server for the web version of the Stellarium planetarium software.
+Port: 80
+# docker pull stellarium/stellarium-web
+# docker run -d \
+#   --name=stellarium-web \
+#   -p 80:80 \
+#   stellarium/stellarium-web
+Options: None specifically common beyond standard Docker options.
+
+Name: Statping
+Description: A beautiful status page for monitoring your websites and services. (Can use SQLite or connect to external DB)
+Port: 8080
+# docker pull statping/statping
+# docker run -d \
+#   --name=statping \
+#   -p 8080:8080 \
+#   -v <path_to_data>:/app \
+#   statping/statping
+Options: None specifically common beyond standard Docker options.
+
+Name: Appsmith
+Description: A low-code platform for building internal tools, dashboards, and workflows with a visual interface. (Multi-container setup recommended)
+Port: 80 (HTTP), 443 (HTTPS) - typically accessed via these ports mapped to internal container ports.
+# docker-compose up -d # Appsmith is typically deployed using Docker Compose.
+Options: Typically configured via environment variables in a docker-compose.yml file. Specific command line options for a single container run are less common.
+
+Name: Duplicati
+Description: A free backup client that securely stores encrypted, incremental, compressed backups on cloud storage services and remote file servers.
+Port: 8200
+# docker pull linuxserver/duplicati # or ghcr.io/linuxserver/duplicati
+# docker run -d \
+#   --name=duplicati \
+#   -p 8200:8200 \
+#   -v <path_to_config>:/config \
+#   -v <path_to_source_data>:/source \
+#   -v <path_to_destination_data>:/destination \
+#   -e PUID=1000 \
+#   -e PGID=1000 \
+#   -e TZ=Etc/UTC \
+#   linuxserver/duplicati
+Options: PUID, PGID, TZ
+
+Name: UrBackup
+Description: An open-source client/server backup system for disk images and file backups.
+Port: 55414 (Admin)
+# docker pull urbackup/server
+# docker run -d \
+#   --name=urbackup \
+#   -p 55414:55414 # Admin UI \
+#   -p 35623:35623 # Client communication \
+#   -p 35623:35623/udp # Client communication \
+#   -v <path_to_data>:/var/lib/urbackup \
+#   -v <path_to_backups>:/backups \
+#   urbackup/server
+Options: None specifically common beyond standard Docker options.
+
+Name: BudgetZen
+Description: A modern, self-hosted budgeting application (alternative to Actual Budget, Firefly III). (Requires a database container)
+Port: 8080
+# docker pull ghcr.io/budgetzen/budgetzen
+# docker run -d \
+#   --name=budgetzen \
+#   -p 8080:8080 \
+#   # ... database connection environment variables ...
+#   ghcr.io/budgetzen/budgetzen
+Options: Various environment variables for database connection.
+
+Name: Bookwyrm
+Description: A federated social network for tracking and discussing books. (Multi-container)
+Port: n.a.
+# docker-compose up -d # Bookwyrm is typically deployed using Docker Compose.
+Options: Typically configured via environment variables in a docker-compose.yml file. Specific command line options for a single container run are less common.
+
+Name: Planka
+Description: An open-source Kanban board application, alternative to Trello. (Requires a database container)
+Port: 80
+# docker pull plankanban/planka
+# docker run -d \
+#   --name=planka \
+#   -p 80:80 \
+#   # ... database connection environment variables ...
+#   plankanban/planka
+Options: Various environment variables for database connection.
+
+Name: Focalboard
+Description: An open-source project management, collaboration, and note-taking tool (Kanban, Table, Calendar views).
+Port: 8000
+# docker pull mattermost/focalboard
+# docker run -d \
+#   --name=focalboard \
+#   -p 8000:8000 \
+#   -v <path_to_data>:/opt/focalboard/data \
+#   mattermost/focalboard
+Options: None specifically common beyond standard Docker options.
+
+Name: Baserow
+Description: An open-source no-code database and Airtable alternative. (Can use SQLite or connect to external DB)
+Port: 80
+# docker pull baserow/baserow
+# docker run -d \
+#   --name=baserow \
+#   -p 80:80 \
+#   -v <path_to_data>:/baserow/data \
+#   baserow/baserow
+Options: None specifically common beyond standard Docker options.
+
+Name: NocoDB
+Description: An open-source no-code database and Airtable alternative that connects to existing databases. (Requires a database)
+Port: 3000
+# docker pull nocodb/nocodb
+# docker run -d \
+#   --name=nocodb \
+#   -p 3000:3000 \
+#   # ... database connection environment variables ...
+#   nocodb/nocodb
+Options: Various environment variables for database connection.
+
+Name: TypeSense
+Description: An open-source, typo-tolerant search engine.
+Port: 8108 (API)
+# docker pull typesense/typesense
+# docker run -d \
+#   --name=typesense \
+#   -p 8108:8108 \
+#   -v <path_to_data>:/data \
+#   typesense/typesense \
+#   --data-dir /data --api-key <your_api_key>
+Options: --data-dir, --api-key
+
+Name: Manticore Search
+Description: A free, open-source, fast search engine.
+Port: 9308 (HTTP), 9306 (MySQL) - API ports. Admin interface might be separate.
+# docker pull manticoresearch/manticoresearch
+# docker run -d \
+#   --name=manticoresearch \
+#   -p 9308:9308 # HTTP API \
+#   -p 9306:9306 # MySQL API \
+#   -v <path_to_data>:/var/lib/manticore \
+#   manticoresearch/manticoresearch
+Options: None specifically common beyond standard Docker options.
+
+Name: Penpot
+Description: An open-source design and prototyping platform. (Multi-container)
+Port: n.a.
+# docker-compose up -d # Penpot is typically deployed using Docker Compose.
+Options: Typically configured via environment variables in a docker-compose.yml file. Specific command line options for a single container run are less common.
+
+Name: AppFlowy
+Description: A privacy-first alternative to Notion, with a self-hostable sync backend. (Image might be for backend/sync)
+Port: 80 (HTTP), 443 (HTTPS) - typically accessed via these ports mapped externally.
+# docker-compose up -d # AppFlowy is typically deployed using Docker Compose.
+Options: Typically configured via environment variables in a docker-compose.yml file. Specific command line options for a single container run are less common.
+
+Name: ActiMirror
+Description: A customizable dashboard for displaying various information feeds (weather, news, calendar, etc.).
+Port: 8080
+# docker pull actiweb/actimirror # Check Docker Hub for latest
+# docker run -d \
+#   --name=actimirror \
+#   -p 8080:80 \
+#   -v <path_to_config>:/app/config \
+#   actiweb/actimirror
+Options: None specifically common beyond standard Docker options.
+
+Name: DashMachine
+Description: A responsive dashboard with +100 themed services.
+Port: 5000
+# docker pull rmountjoy92/dashmachine
+# docker run -d \
+#   --name=dashmachine \
+#   -p 5000:5000 \
+#   -v <path_to_config>:/user-data \
+#   rmountjoy92/dashmachine
+Options: None specifically common beyond standard Docker options.
+
+Name: LibrePhotos
+Description: A self-hosted open-source photo management system with AI features (alternative to PhotoPrism). (Multi-container)
+Port: n.a.
+# docker-compose up -d # LibrePhotos is typically deployed using Docker Compose.
+Options: Typically configured via environment variables in a docker-compose.yml file. Specific command line options for a single container run are less common.
+
+Name: Photoview
+Description: A simple and user-friendly photo management gallery with a focus on privacy. (Requires a database container)
+Port: 8000
+# docker pull photoview/photoview
+# docker run -d \
+#   --name=photoview \
+#   -p 8000:80 \
+#   -v <path_to_photos>:/photos \
+#   -v <path_to_config>:/config \
+#   # ... database connection environment variables ...
+#   photoview/photoview
+Options: Various environment variables for database connection.
+
+Name: WriteFreely
+Description: A simple, minimalist platform for writing and publishing articles.
+Port: 2345
+# docker pull writefreely/writefreely
+# docker run -d \
+#   --name=writefreely \
+#   -p 2345:80 \
+#   -v <path_to_data>:/data \
+#   writefreely/writefreely
+Options: None specifically common beyond standard Docker options.
+
+Name: Plume
+Description: A federated blogging engine, based on ActivityPub. (Requires a database container)
+Port: n.a.
+# docker-compose up -d # Plume is typically deployed using Docker Compose.
+Options: Typically configured via environment variables in a docker-compose.yml file. Specific command line options for a single container run are less common.
+
+Name: Wordpress
+Description: A widely used platform for creating websites and blogs. (Requires a database container)
+Port: n.a.
+# docker-compose up -d # WordPress is typically deployed with a database using Docker Compose.
+Options: Typically configured via environment variables in a docker-compose.yml file. Specific command line options for a single container run are less common.
+
+Name: Joomla
+Description: A popular Content Management System (CMS) for building websites. (Requires a database container)
+Port: n.a.
+# docker-compose up -d # Joomla is typically deployed with a database using Docker Compose.
+Options: Typically configured via environment variables in a docker-compose.yml file. Specific command line options for a single container run are less common.
+
+Name: Drupal
+Description: A powerful and flexible Content Management System (CMS). (Requires a database container)
+Port: n.a.
+# docker-compose up -d # Drupal is typically deployed with a database using Docker Compose.
+Options: Typically configured via environment variables in a docker-compose.yml file. Specific command line options for a single container run are less common.
+
+Name: Commento
+Description: A fast, privacy-focused commenting platform for websites. (Requires a database container)
+Port: 8080 (Admin)
+# docker pull eduardobc/commento
+# docker run -d \
+#   --name=commento \
+#   -p 8080:8080 \
+#   # ... database connection environment variables ...
+#   eduardobc/commento
+Options: Various environment variables for database connection and configuration.
+
+Name: Flarum
+Description: A simple, fast, and free forum software. (Requires a database container)
+Port: n.a.
+# docker-compose up -d # Flarum is typically deployed with a database using Docker Compose.
+Options: Typically configured via environment variables in a docker-compose.yml file. Specific command line options for a single container run are less common.
+
+Name: NodeBB
+Description: A next-generation forum software based on Node.js. (Requires a database - Redis or MongoDB)
+Port: 4567
+# docker pull ghcr.io/nodebb/docker
+# docker run -d \
+#   --name=nodebb \
+#   -p 4567:4567 \
+#   -v <path_to_data>:/data \
+#   # ... database connection environment variables ...
+#   ghcr.io/nodebb/docker
+Options: Various environment variables for database connection.
+
+Name: Openfire
+Description: A real-time collaboration (chat) server based on XMPP. (Requires a database)
+Port: 9090 (Admin HTTP), 9091 (Admin HTTPS)
+# docker pull igniterealtime/openfire
+# docker run -d \
+#   --name=openfire \
+#   -p 9090:9090 # Admin HTTP \
+#   -p 9091:9091 # Admin HTTPS \
+#   -p 5222:5222 # XMPP Client \
+#   -p 5223:5223 # XMPP Client SSL \
+#   -p 5269:5269 # XMPP Server \
+#   -v <path_to_data>:/var/lib/openfire \
+#   # ... database connection environment variables ...
+#   igniterealtime/openfire
+Options: Various port mappings for different services, database connection environment variables.
+
+Name: Ntfy
+Description: A simple HTTP-based push notification service. Send notifications to your phone or desktop via scripts.
+Port: 80 (HTTP), 443 (HTTPS)
+# docker pull binwiederhier/ntfy
+# docker run -d \
+#   --name=ntfy \
+#   -p 80:80 \
+#   -p 443:443 # Optional: for HTTPS \
+#   -v <path_to_data>:/var/cache/ntfy \
+#   binwiederhier/ntfy
+Options: None specifically common beyond standard Docker options.
+
+Name: Adminer
+Description: A full-featured database management tool packed into a single PHP file, accessible via web.
+Port: 8080
+# docker pull adminer
+# docker run -d \
+#   --name=adminer \
+#   -p 8080:8080 \
+#   adminer
+Options: None specifically common beyond standard Docker options.
+
+Name: phpMyAdmin
+Description: A popular web-based administration tool for MySQL and MariaDB databases.
+Port: 80
+# docker pull phpmyadmin/phpmyadmin
+# docker run -d \
+#   --name=phpmyadmin \
+#   -p 80:80 \
+#   -e PMA_HOST=<db_host> # Database host \
+#   -e PMA_PORT=<db_port> # Database port \
+#   phpmyadmin/phpmyadmin
+Options: PMA_HOST, PMA_PORT
+
+Name: pgAdmin
+Description: A web-based administration tool for PostgreSQL databases.
+Port: 80
+# docker pull dpage/pgadmin4
+# docker run -d \
+#   --name=pgadmin \
+#   -p 80:80 \
+#   -e PGADMIN_DEFAULT_EMAIL="<your_email>" \
+#   -e PGADMIN_DEFAULT_PASSWORD="<your_password>" \
+#   dpage/pgadmin4
+Options: PGADMIN_DEFAULT_EMAIL, PGADMIN_DEFAULT_PASSWORD
+
+Name: Gogs
+Description: A painless, self-hosted Git service (alternative to Gitea). (Can use SQLite or connect to external DB)
+Port: 3000 (HTTP), 22 (SSH - often mapped)
+# docker pull gogs/gogs
+# docker run -d \
+#   --name=gogs \
+#   -p 3000:3000 \
+#   -p 2222:22 # Map SSH to host port 2222 \
+#   -v <path_to_data>:/data \
+#   gogs/gogs
+Options: Various environment variables for database connection and configuration.
+
+Name: Forgejo
+Description: A friendly fork of Gitea, a self-hosted Git service. (Can use SQLite or connect to external DB)
+Port: 3000 (HTTP), 22 (SSH - often mapped)
+# docker pull codeberg.org/forgejo/forgejo
+# docker run -d \
+#   --name=forgejo \
+#   -p 3000:3000 \
+#   -p 2222:22 # Map SSH to host port 2222 \
+#   -v <path_to_data>:/data \
+#   codeberg.org/forgejo/forgejo
+Options: Various environment variables for database connection and configuration.
+
+Name: Grafana
+Description: A leading open-source platform for monitoring and observability, creating dashboards from various data sources. (Requires a database, e.g., SQLite or PostgreSQL)
+Port: 3000
+# docker pull grafana/grafana
+# docker run -d \
+#   --name=grafana \
+#   -p 3000:3000 \
+#   -v grafana-storage:/var/lib/grafana \
+#   grafana/grafana
+Options: Various environment variables for database connection and configuration.
+

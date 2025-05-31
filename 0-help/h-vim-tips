@@ -1,0 +1,61 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Ongoing Vim Tips
+===============
+
+- **Replacing one word with another word using visual mode yank and paste**:
+    - Move cursor to the start of a word, then `v` to enter **Visual Mode**.
+    - Use cursor keys or `h`/`l` to select the word (or `<C-right>` or `<C-l>` to word select).
+    - Press `y` to yank the selection into the buffer.
+    - Go to where you want to replace, and again, `v` to start selection and select the word.
+    - Then press `p` or `P` to replace the selected text with the text in the buffer.
+
+- **The "0 Register Tip"**:
+    - A lifesaver for when the unnamed register ("") gets clobbered.
+    - When you yank text with `y`, Vim stores it in
+    - a) The Unnamed Register (\"\"), used by default for `p`/`P` but gets overwritten by any delete or yank, and
+    - b) "Register 0" (\"0). This register specifically stores the text from the most recent `y` (yank) command and is *not* overwritten by `d`, `x`, or `c` commands.
+    - So, to reliably paste the last text you explicitly yanked, even if you've deleted other things since, visually select your source word, press `y`, go to your target location, visually select the text to be replaced, and then instead of just `p` or `P`, press `"` (double quote), then `0` (zero), then `p`.
+    - So, it's `"0p`, or `"0P` to explicitly tells Vim "delete the selection and put the contents of register 0 here." This often saves you from the "oops, I deleted something and now my paste is wrong" problem.  
+
+- **Append things to the end of multiple lines three ways**:
+    - 
+    - `V` and up/down to select the lines.
+    - `:` to enter **Command Mode** and then `norm` and then a space and `A` (append)
+    - After the `A` put what you want to append to the line, maybe a `" or two spaces for Markdown breaks, etc.
+    - Press `Enter` and the text will be added.
+Method 2: Using the Substitute Command (:s)
+This method uses a regular expression to find the end of each line and replace it with itself plus two spaces.
+
+Visually select the lines:
+
+As above, use V and movement keys to select the 50 lines.
+Enter Command Mode and use :s:
+
+Press : to enter command mode. Vim will fill in the '<,'> range.
+Type s/$/ / (that's s for substitute, / delimiter, $ to match the end of the line, / delimiter, two spaces as the replacement, and a final / delimiter which is optional here).
+The full command will look like: :'<,'>s/$/ /
+Press Enter.
+This command will find the end of each selected line ($) and append two spaces there.
+
+Method 3: Using Visual Block Mode
+This method is also quite popular for column-based edits.
+
+Go to the first of the 50 lines.
+Enter Visual Block Mode:
+Press Ctrl+V (or Ctrl+Q on some systems if Ctrl+V is mapped to paste).
+Select the lines:
+Press 49j (to go down 49 lines, selecting a total of 50 lines).
+Go to the end of the lines:
+Press $ to make the visual block extend to the end of each selected line.
+Append text:
+Press A (uppercase A). This will move the cursor to the end of the first line and enter insert mode.
+Type the two spaces.
+Press Esc.
+
+EOF
+) | less -R

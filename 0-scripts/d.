@@ -1,0 +1,244 @@
+#!/bin/bash
+# File visualizer: bar graph for files in the current or specified directory
+
+# --- Configuration ---
+DEFAULT_DIR="."
+DEFAULT_TOP_N=0 # 0 means no limit for --top N
+
+# --- ANSI Color Codes ---
+# Check if stdout is a terminal and enable colors accordingly
+if [ -t 1 ]; then
+    # Use printf to store actual escape sequences in variables
+    COLOR_BOLD_RED=$(printf '\033[1;31m')
+    COLOR_BOLD_YELLOW=$(printf '\033[1;33m')
+    COLOR_BOLD_GREEN=$(printf '\033[1;32m')
+    COLOR_BOLD_BLUE=$(printf '\033[1;34m')
+    COLOR_RESET=$(printf '\033[0m')
+else
+    COLOR_BOLD_RED=''
+    COLOR_BOLD_YELLOW=''
+    COLOR_BOLD_GREEN=''
+    COLOR_BOLD_BLUE=''
+    COLOR_RESET=''
+fi
+BAR_CHAR="█" # U+2588 FULL BLOCK. Ensure your terminal font supports this.
+MAX_BAR_WIDTH=50 # Max characters for the bar graph
+
+# --- Function Definitions ---
+
+show_help() {
+cat << EOF
+File Size Visualizer
+
+Description:
+  Displays a bar graph of file sizes for files in the specified directory.
+  Bars are colored based on their percentage relative to the largest file.
+
+Usage:
+  $(basename "$0") [options] [DIR]
+
+Arguments:
+  DIR                   The directory to scan. Defaults to the current directory ("${DEFAULT_DIR}").
+
+Options:
+  -n, --name            Sort files by name (alphanumerically) instead of by size.
+                        Default is sorting by size (largest first).
+  -d, --disk-usage      Use 'du' to report disk usage (size on disk).
+                        By default, 'stat' is used to report apparent size.
+  -b, --basic           Ignore hidden files (files starting with a dot '.').
+  -s, --sudo            Use 'sudo' for 'find' and 'du'/'stat' commands.
+  --top N               Show only the top N files. N must be a positive integer.
+                        If N is 0, no limit is applied (default: ${DEFAULT_TOP_N}).
+  -h, --help            Show this help message and exit.
+
+Examples:
+  $(basename "$0")
+  $(basename "$0") --top 10 /var/log
+  $(basename "$0") -n -b --disk-usage /etc
+  $(basename "$0") -s --top 5 /root
+
+Notes:
+  - Assumes a UTF-8 compatible terminal and font for optimal display of bar characters.
+  - Color output is automatically disabled if the output is not a terminal.
+EOF
+}
+
+hr_size() {
+  local size_bytes="$1"
+  awk -v s="$size_bytes" 'BEGIN {
+    split("B K M G T P E", u)
+    i=1
+    while (s >= 1024 && i < length(u)) {
+      s /= 1024
+      i++
+    }
+    printf("%.1f %s\n", s, u[i])
+  }'
+}
+
+get_bar_color() {
+  local percent="$1"
+  if   [ "$percent" -ge 90 ]; then printf "%s" "${COLOR_BOLD_RED}"
+  elif [ "$percent" -ge 70 ]; then printf "%s" "${COLOR_BOLD_YELLOW}"
+  elif [ "$percent" -ge 40 ]; then printf "%s" "${COLOR_BOLD_GREEN}"
+  else                             printf "%s" "${COLOR_BOLD_BLUE}"
+  fi
+}
+
+# --- Argument Parsing ---
+USER_DIR_INPUT="$DEFAULT_DIR" # Store original user input for find
+SORT_BY_NAME=false
+DISK_USAGE=false
+IGNORE_HIDDEN=false
+USE_SUDO=false
+TOP_N="$DEFAULT_TOP_N"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -n|--name) SORT_BY_NAME=true; shift ;;
+    -d|--disk-usage) DISK_USAGE=true; shift ;;
+    -b|--basic) IGNORE_HIDDEN=true; shift ;;
+    -s|--sudo) USE_SUDO=true; shift ;;
+    --top)
+      if [[ -n "$2" && "$2" =~ ^[0-9]+$ ]]; then
+        TOP_N="$2"; shift 2
+      else
+        echo "Error: --top requires a non-negative integer value." >&2; show_help >&2; exit 1
+      fi ;;
+    -h|--help) show_help; exit 0 ;;
+    -*) echo "Unknown option: $1" >&2; show_help >&2; exit 1 ;;
+    *) USER_DIR_INPUT="$1"; shift ;;
+  esac
+done
+
+# Validate and resolve directory path
+if [[ ! -d "$USER_DIR_INPUT" ]]; then
+    echo "Error: Directory '$USER_DIR_INPUT' not found or is not a directory." >&2
+    exit 1
+fi
+
+# Resolve DIR to an absolute path for display
+DISPLAY_DIR="$USER_DIR_INPUT"
+if command -v realpath >/dev/null 2>&1; then
+    DISPLAY_DIR=$(realpath "$USER_DIR_INPUT")
+elif command -v readlink >/dev/null 2>&1 && readlink -f "$USER_DIR_INPUT" >/dev/null 2>&1; then
+    DISPLAY_DIR=$(readlink -f "$USER_DIR_INPUT")
+elif [[ "$USER_DIR_INPUT" == "." ]]; then
+    DISPLAY_DIR=$(pwd)
+elif [[ "$USER_DIR_INPUT" == ".." ]]; then
+    DISPLAY_DIR=$(cd .. && pwd)
+else # Basic attempt for other relative paths or if it's already absolute
+    if [[ "$USER_DIR_INPUT" =~ ^/ ]]; then # Already absolute
+        DISPLAY_DIR="$USER_DIR_INPUT"
+    else # Prepend pwd for relative paths
+        DISPLAY_DIR="$(pwd)/$USER_DIR_INPUT"
+        # This won't normalize ../ in the middle, but realpath/readlink should have caught it
+    fi
+fi
+
+# --- Main Logic ---
+CMD_PREFIX=""
+if $USE_SUDO; then
+  if command -v sudo >/dev/null 2>&1; then CMD_PREFIX="sudo"; else
+    echo "Warning: -s/--sudo specified, but 'sudo' command not found. Proceeding without sudo." >&2
+  fi
+fi
+
+find_args=("$USER_DIR_INPUT" -maxdepth 1 -type f)
+$IGNORE_HIDDEN && find_args+=('!' -name '.*')
+find_args+=(-print0)
+
+TMP_FILE_LISTING=$(mktemp)
+trap 'rm -f "$TMP_FILE_LISTING" "$SORTED_AND_TRIMMED_OUTPUT" 2>/dev/null' EXIT # Add SORTED_AND_TRIMMED_OUTPUT here
+
+if ! $CMD_PREFIX find "${find_args[@]}" | while IFS= read -r -d '' file_path; do
+    size_cmd_output=""
+    if $DISK_USAGE; then
+        size_cmd_output=$($CMD_PREFIX du -B1 "$file_path" 2>/dev/null | awk '{print $1}')
+    else
+        size_cmd_output=$($CMD_PREFIX stat --printf="%s" "$file_path" 2>/dev/null)
+    fi
+    if [[ "$size_cmd_output" =~ ^[0-9]+$ ]]; then
+        printf "%s\t%s\n" "$size_cmd_output" "$file_path"
+    fi
+done > "$TMP_FILE_LISTING"; then
+    echo "Error: Failed to list or process files in '$USER_DIR_INPUT'." >&2
+    exit 1
+fi
+
+if [[ ! -s "$TMP_FILE_LISTING" ]]; then
+  echo "No files found or accessible in '$DISPLAY_DIR' matching the criteria."
+  exit 0
+fi
+
+SORTED_AND_TRIMMED_OUTPUT=$(mktemp)
+# trap already includes SORTED_AND_TRIMMED_OUTPUT from above
+
+if $SORT_BY_NAME; then
+  sort -t $'\t' -k2 "$TMP_FILE_LISTING" > "$SORTED_AND_TRIMMED_OUTPUT"
+else
+  sort -t $'\t' -nrk1 "$TMP_FILE_LISTING" > "$SORTED_AND_TRIMMED_OUTPUT"
+fi
+
+if [[ "$TOP_N" -gt 0 ]]; then
+  head -n "$TOP_N" "$SORTED_AND_TRIMMED_OUTPUT" > "$TMP_FILE_LISTING"
+  cat "$TMP_FILE_LISTING" > "$SORTED_AND_TRIMMED_OUTPUT"
+fi
+
+if [[ ! -s "$SORTED_AND_TRIMMED_OUTPUT" ]]; then
+  echo "No files to display after filtering and sorting."
+  exit 0
+fi
+
+MAX_SIZE=$(awk -F'\t' '{print $1}' "$SORTED_AND_TRIMMED_OUTPUT" | sort -nr | head -n1)
+MAX_NAME_LEN=$(awk -F'\t' '{print $2}' "$SORTED_AND_TRIMMED_OUTPUT" | sed 's:.*/::' | awk '{ print length }' | sort -nr | head -n1)
+
+[[ -z "$MAX_SIZE" || "$MAX_SIZE" -eq 0 ]] && MAX_SIZE=1
+[[ -z "$MAX_NAME_LEN" || "$MAX_NAME_LEN" -lt 1 ]] && MAX_NAME_LEN=20
+
+# --- Output Display ---
+printf "\n📦 File Size Bar Graph in %s\n\n" "$DISPLAY_DIR"
+
+TOTAL_BYTES_SUM=0
+
+while IFS=$'\t' read -r size_val path_val; do
+  filename=$(basename "$path_val")
+  if ! [[ "$size_val" =~ ^[0-9]+$ ]]; then continue; fi
+
+  TOTAL_BYTES_SUM=$((TOTAL_BYTES_SUM + size_val))
+
+  percent=0
+  [[ "$MAX_SIZE" -ne 0 ]] && percent=$(( size_val * 100 / MAX_SIZE ))
+
+  bar_len=$(( percent * MAX_BAR_WIDTH / 100 ))
+  [[ "$bar_len" -lt 0 ]] && bar_len=0
+  [[ "$bar_len" -gt "$MAX_BAR_WIDTH" ]] && bar_len="$MAX_BAR_WIDTH"
+
+  bar_fill=""
+  [ "$bar_len" -gt 0 ] && bar_fill=$(printf "%${bar_len}s" | tr ' ' "${BAR_CHAR}")
+
+  current_color=$(get_bar_color "$percent")
+  human_readable_size=$(hr_size "$size_val")
+
+  printf "%-${MAX_NAME_LEN}s  %8s | %s%s%s\n" \
+    "$filename" \
+    "$human_readable_size" \
+    "$current_color" \
+    "$bar_fill" \
+    "${COLOR_RESET}"
+done < "$SORTED_AND_TRIMMED_OUTPUT"
+
+# --- Total Line ---
+if [[ "$TOTAL_BYTES_SUM" -gt 0 || $(wc -l < "$SORTED_AND_TRIMMED_OUTPUT") -gt 0 ]]; then
+    HUMAN_TOTAL_SIZE=$(hr_size "$TOTAL_BYTES_SUM")
+    
+    # Create a separator line that spans the name, size, and initial bar portion
+    SEPARATOR_LEN=$((MAX_NAME_LEN + 2 + 8 + 3)) # Name + spaces + size col + " | "
+    SEPARATOR_LINE=$(printf "%${SEPARATOR_LEN}s" | tr ' ' '-')
+    printf "%s\n" "$SEPARATOR_LINE"
+
+    printf "%-${MAX_NAME_LEN}s  %8s | \n" "Total:" "$HUMAN_TOTAL_SIZE"
+fi
+
+# Temporary files are cleaned up by the trap
+exit 0

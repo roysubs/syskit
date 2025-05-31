@@ -1,0 +1,108 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Lazygit Overview
+=================
+
+### What is Lazygit?
+- **Lazygit** is a terminal-based Git UI that simplifies Git operations by providing a user-friendly interface for common Git tasks.
+- It is highly customizable and easy to use, making Git more accessible in the terminal.
+
+### Installation:
+
+1. **Install Lazygit on Debian-based systems**:
+    ```bash
+    sudo apt update
+    sudo apt install lazygit
+    ```
+
+2. **Alternatively, install via GitHub releases**:
+    - Go to [Lazygit GitHub releases](https://github.com/jesseduffield/lazygit/releases).
+    - Download the latest release for your system.
+    - Extract the archive and move the `lazygit` binary to `/usr/local/bin/`.
+
+### Starting Lazygit:
+- Run `lazygit` from your terminal to open the interactive interface.
+
+### Basic Interface Overview:
+- **Main Screen**: Displays files, branches, commits, and more.
+- **Panels**: Panels show information such as files, commits, and branches. Use the arrow keys to navigate.
+- **Status bar**: Shows information about the current repository, such as branch and remote.
+
+### Navigation:
+- **Move between panels**: `Tab` or `Shift+Tab` to move left and right.
+- **Navigate inside a panel**: Arrow keys.
+- **Open file/commit**: Enter key.
+
+### Common Commands:
+
+- **Stage/Unstage files**:
+  - To stage a file: `Space` (in the file list).
+  - To unstage a file: `u` (in the staged files list).
+  
+- **Commit changes**:
+  - Press `c` to start a commit. 
+  - Enter the commit message and press `Enter` to commit.
+  
+- **Push changes**:
+  - Press `p` to push your commits to the remote repository.
+  
+- **Pull changes**:
+  - Press `P` to pull changes from the remote repository.
+
+- **Create/Checkout Branch**:
+  - Press `b` to view branches and create new branches.
+  - Press `Shift+b` to checkout a branch.
+  
+- **View commit details**:
+  - Press `Enter` on a commit to view details (diff, author, date).
+
+- **View logs**:
+  - Press `l` to view the log for the current branch.
+  
+- **Merge branches**:
+  - Press `m` to merge another branch into the current branch.
+
+- **Revert commit**:
+  - Press `r` on a commit to revert it.
+
+- **Stash changes**:
+  - Press `s` to stash uncommitted changes.
+
+- **View diffs**:
+  - Press `d` to view a diff of the staged/unstaged changes.
+
+### Advanced Features:
+
+- **Search for files**:
+  - Press `/` to search for a file.
+  
+- **Show commit history for a file**:
+  - Press `h` when a file is selected to view its commit history.
+
+- **View remote repositories**:
+  - Press `Shift+r` to view remote repositories.
+
+- **Configure Git settings**:
+  - Press `?` to bring up the help menu and access configuration settings.
+
+### Tips:
+- **Split View**: Press `Tab` to switch between different panels.
+- **Customize Keybindings**: Modify the keybindings in the configuration file `~/.config/lazygit/config.yml`.
+- **Search Commits**: Press `/` to search the commit log.
+- **Diff View**: Press `d` to view changes in a commit or file.
+
+### Troubleshooting:
+- **Lazygit not starting?**:
+    - Ensure that your terminal supports TUI (text user interface) applications.
+    - Try updating your terminal or reinstalling the app.
+    
+- **Git authentication issues**:
+    - Ensure your SSH keys are correctly set up for GitHub or GitLab.
+    - You can configure the SSH key with `ssh-add` or update your Git configuration.
+
+EOF
+) | less -R

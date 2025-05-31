@@ -1,0 +1,51 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+VNC Quick Notes
+===============
+
+- **Install VNC Server**:
+    - For Ubuntu/Debian: `sudo apt install tightvncserver`
+    - For Fedora: `sudo dnf install tigervnc-server`
+
+- **Start VNC Server**:
+    - Start VNC server (default port 5901): `vncserver`
+    - Start with a custom display number (e.g., :2): `vncserver :2`
+    - Specify screen resolution: `vncserver :1 -geometry 1920x1080`
+    - Start with a specific user: `sudo -u username vncserver`
+
+- **Stop VNC Server**:
+    - Stop VNC server: `vncserver -kill :1` (for display :1)
+    - List VNC server sessions: `vncserver -list`
+
+- **Connect to VNC Server**:
+    - Use VNC client (e.g., TigerVNC, RealVNC):
+      - Connect to: `vncviewer server_ip:1` (display :1)
+      - Connect with password: `vncviewer server_ip:1 -passwd /path/to/password/file`
+    - Using SSH tunneling for secure VNC:
+      - `ssh -L 5901:localhost:5901 user@server_ip`
+      - Then connect to: `vncviewer localhost:1`
+
+- **VNC Configuration Files**:
+    - VNC server settings: `~/.vnc/xstartup` (set window manager, etc.)
+    - Example `xstartup` file:
+      ```bash
+      #!/bin/sh
+      xrdb $HOME/.Xresources
+      startxfce4 &  # Start desktop environment (e.g., XFCE)
+      ```
+    - Change VNC password: `vncpasswd`
+
+- **VNC Viewer Options**:
+    - Start in full-screen: `vncviewer -fullscreen server_ip:1`
+    - Start with 24-bit color depth: `vncviewer -depth 24 server_ip:1`
+
+- **VNC Security**:
+    - Configure VNC to use encrypted connections (requires Xvnc and SSL/TLS settings).
+    - SSH tunneling for encryption: `ssh -L 5901:localhost:5901 user@server_ip`
+
+EOF
+) | less -R

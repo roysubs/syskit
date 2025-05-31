@@ -1,0 +1,144 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Using UUIDs in /etc/fstab: Best Practices and How-Tos
+
+When setting up or maintaining a Linux system, one key consideration is how to reference storage devices in `/etc/fstab`. While some systems default to using `/dev/sdX` notation, it's generally better to use UUIDs for reliability and future-proofing.
+
+## Why Use UUIDs Instead of /dev/sdX Notation?
+
+### Potential Issues with /dev/sdX
+1. **Device Name Changes**:
+   - `/dev/sdX` device names are assigned dynamically based on detection order.
+   - Adding or rearranging drives, USB devices, or other hardware can cause these names to change, breaking mount points and potentially the boot process.
+
+2. **System Boot Failures**:
+   - If the system drive's `/dev/sdX` name changes, the system may drop into emergency mode during boot.
+
+3. **Lack of Portability**:
+   - `/dev/sdX` is hardware-specific and less predictable across different environments or when migrating systems.
+
+### Benefits of UUIDs
+1. **Consistency**:
+   - UUIDs (Universally Unique Identifiers) are tied to the filesystem and remain consistent, regardless of hardware changes.
+
+2. **Reliability**:
+   - Prevents boot issues and ensures devices are always mounted correctly.
+
+3. **Future-Proofing**:
+   - Using UUIDs avoids manual intervention if device names change, making systems more resilient to hardware modifications.
+
+---
+
+## When Is /dev/sdX Okay to Use?
+While UUIDs are preferred, there are some cases where `/dev/sdX` might suffice:
+1. **Single Disk Systems**:
+   - If the system has one storage device and no likelihood of adding more.
+
+2. **Embedded or Custom Systems**:
+   - Predictable hardware setups with no expected changes.
+
+3. **Non-Critical, Temporary Devices**:
+   - Devices like USB sticks or test drives where permanence isn’t necessary.
+
+Even in these cases, using UUIDs is generally a safer choice.
+
+---
+
+## How to Use UUIDs in /etc/fstab
+
+### 1. Find the UUID for a Device
+Run the following command to list the UUID for a device:
+```bash
+blkid /dev/sdX
+```
+Example output:
+```plaintext
+/dev/sda1: UUID="9c82dbdb-f997-4f0b-974d-3111b7e0e53a" TYPE="ext4"
+```
+
+### 2. Update /etc/fstab
+Replace `/dev/sdX` with the UUID in `/etc/fstab`. Example:
+#### Original `/etc/fstab` Entry
+```plaintext
+/dev/sda1 / ext4 defaults 0 1
+```
+#### Updated `/etc/fstab` Entry
+```plaintext
+UUID=9c82dbdb-f997-4f0b-974d-3111b7e0e53a / ext4 defaults 0 1
+```
+
+### 3. Rebuild GRUB (if applicable)
+After modifying `/etc/fstab`, update GRUB to ensure the changes are recognized:
+```bash
+sudo update-grub
+```
+
+### 4. Test Without Rebooting
+Run the following command to test the changes:
+```bash
+sudo mount -a
+```
+This checks for syntax errors and ensures everything is mounted correctly.
+
+### 5. Reboot
+After confirming that everything works, reboot the system:
+```bash
+sudo reboot
+```
+
+---
+
+## Handling Non-Critical Devices (e.g., USB Sticks and NAS Mounts)
+
+### When to Use UUIDs
+For non-critical devices (e.g., data drives, USB sticks, and NAS boxes):
+- **Use UUIDs if the device is semi-permanent** (e.g., regularly attached to the system).
+- **Use `/dev/sdX` for temporary devices**, but ensure they are not critical to the system.
+
+### Mount Options for Non-Critical Devices
+To prevent the system from entering emergency mode if the device is missing, use the `nofail` and `x-systemd.device-timeout` options in `/etc/fstab`. Example:
+```plaintext
+UUID=1234-5678 /mnt/nas ext4 defaults,nofail,x-systemd.device-timeout=10 0 2
+```
+- `nofail`: Prevents the system from failing to boot if the device is missing.
+- `x-systemd.device-timeout`: Limits how long the system waits for the device.
+
+---
+
+## Converting /dev/sdX to UUID for System Drives
+For existing systems using `/dev/sdX` notation for the root filesystem:
+
+### 1. Find the UUID for the Root Filesystem
+Run:
+```bash
+blkid /dev/sda1
+```
+Example output:
+```plaintext
+/dev/sda1: UUID="9c82dbdb-f997-4f0b-974d-3111b7e0e53a" TYPE="ext4"
+```
+
+### 2. Update `/etc/fstab`
+Replace the `/dev/sda1` entry with the UUID:
+```plaintext
+UUID=9c82dbdb-f997-4f0b-974d-3111b7e0e53a / ext4 defaults 0 1
+```
+
+### 3. Rebuild GRUB and Test
+```bash
+sudo update-grub
+sudo mount -a
+sudo reboot
+```
+
+---
+
+## Summary
+Using UUIDs in `/etc/fstab` provides consistency, reliability, and future-proofing for your Linux systems. While `/dev/sdX` notation may work in some scenarios, switching to UUIDs is highly recommended, especially for critical system drives and regularly mounted data devices.
+
+EOF
+) | less -R

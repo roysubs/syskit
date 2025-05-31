@@ -1,0 +1,74 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+# PowerShell Readline Keybindings
+
+PowerShell uses Readline-style keybindings for command-line editing. Here are the keybindings you can use:
+
+---
+
+## Keybindings in PowerShell
+
+| Keybinding     | Description                                           |
+|----------------|-------------------------------------------------------|
+| Ctrl + W       | Delete the word before the cursor                     |
+| Ctrl + D       | Delete the character under the cursor                 |
+| Esc, then D    | Delete the word after the cursor (alternative for Alt + D in some cases) |
+| Ctrl + U       | Delete from the cursor to the beginning of the line   |
+| Ctrl + K       | Delete from the cursor to the end of the line         |
+| Ctrl + L       | Clear the screen (like clear in Unix/Linux)           |
+| Ctrl + T       | Transpose the character under the cursor with the one before it |
+| Ctrl + C       | Cancel the current command (interrupt)                |
+| Ctrl + Z       | Suspend the current process (can be resumed with fg in Linux) |
+| Alt + F        | Move the cursor forward by one word                   |
+| Alt + B        | Move the cursor backward by one word                  |
+
+> Note: PowerShell uses a version of Readline that's more customized compared to other shells, and not all Linux-style shortcuts may work.
+
+| Ctrl + Y       | Paste text from clipboard (yank)                      |
+| Ctrl + A       | Move the cursor to the beginning of the line          |
+| Ctrl + E       | Move the cursor to the end of the line                |
+| Ctrl + F       | Move the cursor forward one character                 |
+| Ctrl + B       | Move the cursor backward one character                |
+---
+
+## PowerShell Custom Keybindings
+
+PowerShell allows you to customize keybindings by modifying the $PROFILE script or using the Set-PSReadlineKeyHandler cmdlet.
+
+### Example: Bind Ctrl + L to clear the screen
+
+Set-PSReadlineKeyHandler -Key Ctrl+L -Function ClearScreen
+
+### Example: Bind Ctrl + U to delete to the beginning of the line
+
+Set-PSReadlineKeyHandler -Key Ctrl+U -Function KillLine
+
+### Example: Bind Alt + D to delete the word after the cursor
+
+Set-PSReadlineKeyHandler -Key 'Alt+D' -Function DeleteWord
+
+After modifying keybindings, you can persist them by adding the commands to your $PROFILE.
+
+---
+
+## Inspecting Current Keybindings
+
+To see the current keybindings in PowerShell:
+
+Get-PSReadlineKeyHandler
+
+This will list all the current keybindings and their associated functions.
+
+---
+
+## Summary
+
+- PowerShell supports many Readline-like keybindings, such as Ctrl + A, Ctrl + E, and Ctrl + K.
+- Custom keybindings can be set using the Set-PSReadlineKeyHandler cmdlet.
+- You can view current keybindings with Get-PSReadlineKeyHandler.
+
+EOF
+) | less -R

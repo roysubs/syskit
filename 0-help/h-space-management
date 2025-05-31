@@ -1,0 +1,33 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+### ncdu (Recommended)
+This is an interactive disk usage analyzer that provides a nice overview of space usage in a directory.
+Install it (if not already installed):
+`sudo apt install ncdu`
+Run it on the root directory (/):
+`sudo ncdu /`
+Use arrow keys to navigate (left to go up a directory), q to quit, ? to see help.
+
+### du (Basic, but powerful)
+If you prefer built-in tools, du (disk usage) is available by default:
+`sudo du -ahx / | sort -rh | head -20`
+This shows the top 20 largest files and folders in / from which you can drill into folders and rerun.
+To scan only a specific directory (like /home):
+`sudo du -h --max-depth=1 /home | sort -h`
+
+### df (To see overall disk usage)
+To check which partitions are using space:
+`df -hT`
+This gives an overview of all mounted filesystems.
+
+### find (To locate huge files)
+If you suspect large individual files are causing the issue:
+`sudo find / -type f -size +500M -exec ls -lh {} +`
+This finds files larger than 500 MB.
+
+EOF
+) | less -R

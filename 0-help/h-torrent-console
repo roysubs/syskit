@@ -1,0 +1,158 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Torrents on console (Transmission, qBittorrent)
+
+Both apps are well-suited for headless, console-based torrenting. Transmission can be managed via the `transmission-remote` command or the transmission-daemon for remote control. You can also use transmission-web for a simple web UI. qBittorrent is can running in a headless mode with qbittorrent-nox, and supports a TUI interface via `qbtcli` for a more interactive, curses-based experience.
+
+## 1. **Setting Up Transmission (Console-Based)**
+
+### Install Transmission (CLI Version)
+- Install Transmission's command-line client and daemon:  
+sudo apt update; sudo apt install transmission-cli transmission-daemon
+
+### Configure Transmission Daemon (Headless)
+- The Transmission daemon runs in the background; control it with the cli.
+- The configuration file is located at `/etc/transmission-daemon/settings.json`.
+- Stop the daemon before modifying settings:  
+sudo systemctl stop transmission-daemon
+
+- Edit the settings file:  
+sudo nano /etc/transmission-daemon/settings.json
+
+
+### Key Configuration Settings
+- Change the following to allow local access:
+- `"rpc-authentication-required": false`  
+  (Disable authentication for local access)
+- `"rpc-whitelist-enabled": false`  
+  (Disable the whitelist, allowing access from any IP)
+- `"rpc-bind-address": "0.0.0.0"`  
+  (Bind the RPC to all interfaces)
+- `"download-dir": "/path/to/download"`  
+  (Set the default download directory)
+- `"incomplete-dir": "/path/to/incomplete"`  
+  (Set the incomplete download directory)
+
+- After making changes, restart the daemon:  
+sudo systemctl start transmission-daemon
+
+### Accessing Transmission Console Interface (TUI)
+- Use **transmission-remote** to interact with the Transmission daemon via the command line:
+- List torrents:  
+  ```
+  transmission-remote -l
+  ```
+- Add a torrent (e.g., from a `.torrent` file or magnet link):  
+  ```
+  transmission-remote -a <torrent-file-or-magnet-link>
+  ```
+- Start a torrent:  
+  ```
+  transmission-remote -t <torrent-id> --start
+  ```
+- Stop a torrent:  
+  ```
+  transmission-remote -t <torrent-id> --stop
+  ```
+- View torrent details:  
+  ```
+  transmission-remote -t <torrent-id> -i
+  ```
+
+### Alternative: Using Transmission-UI (Optional)
+- For a more visual console interface, you can install **Transmission-UI** (a simple web UI):
+sudo apt install transmission-web
+
+- Access via:  
+  `http://localhost:9091` (from any web browser)
+
+## 2. **Setting Up qBittorrent (CLI and TUI)**
+
+### Install qBittorrent (CLI Version)
+- Install qBittorrent with its command-line interface:  
+sudo apt update sudo apt install qbittorrent-nox
+
+### Configure qBittorrent (Headless)
+- Start the qBittorrent daemon (headless mode):  
+qbittorrent-nox
+
+### Configure Web UI (Optional for Remote Access)
+- When running `qbittorrent-nox` for the first time, it will ask you to set up an administrator password for the Web UI.
+- After that, you can access the Web UI (which isn't strictly console-based, but useful for managing torrents remotely) via:  
+`http://localhost:8080`  
+Username: `admin`  
+Password: (the one you set)
+
+### Console Interaction via qBittorrent-CLI (`qbittorrent-nox`)
+- Use **qbittorrent-nox** (with no graphical UI) to interact with torrents:
+- List all torrents:  
+  ```
+  qbittorrent-nox -l
+  ```
+- Add a torrent from a file or magnet link:  
+  ```
+  qbittorrent-nox -a <torrent-file-or-magnet-link>
+  ```
+- Start a torrent:  
+  ```
+  qbittorrent-nox -s <torrent-id>
+  ```
+- Stop a torrent:  
+  ```
+  qbittorrent-nox -p <torrent-id>
+  ```
+
+### Using `qBittorrent-nox` Console UI (`qbtcli`)
+- qBittorrent also provides a **console-based user interface** (CLI TUI) through the **`qbtcli`** tool (also known as `qbittorrent-console-ui`).
+- To install `qbtcli` on Debian, download the package from the [official repository](https://github.com/TruePenny93/qbt-cli). It's a TUI that lets you interact with torrents in a similar way to `htop` or `btop`:
+
+git clone https://github.com/TruePenny93/qbt-cli cd qbt-cli python3 -m pip install -r requirements.txt python3 qbt-cli.py
+
+- With `qbtcli`, you get a terminal interface like this:  
+qBittorrent CLI
+Status | Torrent Name | % Complete | Download Speed | Upload Speed
+Downloading | example.torrent | 78% | 1.2 MB/s | 0.5 MB/s ...
+
+## 3. **General Torrenting Tips for Console-Only Torrenting**
+
+### Managing Torrents
+- To view all active torrents and their status in Transmission:
+transmission-remote -l
+
+- To check the status and details of a specific torrent:
+transmission-remote -t <torrent-id> -i
+
+
+### Storing Torrents (Magnet Links or Files)
+- To add a **magnet link**:
+transmission-remote -a "magnet:?xt=urn:btih:<hash>"
+
+### Automated Downloads with `cron`
+- To automate torrent downloads using cron jobs, create a cron job that runs Transmission or qBittorrent commands at scheduled times:
+crontab -e
+
+Add an entry for scheduled torrent actions, e.g., adding a new torrent:
+0 3 * * * transmission-remote -a "magnet:?xt=urn:btih:<hash>"
+
+### Using `screen` or `tmux` for Long-Running Torrent Sessions
+- It's often useful to run transmission or qBittorrent in a `screen` or `tmux` session to keep the process running in the background:
+- Start a `screen` or `tmux` session:
+  ```
+  screen
+  ```
+  Or:
+  ```
+  tmux
+  ```
+- Run the torrent client within that session.
+- Detach from the session and leave it running in the background:  
+  - For `screen`: `Ctrl + A, D`  
+  - For `tmux`: `Ctrl + B, D`
+
+
+EOF
+) | less -R

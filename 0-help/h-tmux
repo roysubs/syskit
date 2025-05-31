@@ -1,0 +1,114 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Tmux Basics
+============
+
+- **Start a tmux session**: `tmux` or `tmux new-session -s <name>`
+- **Attach to a session**: `tmux attach -t <name>` or `tmux a -t <name>`
+- **List sessions**: `tmux ls`
+- **Kill a session**: `tmux kill-session -t <name>`
+
+Basic Keybindings
+=================
+
+- **Prefix**: `Ctrl+b` (default, press before other keybinding)
+- **New window**: `Ctrl+b c`, **Switch window**: `Ctrl+b n` (next), `Ctrl+b p` (previous)
+- **Split window vertically**: `Ctrl+b %`, **Split window horizontally**: `Ctrl+b "`
+- **Move between panes**: `Ctrl+b <arrow keys>` (up, down, left, right)
+- **Resize panes**: `Ctrl+b :resize-pane -D/-U/-L/-R`
+- **Close current pane/window**: `Ctrl+b x` (confirm with `y`)
+- **Scroll up/down**: `Ctrl+b [`, **Exit scroll mode**: `q`
+- **Detach from session**: `Ctrl+b d`
+- **Kill pane**: `Ctrl+b &`
+- **Rename window**: `Ctrl+b ,`
+- **Switch to last active window**: `Ctrl+b l`
+- **List windows**: `Ctrl+b w`
+
+Window Management
+=================
+
+- **Next window**: `Ctrl+b n`, **Previous window**: `Ctrl+b p`
+- **Move window left/right**: `Ctrl+b <`, `Ctrl+b >`
+- **List all windows**: `Ctrl+b w`, **Switch window by number**: `Ctrl+b <0-9>`
+- **Close window**: `Ctrl+b &`
+- **Create a new window**: `Ctrl+b c`, **Move to last window**: `Ctrl+b l`
+
+Pane Management
+===============
+
+- **Split horizontally**: `Ctrl+b "`, **Split vertically**: `Ctrl+b %`
+- **Switch between panes**: `Ctrl+b <arrow keys>`
+- **Resize panes**: `Ctrl+b :resize-pane -L/-R/-U/-D`
+- **Close pane**: `Ctrl+b x`
+- **Move pane to another window**: `Ctrl+b !`
+- **Swap panes**: `Ctrl+b o`
+- **Toggle pane zoom**: `Ctrl+b z`
+- **Sync panes**: `Ctrl+b :setw synchronize-panes on`
+
+Session Management
+=================
+
+- **Create a new session**: `tmux new-session -s <name>`
+- **List all sessions**: `tmux ls`
+- **Attach to a session**: `tmux attach-session -t <name>`
+- **Detach from session**: `Ctrl+b d`
+- **Kill a session**: `tmux kill-session -t <name>`
+- **Rename a session**: `tmux rename-session -t <name> <new_name>`
+- **Move between sessions**: `Ctrl+b s`
+
+Tmux Customization
+==================
+
+- **Change tmux prefix**: `set-option -g prefix <key>` (e.g., `set-option -g prefix C-a`)
+- **Enable mouse**: `set -g mouse on`
+- **Set default shell**: `set-option default-shell /bin/bash`
+- **Set window list behavior**: `set -g window-status-current-format "#W"`
+
+Session Configuration
+====================
+
+- **Create session with specific name**: `tmux new -s <session_name>`
+- **Save session list to file**: `tmux save-session <filename>`
+- **Restore from session file**: `tmux source-file <filename>`
+
+Tmux Scripting and Automation
+=============================
+
+- **Run tmux command in script**: `tmux send-keys -t <session_name> <keys> Enter`
+- **Automate pane creation**: 
+  ```bash
+  tmux new-session -d -s <name>
+  tmux split-window -h
+  tmux split-window -v
+  tmux attach-session -t <name>
+  ```
+
+Keybinding Customization
+========================
+
+- **Edit keybindings: `~/.tmux.conf`** 
+-- Example: `bind h split-window -h` (bind h to horizontal split)
+- Set keybinding prefix: unbind C-b, set-option -g prefix C-a
+- Enable vi mode: setw -g mode-keys vi
+
+Tmux Plugins and Extensions
+===========================
+
+- Tmux Plugin Manager (TPM):
+    Install TPM:
+    `git clone https://github.com/tmux-plugins/tpm`
+    `~/.tmux/plugins/tpm`
+    Use TPM to install plugins: prefix + I
+- Some useful plugins:
+  ```bash
+  tmux-resurrect: Restore tmux sessions after restart.
+  tmux-continuum: Auto-save tmux sessions.
+  tmux-copycat: Search text within tmux panes.
+  ```
+
+EOF
+) | less -R

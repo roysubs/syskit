@@ -1,0 +1,75 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Starship Quick Notes
+====================
+
+Uninstalling Starship and Reverting to Normal Bash Prompt
+========================================================
+1. **Remove Starship**:  
+     ```bash
+     # Via package managers
+     sudo apt remove starship / cargo uninstall starship / brew uninstall starship 
+     ```
+   - Starship configuration is typically located at `~/.config/starship.toml`.
+     To remove Starship configuration: `rm ~/.config/starship.toml`  
+   - Revert to default Bash Prompt: Open `~/.bashrc` (or `~/.bash_profile` if using that)
+     Remove the Starship initialization line: `eval "$(starship init bash)"`
+   - Apply the changes by reloading .bashrc: `source ~/.bashrc`
+
+Starship Features and Customization
+===================================
+
+- **What is Starship?**
+  - Starship is a minimal, fast, and customizable prompt for any shell (Bash, Zsh, Fish, etc.) that provides a dynamic, feature-rich, and visually appealing prompt.
+  - Designed for speed and customization with a focus on developer-friendly features.
+
+- **Installation**:
+  - Install Starship using:
+    ```bash
+    # Via cargo (Rust package manager):
+    cargo install starship
+    
+    # Via package manager (apt or brew):
+    sudo apt install starship   # Or brew install starship
+    ```
+
+- **Basic Configuration**:
+  - Starship reads configuration from `~/.config/starship.toml`. The file contains settings for how your prompt will look and behave.
+  - Example of a simple configuration:
+    ```toml
+    # ~/.config/starship.toml
+    [character]
+    symbol = "❯"
+    style = "bold green"
+    ```
+
+- **Prompt Customization**:
+  - You can customize what appears in your prompt by modifying `starship.toml`. For example:
+    - **Time**:
+      ```toml
+      [time]
+      format = "[$time]($style) "
+      style = "bold yellow"
+      ```
+    - **Git Status**:
+      ```toml
+      [git_status]
+      format = "([\($branch\) $state])"
+      style = "bold blue"
+      ```
+
+- **Other Shell Integrations**:
+  - Starship supports many shells, including Bash, Zsh, Fish, PowerShell, and Elvish. You just need to initialize it by adding the appropriate line to the shell configuration file (e.g., `~/.bashrc`, `~/.zshrc`).
+
+- **Features**:
+  - **Fast and lightweight**: Designed to be minimal and responsive, even for users with large codebases.
+  - **Highly customizable**: A flexible configuration file allows you to easily adjust the appearance, modules, and behavior of the prompt.
+  - **Git integration**: Displays detailed Git information such as the branch name, status, and changes in the prompt.
+  - **Support for multiple languages and tools**: Offers built-in support for many development tools, such as Python, Node.js, Rust, Docker, and more.
+
+EOF
+) | less -R

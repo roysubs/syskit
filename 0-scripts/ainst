@@ -1,0 +1,112 @@
+#!/bin/bash
+
+# acheck: Identify the package manager, and use it to install a package, then verify the install
+
+# Function to install a package and verify its executable
+# Args:
+#    $1: pkg_name - Name of the package to install, e.g., "neovim"
+#    $2: exec_name - Name of the command executable provided by the package, e.g., "nvim"
+#    If $2 is not provided, assume that exec_name is same as pkg_name (usually the case, but not always, e.g. neovim / nvim
+# exec_name="${2:-$1}" => if $2 is provided, use it as exec_name; otherwise, use $1.
+
+install_package() {
+    local pkg_name="$1"
+    local exec_name="$2"
+
+    if [ -z "$pkg_name" ] || [ -z "$exec_name" ]; then
+        echo "Error (install_package): Function requires both package name and executable name."
+        return 1
+    fi
+
+    echo "Ensuring package '$pkg_name' (providing '$exec_name') is installed..."
+
+    # Check if executable is already installed before attempting install
+    if command -v "$exec_name" &> /dev/null; then
+        echo "'$exec_name' (from package '$pkg_name') is already available."
+        return 0 # Executable already found
+    fi
+
+    echo "'$exec_name' not found. Attempting to install package '$pkg_name'..."
+
+    # Determine installation commands based on package manager
+    if command -v apt &> /dev/null; then
+        echo "Using apt"
+        # Use || true for update in case the mirrors are temporarily unavailable
+        if ! sudo apt update || ! sudo apt install -y "$pkg_name"; then
+             echo "Error: apt installation of '$pkg_name' failed."
+             return 1 # Indicate apt failure
+        fi
+    elif command -v apk &> /dev/null; then
+        echo "Using apk"
+        if ! sudo apk update || ! sudo apk add --no-cache "$pkg_name"; then
+             echo "Error: apk installation of '$pkg_name' failed."
+             return 1 # Indicate apk failure
+        fi
+    elif command -v dnf &> /dev/null; then
+        echo "Using dnf"
+        sudo dnf check-update || true # Ignore check-update errors
+        if ! sudo dnf install -y "$pkg_name"; then
+             echo "Error: dnf installation of '$pkg_name' failed."
+             return 1 # Indicate dnf failure
+        fi
+    elif command -v yum &> /dev/null; then
+        echo "Using yum"
+        sudo yum check-update || true # Ignore check-update errors
+        if ! sudo yum install -y "$pkg_name"; then
+             echo "Error: yum installation of '$pkg_name' failed."
+             return 1 # Indicate yum failure
+        fi
+    elif command -v pacman &> /dev/null; then
+        echo "Using pacman"
+        # Use || true for update in case the mirrors are temporarily unavailable
+        if ! sudo pacman -Sy --noconfirm || ! sudo pacman -S --noconfirm "$pkg_name"; then
+             echo "Error: pacman installation of '$pkg_name' failed."
+             return 1 # Indicate pacman failure
+        fi
+    elif command -v zypper &> /dev/null; then
+        echo "Using zypper"
+        if ! sudo zypper refresh || ! sudo zypper install -y "$pkg_name"; then
+             echo "Error: zypper installation of '$pkg_name' failed."
+             return 1 # Indicate zypper failure
+        fi
+    else
+        echo "Error: Could not detect a supported package manager (apt, apk, dnf, yum, pacman, zypper)."
+        echo "Please install package '$pkg_name' (providing command '$exec_name') manually."
+        return 1 # Indicate failure
+    fi
+
+    # Verify installation success by checking for the executable
+    if command -v "$exec_name" &> /dev/null; then
+        echo "'$pkg_name' installed successfully ('$exec_name' is available)."
+        return 0 # Success
+    else
+        echo "Error: Failed to find '$exec_name' command after installing '$pkg_name'."
+        echo "Manual intervention may be required to install package '$pkg_name'."
+        return 1 # Indicate failure
+    fi
+}
+
+# --- Main script execution ---
+
+# Check if at least one argument is provided
+if [ $# -eq 0 ]; then
+    echo "Universal application install and check (all package managers)"
+    echo "Usage: $(basename $0) <package_name> [executable_name]"
+    echo "  <package_name> - The name of the package to install."
+    echo "  [executable_name] - The command name provided by the package (optional)."
+    echo "Detects the package manager on this system and installs package_name."
+    echo "It then verifies if the package was installed by checking the expected binary."
+    echo "The binary will be assumed to have the same name as package_name, unless executable_name is provided."
+    echo "The script will return the status of the operation."
+    exit 1
+fi
+
+# Assign arguments
+pkg_name="$1"
+exec_name="${2:-$1}"  # Use $2 if provided (and not empty), otherwise use $1
+
+# Call the installation function
+install_package "$pkg_name" "$exec_name"
+
+# Exit with the same status as the installation function
+exit $?

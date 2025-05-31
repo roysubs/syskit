@@ -1,0 +1,24 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Cheat Quick Notes
+
+## Basics
+
+cheat is a console app that comes with a very set of plain text cheatseats for frequently used commands. It also allows users to create, view, and manage these and their own additions to these. Its purpose is to provide quick access to reminders and examples of command syntax and options directly from the terminal, saving you from having to remember complex man pages or search online documentation repeatedly.
+
+### Installation
+
+Install the cheat tool:  # <--- MODIFIED LINE
+```bash
+cd /tmp
+wget [https://github.com/cheat/cheat/releases/download/4.4.0/cheat-linux-amd64.gz](https://github.com/cheat/cheat/releases/download/4.4.0/cheat-linux-amd64.gz)
+gunzip cheat-linux-amd64.gz
+chmod +x cheat-linux-amd64
+sudo mv cheat-linux-amd64 /usr/local/bin/cheat
+
+EOF
+) | less -R
