@@ -1,0 +1,17 @@
+# sudo apt install wesnoth
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following additional packages will be installed:
+  fonts-adf-oldania libboost-program-options1.74.0 libboost-random1.74.0 libboost-regex1.74.0 libsdl2-image-2.0-0 wesnoth-1.16
+  wesnoth-1.16-core wesnoth-1.16-data wesnoth-1.16-did wesnoth-1.16-dm wesnoth-1.16-dw wesnoth-1.16-ei wesnoth-1.16-httt
+  wesnoth-1.16-l wesnoth-1.16-low wesnoth-1.16-music wesnoth-1.16-nr wesnoth-1.16-sof wesnoth-1.16-sota wesnoth-1.16-sotbe
+  wesnoth-1.16-thot wesnoth-1.16-trow wesnoth-1.16-tsg wesnoth-1.16-ttb wesnoth-1.16-utbs
+The following NEW packages will be installed:
+  fonts-adf-oldania libboost-program-options1.74.0 libboost-random1.74.0 libboost-regex1.74.0 libsdl2-image-2.0-0 wesnoth
+  wesnoth-1.16 wesnoth-1.16-core wesnoth-1.16-data wesnoth-1.16-did wesnoth-1.16-dm wesnoth-1.16-dw wesnoth-1.16-ei
+  wesnoth-1.16-httt wesnoth-1.16-l wesnoth-1.16-low wesnoth-1.16-music wesnoth-1.16-nr wesnoth-1.16-sof wesnoth-1.16-sota
+  wesnoth-1.16-sotbe wesnoth-1.16-thot wesnoth-1.16-trow wesnoth-1.16-tsg wesnoth-1.16-ttb wesnoth-1.16-utbs
+0 upgraded, 26 newly installed, 0 to remove and 0 not upgraded.
+Need to get 438 MB of archives.
+After this operation, 583 MB of additional disk space will be used.
