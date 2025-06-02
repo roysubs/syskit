@@ -1,0 +1,6 @@
+How to get X11 forwarding. Windows *must* set the DISPLAY manually
+$env:DISPLAY = "127.0.0.1:0.0"
+ssh -X boss@192.168.1.142
+ssh -v / -vv / -vvv
+
+How to use xclip and xsel...

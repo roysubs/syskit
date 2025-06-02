@@ -16,7 +16,7 @@ show_help() {
     echo "  r <package(s)>    Remove the specified package(s) (uses sudo)"
     echo "  s <package(s)>    Search for the specified package(s)"
     echo "  sno <package(s)>  Show package names that contain the searched text"
-    echo "  sbin <string>     apt-file syntax example to show string in binary folders /bin, /usr/bin, /sbin, /usr/sbin"
+    echo "  sbin <string>     Search all packages for files with <string> in bin folders (/bin, /usr/bin, /sbin, /usr/sbin)"
     echo "  sx <package(s)>   Show executable files in packages found"
     echo "  u                 Update, then upgrade, then autoremove (uses sudo)"
     echo "  ar                Autoremove packages that are no longer required (uses sudo)"
@@ -137,7 +137,7 @@ case "$option" in
                 # - /usr/sbin/executable_name
                 # - /usr/games/executable_name
                 # - /opt/some_dir/bin/executable_name
-            done < packages_to_check.txt
+            done < /tmp/packages_to_check.txt
             # Clean up the temporary file
             # rm packages_to_check.txt
         done

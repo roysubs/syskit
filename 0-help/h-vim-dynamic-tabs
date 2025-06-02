@@ -1,0 +1,270 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+# Intelligent Indentation in Vim: A Complete Guide
+
+## Overview
+
+This document provides a comprehensive guide to managing code indentation in the Vim editor, focusing on achieving "intelligent" behavior similar to modern IDEs like VS Code.
+
+## The Challenge of Indentation
+
+Consistent code indentation is crucial for:
+- **Readability:** Clean, consistent code structure
+- **Collaboration:** Team standards and consistency
+- **Project standards:** Different projects may require different indentation styles (2 spaces, 4 spaces, tabs)
+
+The challenge is that different projects, languages, and developers use varying indentation standards, and manually configuring this for each file or project becomes tedious.
+
+## How Modern Editors Handle Indentation
+
+Modern IDEs like VS Code automatically detect and apply appropriate indentation through:
+
+1. **`.editorconfig` files:** Project-specific settings that define indentation rules
+2. **Language-specific defaults:** Pre-configured settings for languages like Python (4 spaces) or JavaScript (2 spaces)
+3. **File content analysis:** Heuristically analyzing existing code to guess the indentation style
+4. **User/Workspace settings:** Global or project-level default configurations
+
+## Vim's Approach: Declarative & Extensible
+
+By default, Vim's indentation is configured declaratively through settings in your `.vimrc` file. However, Vim's true power lies in its extensibility via plugins that can provide intelligent, automatic indentation detection.
+
+## Core Vim Indentation Settings
+
+These foundational settings control how Vim handles tabs and spaces:
+
+```vim
+" In your .vimrc file
+
+" Sets the width of a hard tab character (\t) for display
+set tabstop=4
+
+" Sets the width for automatic indentation operations (e.g., >>, <<)
+set shiftwidth=4
+
+" Makes the <Tab> key effectively insert/delete this many spaces
+" Works with `expandtab` to insert spaces, or can insert a mix of tabs/spaces
+set softtabstop=4
+
+" Converts <Tab> key presses into spaces (highly recommended for space-based indentation)
+set expandtab
+
+" Makes the <Tab> key behave differently at the start of a line (uses shiftwidth)
+" versus in the middle of a line (uses tabstop, inserting a hard tab if expandtab is off)
+set smarttab
+```
+
+### Setting Explanations
+
+- **`tabstop`:** Controls how existing tab characters are displayed
+- **`shiftwidth`:** Controls indentation width for `>>`, `<<`, and automatic indentation
+- **`softtabstop`:** Controls how many columns the Tab key moves the cursor
+- **`expandtab`:** Converts tab keypresses to spaces
+- **`smarttab`:** Makes Tab key context-aware (beginning vs middle of line)
+
+## Achieving "Intelligent" Indentation in Vim
+
+To make Vim automatically adapt to different file indentation styles, plugins are the recommended approach:
+
+### 1. EditorConfig Plugin
+
+**Plugin:** `editorconfig-vim`
+
+**Function:** Reads `.editorconfig` files in your project and automatically applies the specified indentation and other settings.
+
+**Installation:**
+```vim
+" Using vim-plug
+Plug 'editorconfig/editorconfig-vim'
+
+" Using Vundle
+Plugin 'editorconfig/editorconfig-vim'
+```
+
+**Example .editorconfig file:**
+```ini
+# .editorconfig file in project root
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.py]
+indent_style = space
+indent_size = 4
+
+[*.js]
+indent_style = space
+indent_size = 2
+
+[*.go]
+indent_style = tab
+```
+
+**Best for:** Team projects and ensuring project-wide consistency.
+
+### 2. Automatic Detection Plugin
+
+**Plugin:** `vim-sleuth`
+
+**Function:** Automatically inspects files when opened and heuristically determines the correct indentation settings (`shiftwidth`, `expandtab`, etc.), similar to how VS Code analyzes file content.
+
+**Installation:**
+```vim
+" Using vim-plug
+Plug 'tpope/vim-sleuth'
+
+" Using Vundle
+Plugin 'tpope/vim-sleuth'
+```
+
+**Features:**
+- Lightweight and requires no configuration
+- Automatically detects indentation style from file content
+- Works immediately after installation
+- Falls back to your default settings when detection is uncertain
+
+**Best for:** Individual use or when no `.editorconfig` is present.
+
+### 3. Filetype-Specific Settings (ftplugin)
+
+**How it works:** Create specific configuration files for different programming languages in `~/.vim/ftplugin/` directory.
+
+**Example for Python (4 spaces):**
+```vim
+" In ~/.vim/ftplugin/python.vim
+setlocal shiftwidth=4
+setlocal softtabstop=4
+setlocal expandtab
+setlocal tabstop=4
+```
+
+**Example for JavaScript (2 spaces):**
+```vim
+" In ~/.vim/ftplugin/javascript.vim
+setlocal shiftwidth=2
+setlocal softtabstop=2
+setlocal expandtab
+setlocal tabstop=2
+```
+
+**Example for Go (tabs):**
+```vim
+" In ~/.vim/ftplugin/go.vim
+setlocal noexpandtab
+setlocal tabstop=4
+setlocal shiftwidth=4
+setlocal softtabstop=4
+```
+
+**Note:** This method sets defaults per filetype but doesn't adapt if an individual file uses a different style than your defined standard.
+
+## Recommended Setup Strategy
+
+### For Team/Project Work
+1. Use `editorconfig-vim` plugin
+2. Maintain `.editorconfig` files in project roots
+3. Set sensible defaults in `.vimrc` as fallback
+
+### For Individual/Mixed Work
+1. Use `vim-sleuth` for automatic detection
+2. Set up filetype-specific defaults via `ftplugin`
+3. Configure base settings in `.vimrc`
+
+### Complete .vimrc Example
+```vim
+" Base indentation settings (fallback defaults)
+set tabstop=4
+set shiftwidth=4
+set softtabstop=4
+set expandtab
+set smarttab
+
+" Enable automatic indentation
+set autoindent
+set smartindent
+
+" Install plugins (using vim-plug example)
+call plug#begin('~/.vim/plugged')
+Plug 'editorconfig/editorconfig-vim'  " For .editorconfig support
+Plug 'tpope/vim-sleuth'               " For automatic detection
+call plug#end()
+```
+
+## Testing Your Setup
+
+To verify your indentation settings are working:
+
+1. **Check current settings:**
+   ```vim
+   :set tabstop?
+   :set shiftwidth?
+   :set expandtab?
+   ```
+
+2. **Test indentation:**
+   - Press `>>` to indent a line
+   - Press `<<` to unindent a line
+   - Use Tab key at beginning of line
+
+3. **View whitespace:**
+   ```vim
+   :set list
+   :set listchars=tab:>-,space:·
+   ```
+
+## Troubleshooting
+
+### Plugin Not Working
+- Ensure plugins are properly installed and loaded
+- Check for conflicts with other plugins
+- Verify `.editorconfig` file syntax
+
+### Inconsistent Behavior
+- Check if filetype detection is working: `:set filetype?`
+- Verify no conflicting settings in `.vimrc`
+- Use `:verbose set shiftwidth?` to see where setting came from
+
+### Mixed Indentation in Files
+- Use `:retab` to convert existing tabs to spaces (or vice versa)
+- Set up proper `.editorconfig` or use `vim-sleuth` for detection
+
+## Summary
+
+By combining these approaches, you can achieve intelligent indentation in Vim that rivals modern IDEs:
+
+- **Base settings** in `.vimrc` provide sensible defaults
+- **EditorConfig plugin** ensures project consistency
+- **vim-sleuth** provides automatic detection for individual files
+- **Filetype plugins** offer language-specific defaults
+
+The key is layering these solutions to handle different scenarios while maintaining consistency and reducing manual configuration.
+
+## Quick Reference
+
+```vim
+" Essential .vimrc settings
+set tabstop=4 shiftwidth=4 softtabstop=4 expandtab smarttab
+
+" Recommended plugins
+Plug 'editorconfig/editorconfig-vim'
+Plug 'tpope/vim-sleuth'
+
+" Check current settings
+:set tabstop? shiftwidth? expandtab?
+
+" Convert tabs/spaces
+:retab
+
+" View whitespace
+:set list listchars=tab:>-,space:·
+```
+
+EOF
+) | less -R

@@ -58,8 +58,8 @@ Options:
   nv|n%%           New Vertical pane split 'C-b %%' (nh|nv will create from new, or in existing session)
   f|b             Pane switch: f (forwards 'C-b f'), or b (backwards 'C-b b');  tmux select-pane -t :.+ (forwards), or :.- (backwards)
   c|n|p|choose    Windows: c (create 'C-b c'), n (next window 'C-b n'), p (previous window 'C-b p'), choose (choose window screen)
-  btop            Open btop but stay in calling pane
-  vi \$1           Open vi and edit (i.e. stay in the vi pane)
+  btop            Open btop in second pane but stay in the calling pane
+  vi <filepath>   Open vi and edit (i.e. stay in the vi pane)
   rl|rr|ru|rd     Resize current pane (L/R/U/D by 5 cells)
   copy            Enter copy mode
   mouse           Toggle tmux mouse mode on/off
@@ -520,7 +520,7 @@ ask_btop_install() {
 }
 
 show_tmux_keys() {
-    printf "${YELLOW}  *** Default tmux Key Bindings ***${NC}\n  First press ${CYAN}C-b${NC} (Ctrl+b), then one of the following:\n\n${YELLOW}  Splits & Panes                                Navigation${NC}\n  ${CYAN}\"${NC}    : Split horizontally            ${CYAN}o / ;${NC}     : Next / Last pane\n  ${CYAN}%%${NC}    : Split vertically              ${CYAN}Arrow keys${NC}: Move between panes\n  ${CYAN}!${NC}    : Break pane into window        ${CYAN}Ctrl+Arrow${NC}: Resize pane\n  ${CYAN}x${NC}    : Kill current pane             ${CYAN}Space${NC}     : Cycle layouts (often, might need binding)\n  ${CYAN}z${NC}    : Toggle zoom (fullscreen)\n\n${YELLOW}  Windows & Sessions                            Copy Mode${NC}\n  ${CYAN}c${NC}    : Create new window             ${CYAN}[${NC}     : Copy mode (PgUpDn+cursors to move)\n  ${CYAN}n / p${NC} : Next / Prev window              then ${CYAN}Space${NC} to start selection\n  ${CYAN},${NC}    : Rename window                   then ${CYAN}Enter${NC} to copy highlighted to buffer\n  ${CYAN}&${NC}    : Kill window                   ${CYAN}]${NC}     : Paste buffer\n  ${CYAN}w${NC}    : Choose window\n  ${CYAN}s${NC}    : List sessions\n\n${YELLOW}  Mouse & Buffers                               Miscellaneous${NC}\n  ${CYAN}:${NC}    : Open command prompt\n  ${CYAN}:show-buffer${NC}                            ${CYAN}d${NC} : Detach from session\n  ${CYAN}:save-buffer ~/out.txt${NC}                  ${CYAN}?${NC} : List all key bindings\n  ${CYAN}:list-buffers${NC}                           ${CYAN}t${NC} : Show clock\n  ${CYAN}:clear-history${NC}                          ${CYAN}r${NC} : Reload config\n\n${YELLOW}  Mouse Usage (optional, but very useful)${NC}\n  ${CYAN}:set -g mouse on${NC}    : Enable mouse mode (click, resize splits, scroll)\n  ${CYAN}:set -g mouse off${NC}   : Disable mouse mode (back to keyboard only)\n  Useful key binding to easily toggle mouse on/off:\n  ${CYAN}bind g set -g mouse \\; display-message \"Mouse mode: #{?mouse,on,off}\"${NC}\n${YELLOW}  To add this to your config:${NC} ${CYAN}vi ~/.tmux.conf${NC}\n  Then reload with ${CYAN}C-b r${NC} or ${CYAN}:source-file ~/.tmux.conf${NC}\n\n  For full list: ${CYAN}C-b ?${NC} or run ${CYAN}\"t help\"${NC} inside tmux\n"
+    printf "${YELLOW}  *** Default tmux Key Bindings ***${NC}\n  First press ${CYAN}C-b${NC} (Ctrl+b), then one of the following:\n\n${YELLOW}  Splits & Panes                                Navigation${NC}\n  ${CYAN}\"${NC}    : Split horizontally            ${CYAN}o / ;${NC}     : Next / Last pane\n  ${CYAN}%%${NC}    : Split vertically              ${CYAN}Arrow keys${NC}: Move between panes\n  ${CYAN}!${NC}    : Break pane into window        ${CYAN}Ctrl+Arrow${NC}: Resize pane\n  ${CYAN}x${NC}    : Kill current pane             ${CYAN}Space${NC}     : Cycle layouts (often, might need binding)\n  ${CYAN}z${NC}    : Toggle zoom (fullscreen)\n\n${YELLOW}  Windows & Sessions                            Copy Mode${NC}\n  ${CYAN}c${NC}    : Create new window             ${CYAN}[${NC}  : Start Copy mode (PgUpDn+cursors to move)\n  ${CYAN}n / p${NC} : Next / Prev window              press ${CYAN}Space${NC} to start selection block\n  ${CYAN},${NC}    : Rename window                    then press ${CYAN}Enter${NC} to copy highlighted block into buffer\n  ${CYAN}&${NC}    : Kill window                   ${CYAN}]${NC}  : Paste buffer at current position\n  ${CYAN}w${NC}    : Choose window\n  ${CYAN}s${NC}    : List sessions\n\n${YELLOW}  Mouse & Buffers                               Miscellaneous${NC}\n  ${CYAN}:${NC}    : Open command prompt\n  ${CYAN}:show-buffer${NC}                            ${CYAN}d${NC} : Detach from session\n  ${CYAN}:save-buffer ~/out.txt${NC}                  ${CYAN}?${NC} : List all key bindings\n  ${CYAN}:list-buffers${NC}                           ${CYAN}t${NC} : Show clock\n  ${CYAN}:clear-history${NC}                          ${CYAN}r${NC} : Reload config\n\n${YELLOW}  Mouse Usage (optional, but very useful)${NC}\n  ${CYAN}:set -g mouse on${NC}    : Enable mouse mode (click, resize splits, scroll)\n  ${CYAN}:set -g mouse off${NC}   : Disable mouse mode (back to keyboard only)\n  Useful key binding to easily toggle mouse on/off:\n  ${CYAN}bind g set -g mouse \\; display-message \"Mouse mode: #{?mouse,on,off}\"${NC}\n${YELLOW}  To add this to your config:${NC} ${CYAN}vi ~/.tmux.conf${NC}\n  Then reload with ${CYAN}C-b r${NC} or ${CYAN}:source-file ~/.tmux.conf${NC}\n\n  For full list: ${CYAN}C-b ?${NC} or run ${CYAN}\"t help\"${NC} inside tmux\n"
 }
 
 show_byobu_help() {
@@ -583,8 +583,8 @@ main() {
         swi) switch_session "$1" ;;
         h) show_tmux_keys ;;    # hb) show_byobu_help ;;  No longer using byobu, keys clash with too many apps
         ck) show_commands; show_keys ;;
-        cmd) show_commands ;;
-        key) show_keys ;;
+        cmds) show_commands ;;
+        keys) show_keys ;;
         
         *)
             echo -e "${RED}Unknown option: $command${NC}\n" >&2
