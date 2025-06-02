@@ -216,62 +216,147 @@ display_samba_shares() {
     echo -e "${CYAN}${BOLD}---------------------------------${NC}"
     if ! ensure_command_available "testparm" "samba or samba-common-bin"; then echo ""; return; fi
     echo -e "${ORANGE}Source: testparm -s (parsed)${NC}"
-    
-    testparm -s 2>&1 | awk '
-    BEGIN {
-        current_share = ""; share_count = 0;
-        headers[0] = "Name"; headers[1] = "Path"; headers[2] = "Read-Only"; headers[3] = "ValidUsers";
-        headers[4] = "CreateMask"; headers[5] = "DirMask"; headers[6] = "Comment";
-        for (i = 0; i <= 6; i++) max_widths[i] = length(headers[i]);
-    }
-    { 
-        if ($0 ~ /^\[.*\]$/) {
-            if (current_share != "" && current_share != "global" && current_share != "printers") share_order[share_count++] = current_share;
-            first_bracket = index($0, "["); last_bracket = index($0, "]");
-            current_share = substr($0, first_bracket + 1, last_bracket - first_bracket - 1);
-            if (current_share != "" && current_share != "global" && current_share != "printers") {
-                shares[current_share]["Path"] = "n/a"; shares[current_share]["Read-Only"] = "n/a"; shares[current_share]["ValidUsers"] = "n/a";
-                shares[current_share]["CreateMask"] = "n/a"; shares[current_share]["DirMask"] = "n/a"; shares[current_share]["Comment"] = "n/a";
-            }
-        } else if (current_share != "" && current_share != "global" && current_share != "printers") {
-            line = $0; gsub(/^[ \t]+|[ \t]+$/, "", line); 
-            if (match(line, /^path[ \t]*=[ \t]*(.*)/, arr)) shares[current_share]["Path"] = arr[1];
-            else if (match(line, /^read only[ \t]*=[ \t]*(Yes|No)/, arr)) shares[current_share]["Read-Only"] = arr[1];
-            else if (match(line, /^valid users[ \t]*=[ \t]*(.*)/, arr)) shares[current_share]["ValidUsers"] = arr[1];
-            else if (match(line, /^create mask[ \t]*=[ \t]*(.*)/, arr)) shares[current_share]["CreateMask"] = arr[1];
-            else if (match(line, /^directory mask[ \t]*=[ \t]*(.*)/, arr)) shares[current_share]["DirMask"] = arr[1];
-            else if (match(line, /^comment[ \t]*=[ \t]*(.*)/, arr)) shares[current_share]["Comment"] = arr[1];
-        }
-    }
-    END {
-        if (current_share != "" && current_share != "global" && current_share != "printers") share_order[share_count++] = current_share;
-        if (share_count == 0) { print "No user-defined Samba shares found (excluding [global] and [printers])."; exit; }
-        for (idx = 0; idx < share_count; idx++) {
-            sn = share_order[idx];
-            if (length(sn) > max_widths[0]) max_widths[0] = length(sn);
-            if (length(shares[sn]["Path"]) > max_widths[1]) max_widths[1] = length(shares[sn]["Path"]);
-            if (length(shares[sn]["Read-Only"]) > max_widths[2]) max_widths[2] = length(shares[sn]["Read-Only"]);
-            if (length(shares[sn]["ValidUsers"]) > max_widths[3]) max_widths[3] = length(shares[sn]["ValidUsers"]);
-            if (length(shares[sn]["CreateMask"]) > max_widths[4]) max_widths[4] = length(shares[sn]["CreateMask"]);
-            if (length(shares[sn]["DirMask"]) > max_widths[5]) max_widths[5] = length(shares[sn]["DirMask"]);
-            if (length(shares[sn]["Comment"]) > max_widths[6]) max_widths[6] = length(shares[sn]["Comment"]);
-        }
-        fmt_str = ""; sep_str = "";
-        for (col = 0; col <= 6; col++) {
-            fmt_str = fmt_str "%-" max_widths[col] "s" (col < 6 ? "\t" : "\n");
-            for (j = 0; j < max_widths[col]; j++) sep_str = sep_str "=";
-            if (col < 6) sep_str = sep_str "\t"; 
-        }
-        printf fmt_str, headers[0], headers[1], headers[2], headers[3], headers[4], headers[5], headers[6]; print sep_str;
-        for (idx = 0; idx < share_count; idx++) {
-            sn = share_order[idx];
-            printf fmt_str, sn, shares[sn]["Path"], shares[sn]["Read-Only"], shares[sn]["ValidUsers"], \
-                   shares[sn]["CreateMask"], shares[sn]["DirMask"], shares[sn]["Comment"];
-        }
-    }' | column -t -s $'\t'
+
+    # Use a simpler approach with sed and grep instead of complex AWK
+    local testparm_output
+    testparm_output=$(testparm -s 2>/dev/null)
+
+    if [ -z "$testparm_output" ]; then
+        echo "No Samba configuration found or testparm failed."
+        echo ""
+        echo ""
+        return
+    fi
+
+    # Extract share sections (exclude global and printers)
+    local shares
+    shares=$(echo "$testparm_output" | grep -E '^\[' | grep -v -E '^\[(global|printers)\]' | sed 's/^\[//; s/\]$//')
+
+    if [ -z "$shares" ]; then
+        echo "No user-defined Samba shares found (excluding [global] and [printers])."
+        echo ""
+        echo ""
+        return
+    fi
+
+    # Print header
+    printf "%-15s %-25s %-10s %-15s %-10s %-10s %-20s\n" \
+        "Name" "Path" "Read-Only" "ValidUsers" "CreateMask" "DirMask" "Comment"
+    printf "%-15s %-25s %-10s %-15s %-10s %-10s %-20s\n" \
+        "===============" "=========================" "==========" "===============" "==========" "==========" "===================="
+
+    # Process each share
+    while IFS= read -r share_name; do
+        if [ -n "$share_name" ]; then
+            # Extract configuration for this share
+            local share_config
+            share_config=$(echo "$testparm_output" | sed -n "/^\[$share_name\]/,/^\[/p" | head -n -1)
+
+            # Extract individual settings
+            local path=$(echo "$share_config" | grep -E '^[[:space:]]*path[[:space:]]*=' | sed 's/^[[:space:]]*path[[:space:]]*=[[:space:]]*//' | tr -d '\r')
+            local readonly=$(echo "$share_config" | grep -E '^[[:space:]]*read only[[:space:]]*=' | sed 's/^[[:space:]]*read only[[:space:]]*=[[:space:]]*//' | tr -d '\r')
+            local validusers=$(echo "$share_config" | grep -E '^[[:space:]]*valid users[[:space:]]*=' | sed 's/^[[:space:]]*valid users[[:space:]]*=[[:space:]]*//' | tr -d '\r')
+            local createmask=$(echo "$share_config" | grep -E '^[[:space:]]*create mask[[:space:]]*=' | sed 's/^[[:space:]]*create mask[[:space:]]*=[[:space:]]*//' | tr -d '\r')
+            local dirmask=$(echo "$share_config" | grep -E '^[[:space:]]*directory mask[[:space:]]*=' | sed 's/^[[:space:]]*directory mask[[:space:]]*=[[:space:]]*//' | tr -d '\r')
+            local comment=$(echo "$share_config" | grep -E '^[[:space:]]*comment[[:space:]]*=' | sed 's/^[[:space:]]*comment[[:space:]]*=[[:space:]]*//' | tr -d '\r')
+
+            # Set defaults for empty values
+            [ -z "$path" ] && path="n/a"
+            [ -z "$readonly" ] && readonly="n/a"
+            [ -z "$validusers" ] && validusers="n/a"
+            [ -z "$createmask" ] && createmask="n/a"
+            [ -z "$dirmask" ] && dirmask="n/a"
+            [ -z "$comment" ] && comment="n/a"
+
+            # Print the share information
+            printf "%-15s %-25s %-10s %-15s %-10s %-10s %-20s\n" \
+                "$share_name" "$path" "$readonly" "$validusers" "$createmask" "$dirmask" "$comment"
+        fi
+    done <<< "$shares"
+
     echo ""
     echo ""
 }
+    # testparm -s 2>&1 | awk '
+    # BEGIN {
+    #     current_share = ""; share_count = 0;
+    #     headers[0] = "Name"; headers[1] = "Path"; headers[2] = "Read-Only"; headers[3] = "ValidUsers";
+    #     headers[4] = "CreateMask"; headers[5] = "DirMask"; headers[6] = "Comment";
+    #     for (i = 0; i <= 6; i++) max_widths[i] = length(headers[i]);
+    # }
+    # {
+    #     # Check for section headers like [sharename]
+    #     if (match($0, /^\[[^]]+\]$/)) {
+    #         if (current_share != "" && current_share != "global" && current_share != "printers") {
+    #             share_order[share_count++] = current_share;
+    #         }
+    #         # Extract share name between brackets
+    #         current_share = substr($0, 2, length($0) - 2);
+    #         if (current_share != "" && current_share != "global" && current_share != "printers") {
+    #             shares[current_share]["Path"] = "n/a"; 
+    #             shares[current_share]["Read-Only"] = "n/a"; 
+    #             shares[current_share]["ValidUsers"] = "n/a";
+    #             shares[current_share]["CreateMask"] = "n/a"; 
+    #             shares[current_share]["DirMask"] = "n/a"; 
+    #             shares[current_share]["Comment"] = "n/a";
+    #         }
+    #     } else if (current_share != "" && current_share != "global" && current_share != "printers") {
+    #         # Process configuration lines within a share section
+    #         line = $0; 
+    #         gsub(/^[ \t]+|[ \t]+$/, "", line);
+    #         if (match(line, /^path[ \t]*=[ \t]*(.*)/, arr)) {
+    #             shares[current_share]["Path"] = arr[1];
+    #         } else if (match(line, /^read only[ \t]*=[ \t]*(Yes|No)/, arr)) {
+    #             shares[current_share]["Read-Only"] = arr[1];
+    #         } else if (match(line, /^valid users[ \t]*=[ \t]*(.*)/, arr)) {
+    #             shares[current_share]["ValidUsers"] = arr[1];
+    #         } else if (match(line, /^create mask[ \t]*=[ \t]*(.*)/, arr)) {
+    #             shares[current_share]["CreateMask"] = arr[1];
+    #         } else if (match(line, /^directory mask[ \t]*=[ \t]*(.*)/, arr)) {
+    #             shares[current_share]["DirMask"] = arr[1];
+    #         } else if (match(line, /^comment[ \t]*=[ \t]*(.*)/, arr)) {
+    #             shares[current_share]["Comment"] = arr[1];
+    #         }
+    #     }
+    # }
+    # END {
+    #     if (current_share != "" && current_share != "global" && current_share != "printers") {
+    #         share_order[share_count++] = current_share;
+    #     }
+    #     if (share_count == 0) { 
+    #         print "No user-defined Samba shares found (excluding [global] and [printers])."; 
+    #         exit; 
+    #     }
+    #     
+    #     # Calculate column widths
+    #     for (idx = 0; idx < share_count; idx++) {
+    #         sn = share_order[idx];
+    #         if (length(sn) > max_widths[0]) max_widths[0] = length(sn);
+    #         if (length(shares[sn]["Path"]) > max_widths[1]) max_widths[1] = length(shares[sn]["Path"]);
+    #         if (length(shares[sn]["Read-Only"]) > max_widths[2]) max_widths[2] = length(shares[sn]["Read-Only"]);
+    #         if (length(shares[sn]["ValidUsers"]) > max_widths[3]) max_widths[3] = length(shares[sn]["ValidUsers"]);
+    #         if (length(shares[sn]["CreateMask"]) > max_widths[4]) max_widths[4] = length(shares[sn]["CreateMask"]);
+    #         if (length(shares[sn]["DirMask"]) > max_widths[5]) max_widths[5] = length(shares[sn]["DirMask"]);
+    #         if (length(shares[sn]["Comment"]) > max_widths[6]) max_widths[6] = length(shares[sn]["Comment"]);
+    #     }
+    #     
+    #     # Create format string
+    #     fmt_str = ""; sep_str = "";
+    #     for (col = 0; col <= 6; col++) {
+    #         fmt_str = fmt_str "%-" max_widths[col] "s" (col < 6 ? "\t" : "\n");
+    #         for (j = 0; j < max_widths[col]; j++) sep_str = sep_str "=";
+    #         if (col < 6) sep_str = sep_str "\t";
+    #     }
+    #     
+    #     # Print headers and data
+    #     printf fmt_str, headers[0], headers[1], headers[2], headers[3], headers[4], headers[5], headers[6]; 
+    #     print sep_str;
+    #     for (idx = 0; idx < share_count; idx++) {
+    #         sn = share_order[idx];
+    #         printf fmt_str, sn, shares[sn]["Path"], shares[sn]["Read-Only"], shares[sn]["ValidUsers"], \
+    #                shares[sn]["CreateMask"], shares[sn]["DirMask"], shares[sn]["Comment"];
+    #     }
+    # }' | column -t -s $'\t'
 
 # --- Function to display NFS exports (Server Perspective) ---
 display_nfs_exports_server() {

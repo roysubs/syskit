@@ -143,7 +143,7 @@ AVAILABLE_GAMES = {
     "flobopuyo": "A Puyo Puyo clone with network play. (~1MB)",
     "primrose": "A tile-laying puzzle game about placing colored squares. (~<1MB)",
 
-    "### BOARD & CARD GAMES (TRADITIONAL)": "Digital versions of classic board and card games.",
+    "### BOARD & CARD": "Digital versions of classic board and card games.",
     "gnubg": "GNU Backgammon - a strong backgammon program with analysis capabilities. (~15MB)",
     "gnuchess": "The GNU Chess program (engine, often used with xboard or eboard). (~2MB)",
     "gnushogi": "The GNU Shogi (Japanese Chess) program. (~2MB)",
@@ -160,7 +160,7 @@ AVAILABLE_GAMES = {
     "chessx": "Chess database and GUI, PGN viewer and editor. (~10MB)",
     "lexica": "Word puzzle game similar to Boggle. (~<1MB)", # Also fits here
 
-    "### ROGUELIKES & TEXT-BASED": "Dungeon crawls, interactive fiction, and terminal adventures.",
+    "### ROGUELIKES ETC": "Dungeon crawls, interactive fiction, and terminal adventures.",
     "bsdgames": "A collection of classic text-based UNIX games (adventure, rogue, worms, etc.). (~1MB)",
     "nethack-console": "The classic dungeon exploration roguelike game (console version). (~2MB)",
     "angband": "A single-player dungeon exploration roguelike game (console). (~5MB)",
@@ -182,7 +182,7 @@ AVAILABLE_GAMES = {
     "omega-rpg": "A complex text-based roguelike with a vast overworld and many features. (~1MB)",
     "nethereye": "A 'crawler' type game with a curses interface, focusing on exploration. (~<1MB)",
 
-    "### ADVENTURE & RPG (GRAPHICAL)": "Story-driven games with exploration and character development.",
+    "### ADVENTURE & RPG (X)": "Story-driven games with exploration and character development.",
     "scummvm": "Interpreter for many classic graphical point-and-click adventure games. (~10MB, games separate)",
     "residualvm": "Game engine recreation for Grim Fandango and other 3D adventure games. (~5MB, games separate)",
     "minetest": "An open-source voxel game engine (Minecraft-like, needs game content/mods). (~30MB core)",
@@ -219,7 +219,7 @@ AVAILABLE_GAMES = {
     "kwordquiz": "Flashcard learning program, similar to Anki/Mnemosyne (KDE). (~2MB)",
     "blinken": "Simon Says memory game for KDE. (~<1MB)",
 
-    "### MISCELLANEOUS & CLASSICS": "Fun utilities, old classics, or unique small games.",
+    "### MISCELLANEOUS": "Fun utilities, old classics, or unique small games.",
     "gnome-nibbles": "A snake game for GNOME, also known as Worms. (~<1MB)",
     # "sl": "A classic console animation - a steam locomotive runs across your screen.", # Already in Arcade
     # "cowsay": "A configurable talking cow (or other characters) using ASCII art.", # In your essentials
@@ -275,7 +275,7 @@ def get_package_status(package_name, suppress_logging=False):
 
 def get_formatted_header_text(item_name_key):
     header_content = item_name_key[len(HEADER_PREFIX):].strip().upper()
-    return f"--- {header_content} ---"
+    return f"--- {header_content}"
 
 
 def run_menu_session_with_cache_build(stdscr, item_definitions, status_cache, build_done_flag_container):

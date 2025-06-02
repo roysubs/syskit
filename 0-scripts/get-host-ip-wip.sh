@@ -1,4 +1,6 @@
+#!/bin/bash
 # Author: Roy Wiseman 2025-05
+
 get_host_ip() {
     local ip=""
     # Try common Linux methods first

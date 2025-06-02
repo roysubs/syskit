@@ -274,7 +274,7 @@ def get_package_status(package_name, suppress_logging=False):
 
 def get_formatted_header_text(item_name_key):
     header_content = item_name_key[len(HEADER_PREFIX):].strip().upper()
-    return f"--- {header_content} ---"
+    return f"--- {header_content}"
 
 
 def run_menu_session_with_cache_build(stdscr, item_definitions, status_cache, build_done_flag_container):

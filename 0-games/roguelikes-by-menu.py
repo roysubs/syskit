@@ -142,7 +142,7 @@ The executable is typically 'fangband' in the src/ directory or /usr/local/bin/ 
         "display_name": "Brogue (Community Edition)", "year_created": 2009,
         "package_name": None, "executable": "./brogue",
         "description": "A highly-regarded roguelike known for its simple interface, beautiful ASCII graphics, and deep tactical gameplay.",
-        "install_type": "custom", "source_url": "https://github.com/tsadok/brogue-ce",
+        "install_type": "custom", "source_url": "https://github.com/tmewett/broguece",
         "custom_install_instructions": """1. Go to https://github.com/tsadok/brogue-ce/releases
 2. Download the appropriate precompiled binary for Linux (e.g., brogue-linux-amd64.tbz2).
 3. Create a directory (e.g., ~/games/brogue-ce) and cd into it.

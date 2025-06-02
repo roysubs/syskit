@@ -254,8 +254,8 @@ main() {
         run_distro_container "$image" "$distro_name"
         
         echo
-        read -p "Would you like to launch another container? (Y/n): " another
-        if [[ "$another" =~ ^[Nn]$ ]]; then
+        read -p "Would you like to launch another container? (y/N): " another
+        if [[ ! "$another" =~ ^[Yy]$ ]]; then
             echo -e "${GREEN}Thanks for using the Docker Distro Container Launcher!${NC}"
             exit 0
         fi
