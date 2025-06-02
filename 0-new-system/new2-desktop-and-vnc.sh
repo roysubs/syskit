@@ -39,16 +39,16 @@ log() {
     echo -e "$1" # Still use echo -e for console output to interpret colors
 }
 
-is_pkg_installed() {
-    # Returns 0 if package is installed and configured, 1 otherwise
-    dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q "ok installed"
-}
-
 print_title() { log "${C_TITLE}=== $1 ===${C_RESET}"; }
 print_info() { log "${C_INFO}$1${C_RESET}"; }
 print_warn() { log "${C_WARN}WARN: $1${C_RESET}"; }
 print_error() { log "${C_ERR}ERROR: $1${C_RESET}"; }
 print_cmd() { log "${C_CMD}\$ $1${C_RESET}"; } # For displaying commands to be run
+
+is_pkg_installed() {
+    # Returns 0 if package is installed and configured, 1 otherwise
+    dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q "ok installed"
+}
 
 # --- Initial Setup ---
 mkdir -p "$VNC_DIR"
@@ -57,8 +57,9 @@ mkdir -p "$VNC_DIR"
 chmod 600 "$LOG_FILE" &>/dev/null # Mute chmod error if file just created by printf
 
 # --- Script Start ---
-print_title "VNC Server Setup Script (TightVNC)"
-print_info "This script will guide you through installing and configuring TightVNC server."
+print_title "VNC Desktop Environment and VNC (TightVNC Server) Setup Script"
+print_info "This script will guide you through installing and configuring a Desktop Environment"
+print_info "and a TightVNC server to connect to this system remotely."
 print_info "A detailed log of this session is being saved to: $LOG_FILE"
 echo # Newline for readability
 
@@ -99,13 +100,12 @@ else
     elif is_pkg_installed "gnome-session"; then # GNOME
         print_info "Package 'gnome-session' is installed (indicates GNOME components are present)."
         x_env_found=true
-    # Add any other DE checks here if needed
     fi
 fi
 
 if $x_env_found; then
     print_info "An X Window System or components of a desktop environment appear to be installed."
-    read -r -p "$(echo -e "${C_INPUT}Proceed with VNC server setup using an available/selected DE? (Y/n): ${C_RESET}")" confirm_vnc_setup
+    read -r -p "$(echo -e "${C_INPUT}Proceed with VNC server setup (installing the Desktop Environment if required)? (Y/n): ${C_RESET}")" confirm_vnc_setup
     confirm_vnc_setup="${confirm_vnc_setup:-Y}" # Default to Yes
     if [[ ! "$confirm_vnc_setup" =~ ^[Yy]$ ]]; then
         print_error "Aborting: VNC server setup declined."
@@ -126,14 +126,37 @@ echo # Newline
 # 1.2 Define Available Desktop Environments/Window Managers
 # Format: "Name;Package(s);Startup Command;Resource Level"
 declare -a DESKTOP_ENVIRONMENTS=(
+    # --- Full Desktop Environments ---
+    # Lightweight DEs
     "XFCE;task-xfce-desktop xfce4-goodies;startxfce4;Lightweight"
-    "MATE;task-mate-desktop;mate-session;Medium"
     "LXQt;task-lxqt-desktop;startlxqt;Lightweight"
     "LXDE;task-lxde-desktop;startlxde;Lightweight (older, LXQt often preferred)"
-    "Openbox;openbox obconf menumaker;openbox-session;Very Lightweight (minimal, requires manual menu setup)"
-    "Fluxbox;fluxbox;startfluxbox;Very Lightweight (minimal)"
-    "IceWM;icewm;icewm-session;Very Lightweight (minimal)"
-    # Add other DEs like GNOME/KDE if desired, but they can be heavier and more complex for VNC
+    # Medium DEs
+    "MATE;task-mate-desktop;mate-session;Medium"
+    "Budgie;budgie-desktop;budgie-session;Medium"
+    "UKUI;ukui-desktop-environment;ukui-session;Medium (Ubuntu Kylin interface)"
+    "Cinnamon;task-cinnamon-desktop;cinnamon-session;Medium-Heavyweight"
+    "Enlightenment;enlightenment;enlightenment_start;Medium (highly configurable)"
+    # Heavyweight DEs
+    "GNOME;task-gnome-desktop;gnome-session;Heavyweight (Modern GNOME Shell)"
+    "GNOME Flashback (Metacity);gnome-session-flashback;gnome-session --session=gnome-flashback-metacity;Medium (Classic GNOME, VNC-friendly)"
+    "KDE Plasma;task-kde-desktop;startplasma-x11;Heavyweight (VNC Note: Compositor might need tweaking)"
+    
+    # --- Window Managers (generally more minimalist) ---
+    # Stacking WMs
+    "Openbox;openbox obconf menumaker;openbox-session;Very Lightweight (Stacking WM, highly configurable)"
+    "Fluxbox;fluxbox;startfluxbox;Very Lightweight (Stacking WM, fast)"
+    "IceWM;icewm icewm-themes;icewm-session;Very Lightweight (Stacking WM with themes & basic panel)"
+    "Window Maker;wmaker;wmaker;Lightweight (Stacking WM, NeXTSTEP look)"
+    "FVWM;fvwm;fvwm;Lightweight-Medium (Stacking WM, very powerful, classic)"
+    "AfterStep;afterstep;afterstep;Medium (Stacking WM, NeXTSTEP feel)"
+    # Tiling WMs (keyboard-driven, require more learning/configuration)
+    "i3wm (Tiling);i3 i3status dmenu i3lock;i3;Very Lightweight (Tiling WM)"
+    "AwesomeWM (Tiling);awesome awesome-extra;awesome;Very Lightweight (Tiling WM, Lua configured)"
+    "XMonad (Tiling);xmonad suckless-tools;xmonad;Very Lightweight (Tiling WM, Haskell configured)"
+    
+    # --- Special Purpose ---
+    "Sugar (Learning Platform);sucrose;sugar;Medium (Educational DE, very different paradigm)"
 )
 
 print_info "Available Desktop Environments/Window Managers for VNC:"
@@ -143,10 +166,9 @@ TEMP_DE_LIST=() # For storing display lines
 for i in "${!DESKTOP_ENVIRONMENTS[@]}"; do
     IFS=';' read -r name packages command resource <<< "${DESKTOP_ENVIRONMENTS[$i]}"
     status_msg=""
-    primary_package=$(echo "$packages" | cut -d' ' -f1) # Check based on the task or main package
-    if dpkg -s "$primary_package" >/dev/null 2>&1; then
+    primary_package=$(echo "$packages" | cut -d' ' -f1)
+    if is_pkg_installed "$primary_package"; then
         status_msg="${C_GREEN}[INSTALLED]${C_RESET}"
-        # Auto-select if current desktop matches (simple check)
         if [ -n "$XDG_CURRENT_DESKTOP" ]; then
             if [[ "$XDG_CURRENT_DESKTOP" == *"$name"* ]] || \
                [[ "$XDG_CURRENT_DESKTOP" == *"XFCE"* && "$name" == "XFCE" ]] || \
@@ -158,19 +180,16 @@ for i in "${!DESKTOP_ENVIRONMENTS[@]}"; do
     TEMP_DE_LIST+=("$(echo -e "${C_INFO}$((i+1)). $name ($resource) $status_msg${C_RESET}")")
 done
 
-# If no auto-selection, try to default to installed XFCE if present
 if [ -z "$DEFAULT_DE_CHOICE" ]; then
     for i in "${!DESKTOP_ENVIRONMENTS[@]}"; do
         IFS=';' read -r name packages _ _ <<< "${DESKTOP_ENVIRONMENTS[$i]}"
         primary_package=$(echo "$packages" | cut -d' ' -f1)
-        if [[ "$name" == "XFCE" ]] && dpkg -s "$primary_package" >/dev/null 2>&1; then
-            DEFAULT_DE_CHOICE=$((i+1))
-            break
+        if [[ "$name" == "XFCE" ]] && is_pkg_installed "$primary_package"; then
+            DEFAULT_DE_CHOICE=$((i+1)); break
         fi
     done
 fi
 
-# Print the constructed list
 for line in "${TEMP_DE_LIST[@]}"; do echo -e "$line"; done
 
 SELECTED_DE_INDEX=""
@@ -178,12 +197,12 @@ while true; do
     prompt_msg="${C_INPUT}Select the Desktop Environment for VNC (enter number"
     [ -n "$DEFAULT_DE_CHOICE" ] && prompt_msg+=", default $DEFAULT_DE_CHOICE"
     prompt_msg+="): ${C_RESET}"
-    read -r -p "$(echo -e "$prompt_msg")" choice
-    choice="${choice:-$DEFAULT_DE_CHOICE}" # Use default if input is empty
+    # Ensure the command substitution here is correctly closed
+    read -r -p "$(echo -e "${prompt_msg}")" choice
+    choice="${choice:-$DEFAULT_DE_CHOICE}"
 
     if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#DESKTOP_ENVIRONMENTS[@]}" ]; then
-        SELECTED_DE_INDEX=$((choice-1))
-        break
+        SELECTED_DE_INDEX=$((choice-1)); break
     else
         print_warn "Invalid selection. Please enter a number from the list."
     fi
@@ -193,36 +212,44 @@ IFS=';' read -r SELECTED_DE_NAME SELECTED_DE_PACKAGES SELECTED_DE_CMD RESOURCE_L
 print_info "You selected: ${C_BOLD}$SELECTED_DE_NAME${C_RESET}"
 echo # Newline
 
-PACKAGES_TO_INSTALL="tightvncserver expect dbus-x11" # Core VNC packages
+# Core VNC packages + xfonts-base for font issues
+PACKAGES_TO_INSTALL="tightvncserver expect dbus-x11 xfonts-base"
 NEEDS_DESKTOP_INSTALL=false
 primary_selected_package=$(echo "$SELECTED_DE_PACKAGES" | cut -d' ' -f1)
 
-if ! dpkg -s "$primary_selected_package" >/dev/null 2>&1; then
+if ! is_pkg_installed "$primary_selected_package"; then
     print_warn "$SELECTED_DE_NAME is not currently installed. It will be added to the installation list."
     PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $SELECTED_DE_PACKAGES"
     NEEDS_DESKTOP_INSTALL=true
 else
     print_info "$SELECTED_DE_NAME appears to be already installed."
-    # If DE is installed, ensure 'expect' and 'dbus-x11' are also considered if somehow missing
-    for pkg_check in expect dbus-x11; do
-        if ! dpkg -s "$pkg_check" >/dev/null 2>&1; then
+    # Ensure other core utils are considered if somehow missing
+    for pkg_check in expect dbus-x11 xfonts-base; do
+        if ! is_pkg_installed "$pkg_check"; then
             PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $pkg_check"
         fi
     done
+    # Remove duplicates from PACKAGES_TO_INSTALL if any (e.g. xfonts-base might be added twice)
+    PACKAGES_TO_INSTALL=$(echo "$PACKAGES_TO_INSTALL" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+
 fi
 echo # Newline
 
 # --- Step 2: System Update and Package Installation ---
 print_title "Step 2: System Update and Package Installation"
+# Trim leading/trailing whitespace from PACKAGES_TO_INSTALL before display
+PACKAGES_TO_INSTALL=$(echo "$PACKAGES_TO_INSTALL" | awk '{$1=$1;print}')
 print_info "The following packages will be installed/ensured: ${C_BOLD}$PACKAGES_TO_INSTALL${C_RESET}"
+# Ensure the command substitution here is correctly closed
 read -r -p "$(echo -e "${C_INPUT}Proceed with system update and package installation? (Y/n): ${C_RESET}")" confirm_install
-if [[ "$confirm_install" =~ ^[Nn]$ ]]; then
+confirm_install="${confirm_install:-Y}" # Default to Yes
+if [[ ! "$confirm_install" =~ ^[Yy]$ ]]; then
     print_error "Aborting: Package installation declined."
     exit 1
 fi
 
 print_cmd "sudo apt update"
-sudo apt update 2>&1 | tee -a "$LOG_FILE" # Log stderr too
+sudo apt update 2>&1 | tee -a "$LOG_FILE"
 print_warn "During updates/installs, you might see 'W: Possible missing firmware...' messages."
 print_warn "These are generally non-critical for VNC. If they relate to your hardware (e.g., amdgpu, iwlwifi),"
 print_warn "you can install relevant firmware packages later (e.g., 'firmware-amd-graphics', 'firmware-iwlwifi')."
@@ -230,7 +257,6 @@ print_warn "you can install relevant firmware packages later (e.g., 'firmware-am
 print_cmd "sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y"
 if ! sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y 2>&1 | tee -a "$LOG_FILE"; then
     print_warn "apt upgrade encountered some issues. Check log. Continuing with package installation..."
-    # Non-fatal for upgrade, proceed to install
 fi
 
 print_info "Installing packages. This may take some time. Configuration prompts will be handled with defaults."
@@ -241,8 +267,6 @@ else
     exit_status=$?
     print_error "Failed to install necessary packages (exit code: $exit_status)."
     print_error "Please review the output above and the detailed log: $LOG_FILE"
-    print_error "This script uses DEBIAN_FRONTEND=noninteractive to attempt to avoid interactive prompts."
-    print_error "If issues persist (e.g., broken packages, conflicts), manual intervention may be required."
     exit 1
 fi
 echo # Newline
@@ -250,49 +274,44 @@ echo # Newline
 # --- Step 3: VNC Password Setup ---
 print_title "Step 3: VNC Password Setup"
 VNC_PASSWORD=""
-VIEW_ONLY_PASSWORD="" # Initialize as empty
+VIEW_ONLY_PASSWORD=""
 
 while true; do
+    # Ensure the command substitution here is correctly closed
     read -s -r -p "$(echo -e "${C_INPUT}Enter VNC full access password (6-8 chars recommended for TightVNC): ${C_RESET}")" VNC_PASSWORD
-    echo # Newline after password input
+    echo
     if [ ${#VNC_PASSWORD} -lt 6 ] || [ ${#VNC_PASSWORD} -gt 8 ]; then
         print_warn "Password length is ideally 6-8 characters for TightVNC compatibility."
-        # Allow user to proceed if they insist
     fi
+    # Ensure the command substitution here is correctly closed
     read -s -r -p "$(echo -e "${C_INPUT}Verify VNC full access password: ${C_RESET}")" VNC_PASSWORD_VERIFY
     echo
-    if [ "$VNC_PASSWORD" == "$VNC_PASSWORD_VERIFY" ]; then
-        break
-    else
-        print_warn "Passwords do not match. Please try again."
-    fi
+    if [ "$VNC_PASSWORD" == "$VNC_PASSWORD_VERIFY" ]; then break; else print_warn "Passwords do not match. Try again."; fi
 done
 
+# Ensure the command substitution here is correctly closed
 read -r -p "$(echo -e "${C_INPUT}Set up a view-only password? (y/N): ${C_RESET}")" setup_view_only
-setup_view_only="${setup_view_only:-n}" # Default to 'n'
+setup_view_only="${setup_view_only:-n}"
 if [[ "$setup_view_only" =~ ^[Yy]$ ]]; then
     while true; do
+        # Ensure the command substitution here is correctly closed
         read -s -r -p "$(echo -e "${C_INPUT}Enter VNC view-only password (6-8 chars): ${C_RESET}")" VIEW_ONLY_PASSWORD
         echo
         if [ ${#VIEW_ONLY_PASSWORD} -lt 6 ] || [ ${#VIEW_ONLY_PASSWORD} -gt 8 ]; then
             print_warn "Password length is ideally 6-8 characters."
         fi
+        # Ensure the command substitution here is correctly closed
         read -s -r -p "$(echo -e "${C_INPUT}Verify VNC view-only password: ${C_RESET}")" VIEW_ONLY_PASSWORD_VERIFY
         echo
-        if [ "$VIEW_ONLY_PASSWORD" == "$VIEW_ONLY_PASSWORD_VERIFY" ]; then
-            break
-        else
-            print_warn "View-only passwords do not match. Please try again."
-        fi
+        if [ "$VIEW_ONLY_PASSWORD" == "$VIEW_ONLY_PASSWORD_VERIFY" ]; then break; else print_warn "View-only passwords do not match. Try again."; fi
     done
 fi
 
 print_info "Setting VNC passwords using 'vncpasswd' utility..."
-# Ensure .vnc directory exists (should already from script start, but good for vncpasswd)
 mkdir -p "$VNC_DIR"
 
-# Create a temporary expect script
 # Ensure the EOF marker for the heredoc is on a line by itself, no leading/trailing spaces.
+# And ensure the closing parenthesis for the command substitution $() is correctly placed.
 EXPECT_SCRIPT_CONTENT=$(cat <<EOF
 #!/usr/bin/expect -f
 set timeout 10
@@ -313,19 +332,17 @@ if {"$VIEW_ONLY_PASSWORD" != ""} {
 }
 expect eof
 EOF
-) # Closing parenthesis for command substitution
+) # Closing parenthesis for EXPECT_SCRIPT_CONTENT=$(cat <<EOF...)
 
-# For logging, show expect script content without passwords
 LOGGED_EXPECT_SCRIPT_CONTENT=$(echo "$EXPECT_SCRIPT_CONTENT" | sed "s/$VNC_PASSWORD/********/g" | sed "s/$VIEW_ONLY_PASSWORD/********/g")
 print_cmd "Automated vncpasswd process (passwords redacted in log):"
-echo "$LOGGED_EXPECT_SCRIPT_CONTENT" >> "$LOG_FILE" # Log the (redacted) script
-
-# Execute the expect script
+echo "$LOGGED_EXPECT_SCRIPT_CONTENT" >> "$LOG_FILE"
 echo "$EXPECT_SCRIPT_CONTENT" | expect -f - >> "$LOG_FILE" 2>&1
 
-# Optionally store passwords in a file (with strong warning)
 print_warn "VNC passwords have been set."
+# Ensure the command substitution here is correctly closed
 read -r -p "$(echo -e "${C_INPUT}Store these passwords in plaintext in $PASSWORD_FILE? (y/N) (SECURITY RISK!): ${C_RESET}")" store_pass
+store_pass="${store_pass:-N}" # Default to No
 if [[ "$store_pass" =~ ^[Yy]$ ]]; then
     echo "VNC Full Access Password: $VNC_PASSWORD" > "$PASSWORD_FILE"
     if [ -n "$VIEW_ONLY_PASSWORD" ]; then
@@ -335,8 +352,7 @@ if [[ "$store_pass" =~ ^[Yy]$ ]]; then
     print_info "Passwords stored in $PASSWORD_FILE (permissions set to 600)."
 else
     print_info "Passwords not stored in plaintext file by user choice."
-    # Clear the file if it existed and user chose not to store
-    >"$PASSWORD_FILE" # Truncate file or remove if desired: rm -f "$PASSWORD_FILE"
+    >"$PASSWORD_FILE" # Truncate/clear file
 fi
 echo # Newline
 
@@ -352,36 +368,31 @@ killed_definitively=false
 while [ $attempt -lt $MAX_KILL_ATTEMPTS ] && ! $killed_definitively; do
     attempt=$((attempt + 1))
     print_cmd "vncserver -kill $VNC_DISPLAY (attempt $attempt/$MAX_KILL_ATTEMPTS)"
-    VNC_KILL_OUTPUT=$(vncserver -kill "$VNC_DISPLAY" 2>&1) # Capture output
+    VNC_KILL_OUTPUT=$(vncserver -kill "$VNC_DISPLAY" 2>&1)
     echo "Kill attempt $attempt output for $VNC_DISPLAY: $VNC_KILL_OUTPUT" >> "$LOG_FILE"
 
     if echo "$VNC_KILL_OUTPUT" | grep -q -E "Killing Xtightvnc process|process is successfully killed"; then
-        print_info "Existing VNC server on $VNC_DISPLAY reported killed by 'vncserver -kill'."
+        print_info "Existing VNC server on $VNC_DISPLAY reported killed."
         killed_definitively=true
-    elif echo "$VNC_KILL_OUTPUT" | grep -q -E "no process running|Can't find file.*${VNC_DISPLAY}\.pid|No server running"; then
-        print_info "No VNC server was reported running on $VNC_DISPLAY by 'vncserver -kill'."
-        killed_definitively=true # Display is considered free
+    elif echo "$VNC_KILL_OUTPUT" | grep -q -E "no process running|Can't find file.*${VNC_DISPLAY#:}\.pid|No server running"; then
+        print_info "No VNC server was reported running on $VNC_DISPLAY."
+        killed_definitively=true
     else
-        print_warn "Kill attempt $attempt for $VNC_DISPLAY was inconclusive or failed. Output: $VNC_KILL_OUTPUT"
-        if [ $attempt -lt $MAX_KILL_ATTEMPTS ]; then
-            sleep 2
-        fi
+        print_warn "Kill attempt $attempt for $VNC_DISPLAY was inconclusive. Output: $VNC_KILL_OUTPUT"
+        if [ $attempt -lt $MAX_KILL_ATTEMPTS ]; then sleep 2; fi
     fi
 done
 
 if ! $killed_definitively; then
-    print_warn "'vncserver -kill $VNC_DISPLAY' was not definitively successful after $MAX_KILL_ATTEMPTS attempts."
-    print_warn "You may need to manually kill lingering Xtightvnc processes for display $VNC_DISPLAY."
+    print_warn "'vncserver -kill $VNC_DISPLAY' was not definitively successful."
 fi
 
-VNC_HOSTNAME_FOR_FILES=$(hostname) # Get hostname for PID/log file names
-print_info "Cleaning up potential stale VNC PID file for display $VNC_DISPLAY..."
+VNC_HOSTNAME_FOR_FILES=$(hostname)
+print_info "Cleaning up potential stale VNC PID/socket files for display $VNC_DISPLAY..."
 rm -f "$VNC_DIR/${VNC_HOSTNAME_FOR_FILES}${VNC_DISPLAY}.pid"
-# Also remove the socket file if it exists (for TightVNC, Xorg-based VNC)
 rm -f "/tmp/.X11-unix/X${VNC_DISPLAY#:}"
 rm -f "/tmp/.X${VNC_DISPLAY#:}-lock"
-
-sleep 1 # Brief pause to ensure resources are freed.
+sleep 1
 
 # 4b. Configure ~/.vnc/xstartup
 print_info "Configuring VNC startup script: $VNC_DIR/xstartup"
@@ -419,9 +430,9 @@ EOF
 
 print_info "The following content will be written to $XSTARTUP_FILE:"
 echo -e "${C_CMD}--- xstartup content ---${C_RESET}"
-echo "$XSTARTUP_CONTENT" | sed 's/^/   /' # Indent for display
+# Indent for display in console, but not in the file or log
+echo "$XSTARTUP_CONTENT" | sed 's/^/    /' | while IFS= read -r line; do echo -e "${C_CMD}$line${C_RESET}"; done
 echo -e "${C_CMD}--- end xstartup content ---${C_RESET}"
-# Log the actual content to the log file for debugging
 echo "Writing to $XSTARTUP_FILE:" >> "$LOG_FILE"
 echo "$XSTARTUP_CONTENT" >> "$LOG_FILE"
 echo "--- End of xstartup content in log ---" >> "$LOG_FILE"
@@ -434,26 +445,31 @@ echo # Newline
 # --- Step 5: Start VNC Server ---
 print_title "Step 5: Start VNC Server"
 print_info "Attempting to start VNC server on display $VNC_DISPLAY with geometry $VNC_GEOMETRY and depth $VNC_DEPTH..."
-print_cmd "vncserver $VNC_DISPLAY -geometry $VNC_GEOMETRY -depth $VNC_DEPTH -localhost no"
-# -localhost no allows connections from other machines. For only local access (e.g. SSH tunnel), use -localhost yes or omit.
+# Removed "-localhost no" as it was causing "Unrecognized option: no" with Xtightvnc
+print_cmd "vncserver $VNC_DISPLAY -geometry $VNC_GEOMETRY -depth $VNC_DEPTH"
 
-VNC_START_OUTPUT=$(vncserver "$VNC_DISPLAY" -geometry "$VNC_GEOMETRY" -depth "$VNC_DEPTH" -localhost no 2>&1)
-echo "VNC Start Output: $VNC_START_OUTPUT" >> "$LOG_FILE" # Log the raw output
+VNC_START_OUTPUT=$(vncserver "$VNC_DISPLAY" -geometry "$VNC_GEOMETRY" -depth "$VNC_DEPTH" 2>&1)
+echo "VNC Start Output: $VNC_START_OUTPUT" >> "$LOG_FILE"
 
 VNC_SERVER_LOG_FILE_GUESS="$VNC_DIR/${VNC_HOSTNAME_FOR_FILES}${VNC_DISPLAY}.log"
 
 if echo "$VNC_START_OUTPUT" | grep -q "New 'X' desktop is"; then
     print_info "${C_GREEN}VNC server started successfully!${C_RESET}"
-    echo -e "${C_GREEN}$(echo "$VNC_START_OUTPUT" | grep -E "New 'X' desktop is|Log file is")${C_RESET}"
-    VNC_SERVER_LOG_FILE_REPORTED=$(echo "$VNC_START_OUTPUT" | grep "Log file is" | awk '{print $NF}')
+    RELEVANT_START_INFO=$(echo "$VNC_START_OUTPUT" | grep -E "New 'X' desktop is|Log file is")
+    echo -e "${C_GREEN}${RELEVANT_START_INFO}${C_RESET}"
+    VNC_SERVER_LOG_FILE_REPORTED=$(echo "$RELEVANT_START_INFO" | grep "Log file is" | awk '{print $NF}')
     [ -n "$VNC_SERVER_LOG_FILE_REPORTED" ] && VNC_SERVER_LOG_FILE_GUESS="$VNC_SERVER_LOG_FILE_REPORTED"
 elif echo "$VNC_START_OUTPUT" | grep -q -E "A VNC server is already running|Fatal server error.*Cannot establish any listening sockets"; then
     print_error "VNC server reported it is ALREADY RUNNING on $VNC_DISPLAY or cannot listen (port possibly in use)."
-    print_error "This occurred even after attempts to kill and clean up. Output: $VNC_START_OUTPUT"
+    print_error "This occurred even after attempts to kill and clean up. Output was: ${C_RED}${VNC_START_OUTPUT}${C_RESET}"
     print_error "Please check manually: ${C_CMD}ps aux | grep -Ei 'vnc|Xtightvnc'${C_RESET} and ${C_CMD}ss -tulnp | grep 590${VNC_DISPLAY#:}${C_RESET}"
     print_error "Also review VNC server log: ${C_BOLD}$VNC_SERVER_LOG_FILE_GUESS${C_RESET}"
 else
-    print_error "VNC server may not have started correctly. Output: $VNC_START_OUTPUT"
+    print_error "VNC server may not have started correctly. Full output was: ${C_RED}${VNC_START_OUTPUT}${C_RESET}"
+    if echo "$VNC_START_OUTPUT" | grep -q -i "fontPath"; then # Case-insensitive search for fontPath
+        print_warn "The error mentions a 'fontPath' issue. Ensure font packages like 'xfonts-base' are installed (this script added it)."
+        print_warn "If the issue persists, further X server font configuration might be needed on your system."
+    fi
     print_error "Review this script's log: ${C_BOLD}$LOG_FILE${C_RESET}"
     print_error "And the VNC server's own log (if created): ${C_BOLD}$VNC_SERVER_LOG_FILE_GUESS${C_RESET}"
 fi
@@ -461,31 +477,34 @@ echo # Newline
 
 # --- Step 6: Firewall Configuration (UFW) ---
 print_title "Step 6: Firewall Configuration (UFW)"
-VNC_PORT_NUMBER=$((5900 + ${VNC_DISPLAY#:}) # Calculate port from display number, e.g., :1 -> 5901
+# Ensure VNC_PORT_NUMBER is calculated correctly using arithmetic expansion
+VNC_PORT_NUMBER=$((5900 + ${VNC_DISPLAY#:}) ) # e.g., :1 -> 1, so 5900 + 1 = 5901
 
 if command -v ufw &> /dev/null; then
     print_info "UFW firewall manager is detected."
     if sudo ufw status | grep -qw active; then
         print_cmd "sudo ufw allow $VNC_PORT_NUMBER/tcp comment \"VNC for display $VNC_DISPLAY\""
         sudo ufw allow "$VNC_PORT_NUMBER/tcp" comment "VNC for display $VNC_DISPLAY" 2>&1 | tee -a "$LOG_FILE"
-        print_info "UFW rule added for port $VNC_PORT_NUMBER/tcp. You may need to reload UFW if it was already active."
-        print_cmd "sudo ufw reload # (If UFW was already active and you want to apply changes now)"
+        print_info "UFW rule updated/added for port $VNC_PORT_NUMBER/tcp. Consider reloading if UFW was already active."
+        print_cmd "sudo ufw reload # (Recommended to apply changes if UFW was active)"
     else
         print_warn "UFW is installed but not active. Rule for $VNC_PORT_NUMBER/tcp added, but UFW needs to be enabled."
         print_cmd "sudo ufw allow $VNC_PORT_NUMBER/tcp comment \"VNC for display $VNC_DISPLAY\""
-        sudo ufw allow "$VNC_PORT_NUMBER/tcp" comment "VNC for display $VNC_DISPLAY" 2>&1 | tee -a "$LOG_FILE" # Add rule anyway
-        print_info "To enable UFW (will deny other incoming traffic by default): ${C_CMD}sudo ufw enable${C_RESET}"
+        sudo ufw allow "$VNC_PORT_NUMBER/tcp" comment "VNC for display $VNC_DISPLAY" 2>&1 | tee -a "$LOG_FILE"
+        print_info "To enable UFW (will deny other incoming by default): ${C_CMD}sudo ufw enable${C_RESET}"
     fi
 else
     print_warn "UFW firewall manager not found. Skipping automatic firewall configuration."
-    print_warn "If you use another firewall (e.g., firewalld), please ensure port $VNC_PORT_NUMBER/tcp is open."
+    print_warn "If using another firewall, ensure port $VNC_PORT_NUMBER/tcp is open for incoming connections."
 fi
 echo # Newline
 
 # --- Step 7: Final Information ---
 print_title "Step 7: VNC Setup Complete - Information"
 SERVER_HOSTNAME=$(hostname)
-SERVER_IP=$(hostname -I | awk '{print $1}') # Gets the first IP address
+# Attempt to get a primary, non-localhost IP. Fallback if complex.
+SERVER_IP=$(hostname -I | awk '{print $1}' | sed 's/ //g')
+if [ -z "$SERVER_IP" ]; then SERVER_IP="<Could_not_determine_IP>"; fi
 
 print_info "${C_GREEN}VNC server setup process is complete!${C_RESET}"
 print_info "You should now be able to connect using a VNC client."
@@ -494,20 +513,20 @@ echo -e "${C_INFO}  Desktop Environment: ${C_BOLD}$SELECTED_DE_NAME${C_RESET}"
 echo -e "${C_INFO}  VNC Display:         ${C_BOLD}${VNC_DISPLAY}${C_RESET}"
 echo -e "${C_INFO}  Connect to:          ${C_BOLD}${SERVER_HOSTNAME}${VNC_DISPLAY}${C_RESET} (e.g., ${SERVER_HOSTNAME}:1)"
 echo -e "${C_INFO}  Or by IP:            ${C_BOLD}${SERVER_IP}${VNC_DISPLAY}${C_RESET} (e.g., ${SERVER_IP}:1)"
-print_info "(Note: VNC clients typically use the 'server:display' format, like '${SERVER_IP}:1'. Some might support 'server::port' like '${SERVER_IP}::${VNC_PORT_NUMBER}'.)"
+print_info "(Note: VNC clients typically use 'server:display' format. Some support 'server::port' like '${SERVER_IP}::${VNC_PORT_NUMBER}'.)"
 
 echo -e "\n${C_INFO}Passwords:${C_RESET}"
-echo -e "${C_INFO}  Full Access:     (You set this during the script)"
+echo -e "${C_INFO}  Full Access:     (As you set during the script)"
 if [ -n "$VIEW_ONLY_PASSWORD" ]; then
-    echo -e "${C_INFO}  View-Only Access: (You set this during the script)"
+    echo -e "${C_INFO}  View-Only Access: (As you set during the script)"
 fi
 if [ -f "$PASSWORD_FILE" ] && grep -q "Password" "$PASSWORD_FILE"; then
-    echo -e "${C_INFO}  Passwords were also saved to: $PASSWORD_FILE (if you chose to)"
+    echo -e "${C_INFO}  (Passwords were also saved to: $PASSWORD_FILE if you chose to store them)"
 fi
 
 echo -e "\n${C_INFO}Managing the VNC Server:${C_RESET}"
 echo -e "${C_INFO}  To STOP the VNC server on display $VNC_DISPLAY: ${C_CMD}vncserver -kill $VNC_DISPLAY${C_RESET}"
-echo -e "${C_INFO}  To START it again (using current settings): ${C_CMD}vncserver $VNC_DISPLAY -geometry $VNC_GEOMETRY -depth $VNC_DEPTH -localhost no${C_RESET}"
+echo -e "${C_INFO}  To START it again (using current settings): ${C_CMD}vncserver $VNC_DISPLAY -geometry $VNC_GEOMETRY -depth $VNC_DEPTH${C_RESET}"
 echo -e "${C_INFO}  To list all running VNC servers for you: ${C_CMD}vncserver -list${C_RESET}"
 echo -e "${C_INFO}  To see listening VNC ports (TCP):       ${C_CMD}ss -tulnp | grep -E 'Xtightvnc|${VNC_PORT_NUMBER}'${C_RESET}"
 

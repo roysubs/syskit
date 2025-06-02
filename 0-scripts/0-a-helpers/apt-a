@@ -5,33 +5,46 @@
 # Define colors
 RED='\e[31m'
 GREEN='\e[32m'
+YELLOW='\e[33m'
 NC='\e[0m' # No Color
 
 # Function to show usage help
 show_help() {
-    echo "Apt Tool.   Usage:  [option] <package(s)>"
+    echo "Apt Tool. Usage: $0 [option] <argument(s)>"
     echo "Options:"
-    echo "  i <package(s)>    Install the specified package(s) (uses sudo)"
-    echo "  h                 History: show install/remove/upgrade history"
-    echo "  r <package(s)>    Remove the specified package(s) (uses sudo)"
-    echo "  s <package(s)>    Search for the specified package(s)"
-    echo "  sno <package(s)>  Show package names that contain the searched text"
-    echo "  sbin <string>     Search all packages for files with <string> in bin folders (/bin, /usr/bin, /sbin, /usr/sbin)"
-    echo "  sx <package(s)>   Show executable files in packages found"
-    echo "  u                 Update, then upgrade, then autoremove (uses sudo)"
-    echo "  ar                Autoremove packages that are no longer required (uses sudo)"
-    echo "  v <package(s)>    View info: version, dependencies, package contents, etc"
-    echo "  d <package(s)>    Depends: Packages required to install the specified package(s)"
-    echo "  dr <package(s)>   Reverse Depends: Packages that depend on the specified package(s)"
+    echo -e "  ${GREEN}i <package(s)>${NC}      Install the specified package(s) (uses sudo)."
+    echo -e "  ${GREEN}r <package(s)>${NC}      Remove the specified package(s) (uses sudo)."
+    echo -e "  ${GREEN}u${NC}                   Update, then upgrade, then autoremove (uses sudo)."
+    echo -e "  ${GREEN}ar${NC}                  Autoremove packages no longer required (uses sudo)."
+    echo
+    echo -e "  ${GREEN}s <term(s)>${NC}         Search for packages matching term(s) (uses apt search)."
+    echo -e "  ${GREEN}sno <term(s)>${NC}       Search Names Only: list package names containing term(s)."
+    echo -e "  ${GREEN}sx <term(s)>${NC}        Show eXecutables from packages matching term(s) (uses apt-file)."
+    echo -e "  ${GREEN}sbin <str>${NC}          Search Binaries: find filenames containing <str> in common binary paths"
+    echo -e "                       (e.g. /bin, /usr/bin, /opt/*/bin - uses apt-file)."
+    echo
+    echo -e "  ${GREEN}v <package(s)>${NC}      View detailed info for package(s) (show, depends, contents)."
+    echo -e "  ${GREEN}d <package(s)>${NC}       Depends: list packages required by specified package(s)."
+    echo -e "  ${GREEN}dr <package(s)>${NC}      Reverse Depends: list packages that depend on specified package(s)."
+    echo -e "  ${GREEN}cl <package(s)>${NC}      Changelog: display changelog for package(s)."
+    echo -e "  ${GREEN}why <package(s)>${NC}     Why is package installed? (manual/auto, reverse dependencies)."
+    echo
+    echo -e "  ${GREEN}h${NC}                   History: show apt install/remove/upgrade history."
+    echo -e "  ${GREEN}lu${NC}                  List Upgradable packages."
+    echo -e "  ${GREEN}ao${NC}                  List Orphaned packages (needs deborphan)."
+    echo -e "  ${GREEN}lh${NC}                  List Held packages (apt-mark showhold)."
+    echo -e "  ${GREEN}srcs${NC}                List configured APT Sources (/etc/apt/sources.list & .d/)."
+    echo -e "  ${GREEN}scfg${NC}                Show effective APT ConFiGuration (apt-config dump)."
     echo
 }
 
 # Function to print a command in green and execute it
+# Usage: run_command command arg1 arg2 ...
 run_command() {
-    local full_cmd_string="$1"
-    echo -e "# ${GREEN}${full_cmd_string}${NC}"
-    # Execute the command string. Using bash -c is generally safe for constructed strings.
-    bash -c "$full_cmd_string"
+    # Using 'local' here is correct as it's within a function
+    local cmd_display="$*"
+    echo -e "# ${GREEN}${cmd_display}${NC}"
+    "$@" # Execute the command and its arguments directly
     return $? # Return the exit status of the executed command
 }
 
@@ -42,169 +55,367 @@ if [ $# -eq 0 ]; then
 fi
 
 option=$1
-shift  # Shift to access package arguments
+shift # Shift to access package arguments (if any)
+
+# --- Check for required commands ---
+check_command() {
+    if ! command -v "$1" &>/dev/null; then
+        echo -e "${RED}Error: Command '$1' not found.${NC}"
+        if [ -n "$2" ]; then # If a package name for the command is provided
+            read -p "Install package '$2' to provide '$1'? (y/N) " -n 1 -r REPLY
+            echo
+            if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+                run_command sudo apt update
+                run_command sudo apt install -y "$2"
+                if [ "$1" == "apt-file" ]; then
+                    run_command sudo apt-file update
+                fi
+                # Check again if the command is now available
+                if ! command -v "$1" &>/dev/null; then
+                    echo -e "${RED}Failed to install or find '$1' after installation attempt.${NC}"
+                    return 1
+                fi
+            else
+                echo "Command '$1' (from package '$2') is required for this option. Please install it."
+                return 1
+            fi
+        else
+            echo "Command '$1' is required for this option."
+            return 1
+        fi
+    fi
+    return 0
+}
+
 
 case "$option" in
     i)
-        run_command "sudo apt install $@";
+        if [ $# -eq 0 ]; then echo -e "${RED}Please specify package(s) to install.${NC}"; exit 1; fi
+        run_command sudo apt install "$@";
         ;;
-    h)
-        # Path to the apt history log files
-        HISTORY_LOG="/var/log/apt/history.log"
-        HISTORY_LOG_OLD="/var/log/apt/history.log.1.gz"
-
-        # Function to process log files
-        process_log() {
-            local log_file=$1
-            local description=$2
-            if [[ -f "$log_file" ]]; then
-                echo "$description"
-                # Print entries from the log file
-                grep -E '^(Start-Date|Commandline:.*(install|remove|upgrade))' "$log_file"
-                echo ""
-            fi
-        }
-
-        # Process the current history log (most recent actions)
-        if [[ -f "$HISTORY_LOG" ]]; then
-            process_log "$HISTORY_LOG" "Reading from $HISTORY_LOG"
-        fi
-
-        # Process the old history log (gzipped) first
-        if [[ -f "$HISTORY_LOG_OLD" ]]; then
-            process_log "$HISTORY_LOG_OLD" "Reading from $HISTORY_LOG_OLD"
-        fi
-
-        if command -v cowsay &>/dev/null; then cowsay "'apt' history processed. Moo."; fi
-        ;;
-
     r)
-        run_command "sudo apt remove $@";
+        if [ $# -eq 0 ]; then echo -e "${RED}Please specify package(s) to remove.${NC}"; exit 1; fi
+        run_command sudo apt remove "$@";
         ;;
-
-    s)
-        for package in "$@"; do
-            echo "Search results for $package:"
-            run_command "apt search $package";
-            echo
-        done
-        ;;
-    sno)
-        for package in "$@"; do
-            echo "Search names only"
-            echo "Use -o, --option <key=value> to set a configuration option directly. You can use"
-            echo "this multiple times to set different options, apt-cache --names-only becomes:"
-            echo "apt-cache --names-only '$package' becomes the below using -o"
-            echo
-            echo "Search results for $package:"
-            run_command "apt -o APT::Cache::NamesOnly=true search $package";
-            echo
-        done
-        ;;
-
-    sbin)
-        CMD=apt-file
-        if ! command -v $CMD &>/dev/null; then
-          read -p "$CMD not found. Install (y/N)? " -n 1 -r REPLY && echo
-          [[ $REPLY =~ ^[Yy]$ ]] && (sudo apt install -y $CMD && sudo apt-file update) || { echo "$CMD not installed. Exiting."; exit 1; }
-        fi
-        for searchstr in "$@"; do
-            echo "Search bin"
-            echo "Search the apt-file repository for all files containing '$searchstr' that are"
-            echo "located in likely binary executable folder like /bin, /usr/bin, /sbin, /usr/sbin."
-            echo
-            run_command "apt-file search --regexp '/s?bin/[^/]*$searchstr[^/]*$'"
-        done
-        ;;
-
-    sx)
-        for searchstr in "$@"; do
-            # First, get your list of packages, for example:
-            apt-cache search --names-only $searchstr | awk '{print $1}' > /tmp/packages_to_check.txt
-            # Or use the output from the apt-file search in point 2 if you prefer that starting list
-
-            echo "Executables from packages:"
-            while read -r package_name; do
-                echo "--- Binaries in package: $searchstr ---"
-                # List files and filter for common binary paths
-                # Adding -F to grep for fixed string, and -E for extended regex
-                # Common binary directories: /bin, /sbin, /usr/bin, /usr/sbin, /usr/games, /opt/.../bin
-                apt-file list "$searchstr" | grep -E '/(s?bin|games)/[^/]+$|/opt/[^/]+/bin/[^/]+$'
-                # The regex above tries to match:
-                # - /bin/executable_name
-                # - /sbin/executable_name
-                # - /usr/bin/executable_name
-                # - /usr/sbin/executable_name
-                # - /usr/games/executable_name
-                # - /opt/some_dir/bin/executable_name
-            done < /tmp/packages_to_check.txt
-            # Clean up the temporary file
-            # rm packages_to_check.txt
-        done
-        ;;
-    
     u)
-        # Use run_command and check exit status for chaining
-        if run_command "sudo apt update"; then
-            if run_command "sudo apt upgrade"; then
-                run_command "sudo apt autoremove"
+        if run_command sudo apt update; then
+            if run_command sudo apt full-upgrade -y; then # Using full-upgrade for better handling of dependencies
+                run_command sudo apt autoremove -y
             fi
         fi
         ;;
     ar)
-        run_command "sudo apt autoremove";
+        run_command sudo apt autoremove -y;
         ;;
-    v)
-        for package in "$@"; do
-            echo "Information for '$package' (apt info in Debian, apt show in Mint):"
-            if grep --color=auto -q "Mint" /etc/os-release; then
-                info_cmd="apt show $package";
+
+    s)
+        if [ $# -eq 0 ]; then echo -e "${RED}Please specify search term(s).${NC}"; exit 1; fi
+        for term in "$@"; do
+            echo -e "${YELLOW}Search results for '$term':${NC}"
+            run_command apt search "$term";
+            echo
+        done
+        ;;
+    sno) # Search Names Only - lists only package names
+        if [ $# -eq 0 ]; then echo -e "${RED}Please specify search term(s) for 'sno'.${NC}"; exit 1; fi
+        for term in "$@"; do
+            echo -e "${YELLOW}Package names containing '$term':${NC}"
+            # apt-cache is typically faster for this and gives plainer output
+            if ! output=$(apt-cache search --names-only "$term" 2>/dev/null | awk '{print $1}'); then
+                 echo "   Error during search for '$term'."
+            elif [ -z "$output" ]; then
+                 echo "   No packages found with '$term' in their name."
             else
-                info_cmd="apt info $package";
-            fi
-            run_command "$info_cmd";
-
-            echo
-            read -n 1 -s -r -p "Press any key to show package dependencies for $package"
-            echo
-            run_command "apt-cache depends $package";
-
-            echo
-            read -n 1 -s -r -p "Press any key to show package contents for $package"
-            echo
-
-            if dpkg -s "$package" > /dev/null 2>&1; then
-                run_command "dpkg -L $package";
-            else
-                if ! command -v apt-file > /dev/null 2>&1; then
-                    echo "Installing 'apt-file' to view contents of packages that are not currently installed."
-                    run_command "sudo apt install -y apt-file"; # Use run_command here too
-                    run_command "sudo apt-file update";      # Use run_command here too
-                fi
-                run_command "apt-file list $package";
+                 echo "$output"
             fi
             echo
         done
         ;;
-    d)
+    sx) # Show eXecutables from packages matching term(s)
+        if ! check_command "apt-file" "apt-file"; then exit 1; fi
+        if [ $# -eq 0 ]; then echo -e "${RED}Please specify search term(s) for 'sx'.${NC}"; exit 1; fi
+
+        for searchstr in "$@"; do
+            echo -e "🔍 ${YELLOW}Searching for packages matching '$searchstr'...${NC}"
+            packages_file="/tmp/packages_to_check_${$}_${searchstr//[^A-Za-z0-9_]/}.txt"
+            trap "rm -f '$packages_file'" EXIT # Ensure cleanup on exit
+
+            apt-cache search --names-only "$searchstr" 2>/dev/null | awk '{print $1}' > "$packages_file"
+
+            if ! [ -s "$packages_file" ]; then
+                echo "ℹ️ No packages found whose names match '$searchstr'."
+                rm -f "$packages_file"
+                trap - EXIT # Remove trap if continuing
+                continue
+            fi
+
+            echo ""
+            echo -e "📦 ${YELLOW}Executables for packages matching '$searchstr':${NC}"
+            while IFS= read -r package_name || [ -n "$package_name" ]; do
+                if [ -z "$package_name" ]; then continue; fi
+
+                echo "----------------------------------------"
+                echo "--- Package: ${GREEN}$package_name${NC} ---"
+                
+                # Using command substitution for output and then checking it.
+                executables_output=$(apt-file list "$package_name" 2>/dev/null | grep -E --color=never '/(s?bin|games)/[^/]+$|/opt/[^/]+/bin/[^/]+$|/usr/local/(s?bin)/[^/]+$')
+                
+                if [ -z "$executables_output" ]; then
+                    echo "   -> No executables found in common binary paths for '$package_name'."
+                    echo "      (Ensure 'sudo apt-file update' has been run, and '$package_name' is a valid package name known to apt-file)."
+                else
+                    echo "$executables_output"
+                fi
+            done < "$packages_file"
+
+            rm -f "$packages_file"
+            trap - EXIT # Remove trap after successful cleanup for this searchstr
+            echo "----------------------------------------"
+            echo ""
+        done
+        # Clear trap if loop finishes normally
+        trap - EXIT
+        ;;
+    sbin) # Search Binaries: find filenames containing <str> in common binary paths
+        if ! check_command "apt-file" "apt-file"; then exit 1; fi
+        if [ $# -eq 0 ]; then echo -e "${RED}Please specify a string to search in filenames.${NC}"; exit 1; fi
+
+        for search_term_in_filename in "$@"; do
+            echo -e "${YELLOW}Searching for files in binary locations where filename contains '$search_term_in_filename':${NC}"
+            # Regex for common binary paths, looking for the search term within the filename part
+            regex_pattern="(/s?bin/|/games/|/opt/[^/]+/bin/|/usr/local/s?bin/)[^/]*${search_term_in_filename}[^/]*$"
+            
+            # Manually echo because run_command will show the expanded regex which can be long
+            echo -e "# ${GREEN}apt-file search --regexp \"$regex_pattern\"${NC}"
+            if ! output=$(apt-file search --regexp "$regex_pattern" 2>/dev/null); then
+                echo "   Error during apt-file search for '$search_term_in_filename'."
+            elif [ -z "$output" ]; then
+                echo "   No files found matching the criteria for '$search_term_in_filename'."
+            else
+                echo "$output"
+            fi
+            echo
+        done
+        ;;
+
+    v) # View detailed info for package(s)
+        if [ $# -eq 0 ]; then echo -e "${RED}Please specify package name(s) for 'v'.${NC}"; exit 1; fi
         for package in "$@"; do
-            echo "dependencies for $package:"
-            run_command "apt-cache depends $package";
+            echo -e "--- ${YELLOW}Information for package: $package${NC} ---"
+            
+            echo -e "\n${GREEN}General Information (apt show):${NC}"
+            run_command apt show "$package"
+            echo "-----------------------------------"
+
+            echo -e "\n${GREEN}Dependencies (apt-cache depends):${NC}"
+            run_command apt-cache depends "$package"
+            echo "-----------------------------------"
+
+            echo -e "\n${GREEN}Package Contents:${NC}"
+            if dpkg -s "$package" >/dev/null 2>&1; then # Check if package is installed
+                echo "(Package is installed, listing files with dpkg -L)"
+                run_command dpkg -L "$package"
+            else
+                echo "(Package is not installed, trying to list contents with apt-file)"
+                if check_command "apt-file" "apt-file"; then
+                    if ! apt-file_output=$(apt-file list "$package" 2>/dev/null); then
+                         echo "   Could not list contents for '$package' via apt-file."
+                         echo "   (Perhaps run 'sudo apt-file update' or package has no files?)"
+                    elif [ -z "$apt-file_output" ]; then
+                         echo "   No contents listed for '$package' via apt-file (package might be empty or virtual)."
+                    else
+                         echo "$apt-file_output"
+                    fi
+                fi
+            fi
+            echo "-----------------------------------"
+            echo 
+        done
+        ;;
+    d)
+        if [ $# -eq 0 ]; then echo -e "${RED}Please specify package(s) for 'd'.${NC}"; exit 1; fi
+        for package in "$@"; do
+            echo -e "${YELLOW}Dependencies for '$package':${NC}"
+            run_command apt-cache depends "$package";
             echo
         done
         ;;
     dr)
-         for package in "$@"; do
-            echo "reverse dependencies for $package:"
-            run_command "apt-cache rdepends $package";
+        if [ $# -eq 0 ]; then echo -e "${RED}Please specify package(s) for 'dr'.${NC}"; exit 1; fi
+        for package in "$@"; do
+            echo -e "${YELLOW}Reverse dependencies for '$package' (packages that depend on it):${NC}"
+            run_command apt-cache rdepends "$package";
             echo
         done
         ;;
+    cl) # Changelog
+        if [ $# -eq 0 ]; then echo -e "${RED}Please specify package name(s) for 'cl'.${NC}"; exit 1; fi
+        # apt-listchanges is nice but apt changelog is standard
+        # check_command "apt-listchanges" "apt-listchanges" # Optional: suggest apt-listchanges
+        for package in "$@"; do
+            echo -e "${YELLOW}Changelog for '$package':${NC}"
+            if ! run_command apt changelog "$package"; then
+                echo "   Could not retrieve changelog for '$package'. Ensure package name is correct and sources are updated."
+            fi
+            echo
+        done
+        ;;
+    why) # Why is package installed?
+        if [ $# -eq 0 ]; then echo -e "${RED}Please specify package name(s) for 'why'.${NC}"; exit 1; fi
+        for package in "$@"; do
+            echo -e "--- ${YELLOW}Analysis for package: $package${NC} ---"
+            
+            echo -e "\n${GREEN}Installation State:${NC}"
+            if dpkg -s "$package" >/dev/null 2>&1; then
+                echo "Package '$package' is installed."
+                # Check manual/auto status
+                # apt-mark showauto/manual exits with 0 if package is in the respective list, non-zero otherwise.
+                # Output is the package name itself if found.
+                if apt-mark showauto "$package" 2>/dev/null | grep -Fxq "$package"; then
+                    echo -e "It is marked as ${GREEN}automatically installed${NC} (i.e., as a dependency)."
+                elif apt-mark showmanual "$package" 2>/dev/null | grep -Fxq "$package"; then
+                    echo -e "It is marked as ${GREEN}manually installed${NC}."
+                else
+                    # Fallback for packages that might not be in either list (e.g. protected/essential)
+                    # or if apt-mark behavior is unexpected.
+                    echo "Could not reliably determine manual/auto status via apt-mark."
+                    echo "You can also check 'aptitude why $package' if aptitude is installed."
+                fi
+            else
+                echo "Package '$package' is ${RED}not installed${NC}."
+            fi
+
+            echo -e "\n${GREEN}Packages depending on '$package' (Reverse Dependencies):${NC}"
+            # apt-cache rdepends output includes the package itself and "Reverse Depends:" lines.
+            # Filter these out for a cleaner list of actual reverse dependencies.
+            rdepends_output=$(apt-cache rdepends "$package" 2>/dev/null | sed "/^${package//./\.}$/d; /^Reverse Depends:/d" | awk 'NF') # NF removes empty lines
+            if [ -z "$rdepends_output" ]; then
+                 echo "   No other packages appear to depend on '$package', or it's a meta-package/not installed."
+            else
+                echo "$rdepends_output"
+            fi
+            echo "-----------------------------------"
+        done
+        ;;
+
+    h) # History
+        echo -e "${YELLOW}APT History:${NC}"
+        # Process gzipped log files first (older entries)
+        # ls -vr sorts in reverse version order (e.g., history.log.9.gz ... history.log.1.gz)
+        processed_history=false
+        for log_file_gz in $(ls -vr /var/log/apt/history.log.*.gz 2>/dev/null); do
+            echo -e "\n--- From: $log_file_gz ---"
+            zgrep -E --color=never '^(Start-Date:|Commandline:.*(install|remove|upgrade|autoremove|purge|full-upgrade))' "$log_file_gz"
+            processed_history=true
+        done
+
+        # Process the current log file (most recent entries)
+        if [[ -f "/var/log/apt/history.log" ]]; then
+            echo -e "\n--- From: /var/log/apt/history.log ---"
+            grep -E --color=never '^(Start-Date:|Commandline:.*(install|remove|upgrade|autoremove|purge|full-upgrade))' "/var/log/apt/history.log"
+            processed_history=true
+        fi
+
+        if ! $processed_history; then
+            echo "No apt history logs found in /var/log/apt/ (or files are empty/unreadable)."
+        fi
+        ;;
+    lu) # List Upgradable
+        echo -e "${YELLOW}Listing packages that can be upgraded...${NC}"
+        echo "(Running 'sudo apt update' silently to get the latest package information...)"
+        sudo apt update -qq >/dev/null 2>&1 # Suppress all output from update
+        echo
+        
+        # Get upgradable packages, excluding the header line from 'apt list'
+        upgradable_output=$(apt list --upgradable 2>/dev/null | sed '1d')
+
+        if [ -n "$upgradable_output" ]; then
+            echo -e "${GREEN}The following packages can be upgraded:${NC}"
+            echo "$upgradable_output"
+            echo
+            echo "To upgrade all, you can run: $0 u"
+            echo "To upgrade specific packages: sudo apt install <package_name>"
+        else
+            echo "   All packages are up to date."
+        fi
+        ;;
+    ao) # List Orphaned packages
+        if ! check_command "deborphan" "deborphan"; then exit 1; fi
+        echo -e "${YELLOW}Orphaned packages (via deborphan):${NC}"
+        # deborphan might output to stderr if no packages are found, or if used with certain options.
+        # Capturing both stdout and stderr for checking.
+        deborphan_output=$(deborphan 2>&1) 
+        if [ $? -ne 0 ] && echo "$deborphan_output" | grep -q "no packages found"; then # Common message when none found
+             echo "   No orphaned packages found."
+        elif [ -z "$deborphan_output" ] || echo "$deborphan_output" | grep -q "no packages found"; then # Check if output is empty or explicit "no packages"
+            echo "   No orphaned packages found."
+        else
+            echo "$deborphan_output"
+            echo
+            echo -e "${YELLOW}To remove them, you can try (USE WITH CAUTION):${NC}"
+            echo "  sudo apt remove \$(deborphan)"
+            echo "For orphaned libraries only (often safer):"
+            echo "  sudo apt remove \$(deborphan --libdevel)"
+        fi
+        ;;
+    lh) # List Held packages
+        echo -e "${YELLOW}Packages currently on hold (apt-mark showhold):${NC}"
+        held_packages=$(apt-mark showhold 2>/dev/null)
+        if [ -z "$held_packages" ]; then
+            echo "   No packages are currently on hold."
+        else
+            echo "$held_packages"
+            echo
+            echo "To unhold a package: sudo apt-mark unhold <package_name>"
+            echo "To hold a package: sudo apt-mark hold <package_name>"
+        fi
+        ;;
+    srcs) # List configured APT Sources
+        echo -e "${YELLOW}Configured APT sources:${NC}"
+        echo -e "\n${GREEN}Main sources list file (/etc/apt/sources.list):${NC}"
+        if [ -f /etc/apt/sources.list ]; then
+            grep --color=always -vE '^\s*#|^\s*$' /etc/apt/sources.list || echo "   (empty or only comments)"
+        else
+            echo "   File not found: /etc/apt/sources.list"
+        fi
+        
+        echo -e "\n${GREEN}Additional sources from /etc/apt/sources.list.d/:${NC}"
+        if [ -d /etc/apt/sources.list.d ] && [ -n "$(ls -A /etc/apt/sources.list.d/*.list 2>/dev/null)" ]; then
+            for list_file in /etc/apt/sources.list.d/*.list; do
+                if [ -f "$list_file" ]; then
+                    echo "--- Contents of $list_file ---"
+                    grep --color=always -vE '^\s*#|^\s*$' "$list_file" || echo "   (empty or only comments)"
+                    echo
+                fi
+            done
+        else
+            echo "   No additional source files found in /etc/apt/sources.list.d/"
+        fi
+
+        echo -e "${GREEN}Active PPA URLs (heuristic search):${NC}"
+        found_ppa=false
+        # Search for typical PPA patterns in source files
+        # The -h option to grep suppresses filenames, -o shows only matching part
+        grep_output=$(grep -RoPh --include='*.list' 'deb\s+(http[s]?://ppa\.launchpad\.net/[^/]+/[^/]+/ubuntu)\s+\w+' /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null | sed -E 's/deb\s+//' | sort -u)
+        if [ -n "$grep_output" ]; then
+            echo "$grep_output"
+            found_ppa=true
+        fi
+        
+        if ! $found_ppa; then
+            echo "   No active PPA URLs (like ppa.launchpad.net) found with the current heuristic."
+        fi
+        ;;
+    scfg) # Show effective APT ConFiGuration
+        echo -e "${YELLOW}Effective APT Configuration (apt-config dump):${NC}"
+        run_command apt-config dump
+        ;;
+
     *)
         echo -e "${RED}Unknown option: $option${NC}\n"
         show_help
-        exit 1 # Indicate error
+        exit 1
         ;;
 esac
 
-exit 0 # Indicate success
+exit 0
