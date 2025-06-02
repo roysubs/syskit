@@ -520,7 +520,7 @@ case "$option" in
         if [ -z "$CURRENT_BRANCH" ]; then
             echo_red "❌ Error: Could not determine current branch. Are you in a detached HEAD state?"
             # If this 'acp)' is a function in a larger script, use 'return 1'. If it's standalone, 'exit 1'.
-            return 1
+            exit 1
         fi
 
         echo -e "\033[1;33mWarning: If you are using a VPN, it might interfere with the git push operation.\033[0m"
