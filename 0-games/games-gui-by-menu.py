@@ -19,7 +19,7 @@ HEADER_PREFIX = "### " # Define the prefix for headers
 
 # User should structure this dictionary with headers in the desired places.
 # The order will be preserved in the menu.
-AVAILABLE_GAMES_GRAPHICAL = {
+AVAILABLE_GAMES = {
     "### ACTION & ARCADE (Graphical)": "Fast-paced, reflex-based, and classic arcade-style games with graphical UIs.",
     "a7xpg": "Alpha-7-XPG - an arcade shooter. Part of Debian's finest games selection. (~2MB)",
     "abe": "Abe's Amazing Adventure - a platformer game. Part of Debian's finest games selection. (~5MB)",
