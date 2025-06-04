@@ -1,4 +1,6 @@
 #!/bin/bash
+# Author: Roy Wiseman 2025-01
+
 # path - Script to manage and inspect the PATH environment variable.
 
 # Define colors

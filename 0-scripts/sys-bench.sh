@@ -105,7 +105,7 @@ install_dependency "jq" "jq"
 install_dependency "lshw" "lshw"
 install_dependency "lm-sensors" "sensors"
 install_dependency "smartmontools" "smartctl"
-install_dependency "speedtest" "speedtest" # Note: For Ookla official, repo setup might be needed first
+install_dependency "speedtest-cli" "speedtest" # Note: For Ookla official, repo setup might be needed first
 
 NUM_THREADS=$(nproc 2>/dev/null || echo 1)
 
