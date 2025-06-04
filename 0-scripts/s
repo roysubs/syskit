@@ -1,4 +1,6 @@
 #!/bin/bash
+# Author: Roy Wiseman 2025-01
+
 # Systemd Service Control Script
 # Provides a concise way to manage systemd services using systemctl.
 

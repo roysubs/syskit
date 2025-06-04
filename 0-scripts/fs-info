@@ -1,4 +1,5 @@
 #!/bin/bash
+# Author: Roy Wiseman 2025-01
 
 # fs-info.sh
 # Displays a comprehensive overview of filesystem, mount, disk health, and share information.

@@ -1,4 +1,5 @@
 #!/bin/bash
+# Author: Roy Wiseman 2025-01
 
 # Show usage if -h is passed
 if [[ "$1" == "-h" ]]; then

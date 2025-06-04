@@ -1,4 +1,5 @@
 #!/bin/bash
+# Author: Roy Wiseman 2025-01
 
 # f - Enhanced Find and Grep Script
 # A wrapper for find and grep commands with common operations pre-configured

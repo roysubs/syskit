@@ -1,4 +1,6 @@
 #!/bin/bash
+# Author: Roy Wiseman 2025-01
+
 # BorgBackup Tool Script
 # Provides a simplified interface for common borg operations, showing commands before execution.
 
