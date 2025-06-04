@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Author: Roy Wiseman 2025-01
+
 # d - Directory size summary with relative sizes and optional file/dir counts
 
 set -euo pipefail

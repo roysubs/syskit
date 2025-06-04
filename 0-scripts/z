@@ -1,6 +1,7 @@
 #!/bin/bash
+# Author: Roy Wiseman 2025-01
 
-# zz - Universal Archive Tool
+# z - Universal Archive Tool
 # A swiss army knife for zipping, unzipping, compressing, and decompressing
 # files and folders using zip, gzip, 7z, tar, etc.
 

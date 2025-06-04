@@ -1,4 +1,5 @@
 #!/bin/bash
+# Author: Roy Wiseman 2025-01
 
 # Git Tool Script
 # Provides utilities for common Git operations and troubleshooting.

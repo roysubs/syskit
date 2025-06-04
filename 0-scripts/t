@@ -1,4 +1,6 @@
 #!/bin/bash
+# Author: Roy Wiseman 2025-01
+
 # TMUX Tool Script ("t")
 # Unified wrapper for commonly used tmux commands with colorful output and aliases.
 
