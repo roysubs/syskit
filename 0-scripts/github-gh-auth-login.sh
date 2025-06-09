@@ -1,95 +1,181 @@
 #!/bin/bash
-# Author: Roy Wiseman 2025-05
+# Author: Roy Wiseman, with modifications by Google's Gemini
+# Version: 2.1
+# Date: 2025-06-09
 
-# github-gh-auth-login.sh
-# This script helps you log into GitHub CLI (`gh`) using a Personal Access Token (PAT),
-# avoiding the need for a web browser, and checks if gh is installed.
+# github-gh-auth.sh
+# A user-friendly script to explain and handle GitHub CLI (gh) authentication.
+# It checks for both 'gh' and 'git' dependencies, detects SSH sessions,
+# and offers the most appropriate auth method with clearer instructions.
 
-# This will mimic Ctrl+L to quick-clear the screen *without* removing history
-# This may not work in GNOME terminal, but is useful in many other terminals
-softclear() { printf '\033[H\033[2J'; }
+# A softer clear that doesn't wipe the scrollback buffer.
+softclear() {
+    printf '\033[H\033[2J'
+}
 
+# --- Function to Explain GitHub CLI ---
+explain_gh() {
+    echo "-------------------------------------"
+    echo "What is the GitHub CLI ('gh')?"
+    echo "-------------------------------------"
+    echo
+    echo "'gh' is the official command-line tool for GitHub."
+    echo "It brings pull requests, issues, Actions, and other GitHub features"
+    echo "to your terminal, so you can do all your work in one place."
+    echo
+    echo "With 'gh', you can:"
+    echo "  - Manage repositories (cloning, creating, forking)"
+    echo "  - Handle pull requests and issues directly from the terminal"
+    echo "  - Interact with GitHub Actions workflows"
+    echo "  - Authenticate securely to work with private repositories."
+    echo
+    echo "This script will help you get authenticated."
+    echo
+    read -p "Press Enter to continue..."
+}
+
+# --- Main Script Logic ---
+softclear
+echo "=================================="
+echo "GitHub CLI (gh) Authentication"
+echo "=================================="
+echo
+
+# --- Step 1: Explain what gh is ---
+explain_gh
 softclear
 
-echo -e "GitHub CLI Authentication Script\n=================================="
+# --- Step 2: Check for Prerequisites (gh and git) ---
+echo "--> Checking for required tools: 'gh' and 'git'..."
 
-# --- Check if gh is installed ---
-echo -e "\nChecking for GitHub CLI (gh)..."
+# Check for GitHub CLI (gh)
 if ! command -v gh &> /dev/null; then
-    echo -e "\nError: GitHub CLI (gh) is not found in your PATH."
-    echo "gh is required for this script to work."
-    echo -e "\nPlease install gh first. You can find installation instructions here:"
-    echo "  https://cli.github.com/manual/installation"
-    echo -e "\nFor Debian/Ubuntu/Raspbian:"
-    echo "  sudo apt update"
-    echo "  sudo apt install gh -y"
-    echo -e "\nFor Fedora/CentOS/RHEL (using dnf):"
-    echo "  sudo dnf install 'dnf-command(config-manager)'"
-    echo "  sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo"
-    echo "  sudo dnf install gh"
-    echo -e "\nFor macOS (using Homebrew):"
-    echo "  brew install gh"
-    echo -e "\nPlease install gh and run the script again."
-    exit 1 # Exit with an error code
-fi
-echo "GitHub CLI (gh) found."
-
-echo -e "\nThis script will guide you through logging into GitHub CLI (gh)\nwithout needing a web browser."
-echo -e "Instead, we will use a Personal Access Token (PAT).\n"
-read -p "Press Enter to continue..."
-
-softclear
-
-# Step 1: Explain why a PAT is needed and how to generate it
-echo -e "Step 1: Generate a Personal Access Token (PAT)"
-echo -e "---------------------------------------------"
-echo -e "Since you are using SSH from a remote terminal, GitHub CLI would normally\ntry to open a web browser, which we want to avoid."
-echo -e "Instead, we'll use a PAT to authenticate.\n"
-echo -e "Follow these steps to generate a PAT:"
-echo -e "  1. Open GitHub in a browser on your local machine."
-echo -e "  2. Go to: https://github.com/settings/tokens"
-echo -e "  3. Click 'Generate new token (classic)'."
-echo -e "  4. Give it a name, like 'GitHub CLI Auth'."
-echo -e "  5. Select the following permissions:"
-echo -e "       - 'repo' (for repository access)"
-echo -e "       - 'read:org' (if needed for organizational repositories)"
-echo -e "       - 'write:public_key' (if using SSH authentication)."
-echo -e "  6. Click 'Generate token' and copy it."
-echo -e "  7. Keep it safe! You will only see it once.\n"
-read -p "Press Enter once you've generated the token..."
-
-softclear
-
-# Step 2: Use the token to authenticate
-echo -e "Step 2: Authenticate GitHub CLI (gh) with the PAT"
-echo -e "---------------------------------------------------"
-echo -e "Now that you have your token, we will use it to log in."
-echo -e "Please paste your Personal Access Token below and press Enter:"
-read -s GH_PAT # Read the token silently into the variable GH_PAT
-
-# Check if a token was actually entered
-if [ -z "$GH_PAT" ]; then
-    echo -e "\nNo token was entered. Authentication cancelled."
-    exit 1 # Exit with an error code
+    echo -e "\n❌ Error: GitHub CLI ('gh') is not found."
+    echo "   'gh' is required for this script to work."
+    echo "   Please install it first: https://cli.github.com/manual/installation"
+    echo "   Common commands:"
+    echo "     Debian/Ubuntu: sudo apt update && sudo apt install gh -y"
+    echo "     Fedora/RHEL:   sudo dnf install gh"
+    echo "     macOS (brew):  brew install gh"
+    exit 1
 fi
 
-echo -e "\nAttempting to authenticate gh using the provided token..."
+# Check for Git
+if ! command -v git &> /dev/null; then
+    echo -e "\n❌ Error: Git is not found."
+    echo "   The GitHub CLI ('gh') requires Git to be installed."
+    echo "   Please install Git first. You can find instructions here:"
+    echo "   https://git-scm.com/book/en/v2/Getting-Started-Installing-Git"
+    echo "   Common commands:"
+    echo "     Debian/Ubuntu: sudo apt install git -y"
+    echo "     Fedora/RHEL:   sudo dnf install git"
+    echo "     macOS (brew):  brew install git"
+    exit 1
+fi
 
-# Finally, run the `gh auth login` command, piping the token to it
-# This avoids the browser prompt and uses the token directly.
-echo "$GH_PAT" | gh auth login --with-token
+echo "✅ All required tools ('gh' and 'git') are installed."
+echo
 
-# Check the exit status of the gh auth login command
-if [ $? -eq 0 ]; then
-    echo -e "\nGitHub CLI authentication successful!"
-    echo "You should now be able to use gh commands."
+# --- Step 3: Detect Environment and Choose Auth Method ---
+auth_method=""
+echo "--> Choosing an authentication method..."
+
+# Detect if we are in an SSH session
+if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
+    echo "It looks like you're connected via SSH."
+    echo "The recommended method is using a Personal Access Token (PAT)."
+    read -p "Do you want to try the web browser login anyway? (y/N): " choice
+    if [[ "$choice" =~ ^[Yy]$ ]]; then
+        auth_method="web"
+    else
+        auth_method="pat"
+    fi
 else
-    echo -e "\nGitHub CLI authentication failed."
-    echo "Please double-check your Personal Access Token and ensure it has the correct permissions."
-    echo "You can try running 'gh auth status' to see if any authentication exists."
+    echo "It looks like you're on a local machine with a graphical UI."
+    echo "The easiest method is to log in with your web browser."
+    read -p "Do you want to proceed with the web browser login? (Y/n): " choice
+    if [[ "$choice" =~ ^[Nn]$ ]]; then
+        auth_method="pat"
+    else
+        auth_method="web"
+    fi
 fi
 
-# It's good practice to unset the variable containing the sensitive token
-unset GH_PAT
+echo
+read -p "Press Enter to begin the selected authentication process..."
+softclear
 
-echo -e "\nScript finished."
+# --- Step 4: Perform Authentication ---
+
+if [ "$auth_method" == "web" ]; then
+    # --- Web-based Authentication ---
+    echo "-------------------------------------"
+    echo "Step: Authenticate via Web Browser"
+    echo "-------------------------------------"
+    echo
+    echo "The script will now launch GitHub CLI's interactive login."
+    echo
+    echo "You will be asked a few setup questions first:"
+    echo "  1. What account to log into? (Choose GitHub.com)"
+    echo "  2. Preferred protocol for Git? (HTTPS is a safe default)"
+    echo "  3. Authenticate Git with your credentials? (Choose Yes)"
+    echo
+    echo "After answering, 'gh' will give you a ONE-TIME CODE."
+    echo
+    echo "Finally, it will open a browser window. Paste the code there and"
+    echo "click 'Authorize' to grant access, as shown in the image you provided."
+    echo
+    read -p "Press Enter to start the web login..."
+
+    # The -w flag hints at a web login, but gh auth login is fully interactive.
+    # We will let the user interact with it directly.
+    if gh auth login; then
+        echo -e "\n✅ GitHub CLI authentication successful!"
+    else
+        echo -e "\n❌ GitHub CLI authentication failed."
+        echo "   Please review the error messages above and try again."
+    fi
+
+elif [ "$auth_method" == "pat" ]; then
+    # --- PAT-based Authentication ---
+    echo "------------------------------------------------"
+    echo "Step 1: Generate a Personal Access Token (PAT)"
+    echo "------------------------------------------------"
+    echo
+    echo "Follow these steps on a machine with a web browser:"
+    echo "  1. Open this URL: https://github.com/settings/tokens/new"
+    echo "  2. For 'Note', give the token a name (e.g., 'gh-cli-on-server')."
+    echo "  3. Set an expiration date (highly recommended for security)."
+    echo "  4. Select the following 'scopes' to match the web-auth permissions:"
+    echo "     - 'repo'        (Full control of repositories)"
+    echo "     - 'read:org'    (Read org and team membership)"
+    echo "     - 'workflow'    (Manage GitHub Actions)"
+    echo "     - 'gist'        (Create gists)"
+    echo "  5. Click 'Generate token' and COPY THE TOKEN immediately."
+    echo
+    read -p "Press Enter once you have copied your token..."
+    softclear
+
+    echo "------------------------------------------------"
+    echo "Step 2: Authenticate gh with your PAT"
+    echo "------------------------------------------------"
+    echo
+    echo "Please paste your Personal Access Token and press Enter:"
+    read -s GH_PAT
+
+    if [ -z "$GH_PAT" ]; then
+        echo -e "\nNo token was entered. Authentication cancelled."
+        exit 1
+    fi
+
+    echo -e "\n--> Attempting to authenticate..."
+    if echo "$GH_PAT" | gh auth login --with-token; then
+        echo -e "\n✅ GitHub CLI authentication successful!"
+    else
+        echo -e "\n❌ GitHub CLI authentication failed. Please check your token."
+    fi
+    unset GH_PAT
+fi
+
+echo -e "\nTo verify your status, you can run: gh auth status"
+echo "Script finished."
