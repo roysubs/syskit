@@ -312,12 +312,12 @@ set statusline+=\\ [TYPE=%Y]         \" Add File type (e.g., sh, conf)
 set statusline+=\\ %l/%L             \" Add Current line / total lines
 set statusline+=\\ %P                \" Add Percentage through file
 \" Enable 'list' and 'laststatus' via F4 in normal or insert mode
-nnoremap <F4> :set list! listchars=tab:→\\ ,trail:·,eol:¶<CR>
-        \\ :let &laststatus = (&laststatus == 0 ? 2 : 0)<CR>
-        \\ :echo \"Hidden chars \" . (&list ? \"ON\" : \"OFF\") . \", Statusline \" . (&laststatus == 2 ? \"ON\" : \"OFF\")<CR>
-inoremap <F4> <Esc>:set list! listchars=tab:→\ ,trail:·,eol:¶<CR> \
-        \\ :let &laststatus = (&laststatus == 0 ? 2 : 0)<CR> \
-        \\ :echo \"Hidden chars \" . (&list ? \"ON\" : \"OFF\") . \", Statusline \" . (&laststatus == 2 ? \"ON\" : \"OFF\")<CR>a
+\" Set your list characters once, globally.
+set listchars=tab:▸,trail:·,eol:¶
+\" Create a clean, single-line mapping for Normal Mode. Use <bar> to chain commands together.
+nnoremap <F4> :set list! <bar> let &laststatus = (&laststatus == 2 ? 0 : 2) <bar> echo \"Hidden chars: \" . (&list ? \"ON\" : \"OFF\") . \" \\| Statusline: \" . (&laststatus == 2 ? \"ON\" : \"OFF\")<CR>
+\" Create a corresponding mapping for Insert Mode. This exits insert mode and then executes the same commands.
+inoremap <F4> <Esc><Cmd>set list! <bar> let &laststatus = (&laststatus == 2 ? 0 : 2) <bar> echo \"Hidden chars: \" . (&list ? \"ON\" : \"OFF\") . \" \| Statusline: \" . (&laststatus == 2 ? \"ON\" : \"OFF\")<CR>
 
 "
 
