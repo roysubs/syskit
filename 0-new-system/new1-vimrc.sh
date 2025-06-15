@@ -311,13 +311,31 @@ set statusline+=\\ [ENC=%{&enc}]     \" Add Encoding (e.g., utf-8)
 set statusline+=\\ [TYPE=%Y]         \" Add File type (e.g., sh, conf)
 set statusline+=\\ %l/%L             \" Add Current line / total lines
 set statusline+=\\ %P                \" Add Percentage through file
-\" Enable 'list' and 'laststatus' via F4 in normal or insert mode
-nnoremap <F4> :set list! listchars=tab:→\\ ,trail:·,eol:¶<CR>
-        \\ :let &laststatus = (&laststatus == 0 ? 2 : 0)<CR>
-        \\ :echo \"Hidden chars \" . (&list ? \"ON\" : \"OFF\") . \", Statusline \" . (&laststatus == 2 ? \"ON\" : \"OFF\")<CR>
-inoremap <F4> <Esc>:set list! listchars=tab:→\ ,trail:·,eol:¶<CR> \
-        \\ :let &laststatus = (&laststatus == 0 ? 2 : 0)<CR> \
-        \\ :echo \"Hidden chars \" . (&list ? \"ON\" : \"OFF\") . \", Statusline \" . (&laststatus == 2 ? \"ON\" : \"OFF\")<CR>a
+\" \" Enable 'list' and 'laststatus' via F4 in normal or insert mode
+\" nnoremap <F4> :set list! listchars=tab:→\\ ,trail:·,eol:¶<CR>
+\"         \\ :let &laststatus = (&laststatus == 0 ? 2 : 0)<CR>
+\"         \\ :echo \"Hidden chars \" . (&list ? \"ON\" : \"OFF\") . \", Statusline \" . (&laststatus == 2 ? \"ON\" : \"OFF\")<CR>
+\" inoremap <F4> <Esc>:set list! listchars=tab:→\ ,trail:·,eol:¶<CR> \
+\"         \\ :let &laststatus = (&laststatus == 0 ? 2 : 0)<CR> \
+\"         \\ :echo \"Hidden chars \" . (&list ? \"ON\" : \"OFF\") . \", Statusline \" . (&laststatus == 2 ? \"ON\" : \"OFF\")<CR>a
+
+function! ToggleHiddenAndStatusBar()
+    \" Toggle the 'list' setting to show/hide hidden characters
+    set list!
+
+    \" Set the characters to use for tabs, trailing spaces, etc.
+    \" The '\ ' here correctly sets the tab to be an arrow plus a space.
+    set listchars=tab:→\ ,trail:·,eol:¶
+
+    \" Toggle the statusline. 0=default, 1=never, 2=always.
+    let &laststatus = (&laststatus == 0 ? 2 : 0)
+
+    \" Echo the current state to the command line
+    echo \"Hidden chars \" . (&list ? \"ON\" : \"OFF\") . \", Statusline \" . (&laststatus == 2 ? \"ON\" : \"OFF\")
+endfunction
+
+nnoremap <F4> :call ToggleHiddenAndStatusBar()<CR>
+inoremap <F4> <Esc>:call ToggleHiddenAndStatusBar()<CR>a
 
 "
 

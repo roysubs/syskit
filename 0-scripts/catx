@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Script to copy file contents to the clipboard
+
+if [ -z "$1" ]; then
+    echo "Usage: catx <filename>"
+    exit 1
+fi
+
+if [ ! -f "$1" ]; then
+    echo "Error: File '$1' not found."
+    exit 1
+fi
+
+cat "$1" | xclip -selection clipboard
+echo "Copied contents of '$1' to clipboard."
