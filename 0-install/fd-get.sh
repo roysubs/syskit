@@ -5,9 +5,9 @@
 set -e
 
 # --- Configuration ---
-INSTALL_DIR="/usr/local/bin" # Standard location for system-wide executables
+INSTALL_DIR="/usr/local/bin"
 API_URL="https://api.github.com/repos/sharkdp/fd/releases/latest"
-REQUIRED_CMDS=("curl" "tar" "gzip" "find" "sudo" "jq") # List of required commands
+REQUIRED_CMDS=("curl" "tar" "gzip" "find" "sudo" "jq")
 
 # --- Trap for Cleanup ---
 TEMP_DIR=$(mktemp -d)
@@ -26,21 +26,17 @@ get_latest_release_info() {
     local release_info
     local curl_headers=()
 
-    # *** FINAL UPGRADE: Use GitHub Token if available for higher rate limits ***
     if [ -n "$GITHUB_TOKEN" ]; then
         echo "Found GITHUB_TOKEN. Using authenticated API request."
         curl_headers+=(-H "Authorization: Bearer $GITHUB_TOKEN")
     else
         echo "No GITHUB_TOKEN found. Using unauthenticated API request."
-        echo "Note: You may encounter rate limits. See script comments for info."
     fi
 
-    # Added -L to follow redirects, --fail to exit on HTTP errors, and -A for a User-Agent.
-    if ! release_info=$(curl -L --fail -s -A "fd-install-script/2.0" "${curl_headers[@]}" "$API_URL"); then
+    # *** FINAL FIX: Set User-Agent to the standard curl version to pass network filters ***
+    if ! release_info=$(curl -L --fail -s -A "curl/8.5.0" "${curl_headers[@]}" "$API_URL"); then
         echo "Error: Failed to fetch release information from $API_URL."
-        echo "This may be due to a network issue or GitHub API rate limiting."
-        echo "If rate-limited, creating a GitHub Personal Access Token can help."
-        echo "Run 'curl -i https://api.github.com/rate_limit' to check your status."
+        echo "This may be due to a network issue, a firewall, or API rate limiting."
         return 1
     fi
 
@@ -115,7 +111,10 @@ if [ "$NEEDS_INSTALL" = true ]; then
     echo "----------------------------------------------------"
     echo ""
 
-    if ! check_prerequisites; then exit 1; fi
+    if ! command -v "jq" &> /dev/null || ! command -v "tar" &> /dev/null; then
+        echo "Error: 'jq' and 'tar' are required. Please install them."
+        exit 1
+    fi
 
     read -r -p "Do you want to continue with the installation? (y/N) " response
     if [[ ! "${response,,}" =~ ^(yes|y)$ ]]; then
