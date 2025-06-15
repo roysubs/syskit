@@ -44,8 +44,10 @@ readonly LOG_FILE="/tmp/brave-reset-$(date +%Y%m%d-%H%M%S).log"
 
 # Define colors for output
 if [[ -t 1 ]]; then
-    readonly C_RESET='\033[0m' C_RED='\033[0;31m' C_GREEN='\033[0;32m' C_YELLOW='\033[0;33m' C_CYAN='\033[0;36m' C_WHITE='\033[1;37m'
+    # CORRECT: Use $'...' to interpret escape codes
+    readonly C_RESET=$'\033[0m' C_RED=$'\033[0;31m' C_GREEN=$'\033[0;32m' C_YELLOW=$'\033[0;33m' C_CYAN=$'\033[0;36m' C_WHITE=$'\033[1;37m'
 else
+    # This part is fine as-is
     readonly C_RESET='' C_RED='' C_GREEN='' C_YELLOW='' C_CYAN='' C_WHITE=''
 fi
 
@@ -108,12 +110,12 @@ ${C_CYAN}USAGE${C_RESET}
     $SCRIPT_NAME [OPTIONS]
 
 ${C_CYAN}OPTIONS${C_RESET}
-    ${C_GREEN}-f, --force-reinstall${C_RESET}   Force a full reinstallation (non-interactive).
+    ${C_GREEN}-f, --force-reinstall${C_RESET}    Force a full reinstallation (non-interactive).
     ${C_GREEN}-p, --purge, --uninstall${C_RESET} Completely uninstall Brave and all its data.
-    ${C_GREEN}    --install-helpers${C_RESET}   Opens tabs to help one-click install of useful extensions.
-    ${C_GREEN}    --with-filters${C_RESET}      Add extra ad-blocking filter lists to Brave Shields.
-    ${C_GREEN}    --vertical-tabs${C_RESET}     Enable the Vertical Tabs feature by default.
-    ${C_GREEN}-k, --keep-bookmarks${C_RESET}   Preserve bookmarks during the reset process.
+    ${C_GREEN}    --install-helpers${C_RESET}    Opens tabs to help one-click install of useful extensions.
+    ${C_GREEN}    --with-filters${C_RESET}       Add extra ad-blocking filter lists to Brave Shields.
+    ${C_GREEN}    --vertical-tabs${C_RESET}      Enable the Vertical Tabs feature by default.
+    ${C_GREEN}-k, --keep-bookmarks${C_RESET}     Preserve bookmarks during the reset process.
     ${C_GREEN}-y, --yes${C_RESET}                Assume 'yes' to all prompts (for automation).
     ${C_GREEN}-h, --help${C_RESET}               Show this help message.
 EOF
@@ -153,7 +155,7 @@ detect_environment() {
     fi
 
     if [[ "$HAS_GUI" == "true" ]]; then success "GUI environment detected.";
-    else warn "Headless environment detected. A GUI is needed to use Brave Browser."; fi
+    else warn "Headless environment (or SSH session) detected. A GUI is needed to use Brave Browser."; fi
 }
 
 # --- Core Functions ---
