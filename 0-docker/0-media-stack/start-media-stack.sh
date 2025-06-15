@@ -28,20 +28,21 @@ fi
 # Ensure mikefarah/yq is installed for yaml parsing
 if ! command -v yq &> /dev/null; then
     echo "yq command not found. Installing yq..."
-    YQ_BINARY="yq_linux_amd64"
-    case $(uname -m) in
-        x86_64) YQ_BINARY="yq_linux_amd64";;
-        aarch64) YQ_BINARY="yq_linux_arm64";;
-        *) echo "Unsupported architecture for yq: $(uname -m). Please install yq manually."; exit 1;;
-    esac
+    ../setup-yq-for-yaml.sh
+    # YQ_BINARY="yq_linux_amd64"
+    # case $(uname -m) in
+    #     x86_64) YQ_BINARY="yq_linux_amd64";;
+    #     aarch64) YQ_BINARY="yq_linux_arm64";;
+    #     *) echo "Unsupported architecture for yq: $(uname -m). Please install yq manually."; exit 1;;
+    # esac
 
-    if curl -L "https://github.com/mikefarah/yq/releases/latest/download/$YQ_BINARY" -o /usr/local/bin/yq; then
-        sudo chmod +x /usr/local/bin/yq
-        echo "yq installed successfully to /usr/local/bin."
-    else
-        echo "❌ Failed to download or install yq. Please install yq manually (e.g., via snap 'sudo snap install yq')."
-        exit 1
-    fi
+    # if curl -L "https://github.com/mikefarah/yq/releases/latest/download/$YQ_BINARY" -o /usr/local/bin/yq; then
+    #     sudo chmod +x /usr/local/bin/yq
+    #     echo "yq installed successfully to /usr/local/bin."
+    # else
+    #     echo "❌ Failed to download or install yq. Please install yq manually (e.g., via snap 'sudo snap install yq')."
+    #     exit 1
+    # fi
 fi
 
 # --- BEGIN: WSL2 VPN Container Compatibility Check ---
