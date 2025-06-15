@@ -1,4 +1,8 @@
 # Author: Roy Wiseman 2025-02
+# Manually add this to .vimrc to toggle colorschemes
+# Ctrl+F9 toggle backwards, and Ctrl+F10 to toggle forwards
+# Work in progress, will update this to be a script that auto-injects this to .vimrc
+
 " Helper function to get all available colorschemes
 function! s:GetAllColorschemes()
   let colors = []
