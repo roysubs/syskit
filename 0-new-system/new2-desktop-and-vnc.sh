@@ -1,13 +1,13 @@
 #!/bin/bash
-# Author: Roy Wiseman, Enhanced by Gemini AI
+# Author: Roy Wiseman
 # Date: 2025-06-02
 # Description: Interactive script to install and configure TightVNC server
 #              with a user-selectable desktop environment on Debian-based systems.
 
 # --- Configuration & Global Variables ---
 SCRIPT_NAME=$(basename "$0")
-USER_HOME=$(eval echo ~"$USER") # Reliable way to get user's home directory
-VNC_DIR="$USER_HOME/.vnc"
+# FIX: Use the standard $HOME variable for an absolute path to the user's home.
+VNC_DIR="$HOME/.vnc"
 PASSWORD_FILE="$VNC_DIR/${SCRIPT_NAME%.sh}-passwords.txt" # Plaintext password storage
 LOG_FILE="$VNC_DIR/${SCRIPT_NAME%.sh}-$(date +'%Y-%m-%d_%H-%M-%S').log"
 
@@ -65,8 +65,8 @@ echo # Newline for readability
 
 # --- Sudo Check ---
 if [[ $EUID -eq 0 ]]; then
-   print_error "This script should not be run as root. It uses 'sudo' for privileged commands."
-   exit 1
+    print_error "This script should not be run as root. It uses 'sudo' for privileged commands."
+    exit 1
 fi
 if ! sudo -v; then # Check if sudo credentials are valid / prompt if needed
     print_error "Sudo credentials check failed. Please ensure you can run sudo."
@@ -197,7 +197,6 @@ while true; do
     prompt_msg="${C_INPUT}Select the Desktop Environment for VNC (enter number"
     [ -n "$DEFAULT_DE_CHOICE" ] && prompt_msg+=", default $DEFAULT_DE_CHOICE"
     prompt_msg+="): ${C_RESET}"
-    # Ensure the command substitution here is correctly closed
     read -r -p "$(echo -e "${prompt_msg}")" choice
     choice="${choice:-$DEFAULT_DE_CHOICE}"
 
@@ -229,18 +228,16 @@ else
             PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $pkg_check"
         fi
     done
-    # Remove duplicates from PACKAGES_TO_INSTALL if any (e.g. xfonts-base might be added twice)
+    # Remove duplicates from PACKAGES_TO_INSTALL if any
     PACKAGES_TO_INSTALL=$(echo "$PACKAGES_TO_INSTALL" | tr ' ' '\n' | sort -u | tr '\n' ' ')
-
 fi
 echo # Newline
 
 # --- Step 2: System Update and Package Installation ---
 print_title "Step 2: System Update and Package Installation"
-# Trim leading/trailing whitespace from PACKAGES_TO_INSTALL before display
+# Trim leading/trailing whitespace
 PACKAGES_TO_INSTALL=$(echo "$PACKAGES_TO_INSTALL" | awk '{$1=$1;print}')
 print_info "The following packages will be installed/ensured: ${C_BOLD}$PACKAGES_TO_INSTALL${C_RESET}"
-# Ensure the command substitution here is correctly closed
 read -r -p "$(echo -e "${C_INPUT}Proceed with system update and package installation? (Y/n): ${C_RESET}")" confirm_install
 confirm_install="${confirm_install:-Y}" # Default to Yes
 if [[ ! "$confirm_install" =~ ^[Yy]$ ]]; then
@@ -277,30 +274,25 @@ VNC_PASSWORD=""
 VIEW_ONLY_PASSWORD=""
 
 while true; do
-    # Ensure the command substitution here is correctly closed
     read -s -r -p "$(echo -e "${C_INPUT}Enter VNC full access password (6-8 chars recommended for TightVNC): ${C_RESET}")" VNC_PASSWORD
     echo
     if [ ${#VNC_PASSWORD} -lt 6 ] || [ ${#VNC_PASSWORD} -gt 8 ]; then
         print_warn "Password length is ideally 6-8 characters for TightVNC compatibility."
     fi
-    # Ensure the command substitution here is correctly closed
     read -s -r -p "$(echo -e "${C_INPUT}Verify VNC full access password: ${C_RESET}")" VNC_PASSWORD_VERIFY
     echo
     if [ "$VNC_PASSWORD" == "$VNC_PASSWORD_VERIFY" ]; then break; else print_warn "Passwords do not match. Try again."; fi
 done
 
-# Ensure the command substitution here is correctly closed
 read -r -p "$(echo -e "${C_INPUT}Set up a view-only password? (y/N): ${C_RESET}")" setup_view_only
 setup_view_only="${setup_view_only:-n}"
 if [[ "$setup_view_only" =~ ^[Yy]$ ]]; then
     while true; do
-        # Ensure the command substitution here is correctly closed
         read -s -r -p "$(echo -e "${C_INPUT}Enter VNC view-only password (6-8 chars): ${C_RESET}")" VIEW_ONLY_PASSWORD
         echo
         if [ ${#VIEW_ONLY_PASSWORD} -lt 6 ] || [ ${#VIEW_ONLY_PASSWORD} -gt 8 ]; then
             print_warn "Password length is ideally 6-8 characters."
         fi
-        # Ensure the command substitution here is correctly closed
         read -s -r -p "$(echo -e "${C_INPUT}Verify VNC view-only password: ${C_RESET}")" VIEW_ONLY_PASSWORD_VERIFY
         echo
         if [ "$VIEW_ONLY_PASSWORD" == "$VIEW_ONLY_PASSWORD_VERIFY" ]; then break; else print_warn "View-only passwords do not match. Try again."; fi
@@ -310,8 +302,6 @@ fi
 print_info "Setting VNC passwords using 'vncpasswd' utility..."
 mkdir -p "$VNC_DIR"
 
-# Ensure the EOF marker for the heredoc is on a line by itself, no leading/trailing spaces.
-# And ensure the closing parenthesis for the command substitution $() is correctly placed.
 EXPECT_SCRIPT_CONTENT=$(cat <<EOF
 #!/usr/bin/expect -f
 set timeout 10
@@ -332,7 +322,7 @@ if {"$VIEW_ONLY_PASSWORD" != ""} {
 }
 expect eof
 EOF
-) # Closing parenthesis for EXPECT_SCRIPT_CONTENT=$(cat <<EOF...)
+)
 
 LOGGED_EXPECT_SCRIPT_CONTENT=$(echo "$EXPECT_SCRIPT_CONTENT" | sed "s/$VNC_PASSWORD/********/g" | sed "s/$VIEW_ONLY_PASSWORD/********/g")
 print_cmd "Automated vncpasswd process (passwords redacted in log):"
@@ -340,7 +330,6 @@ echo "$LOGGED_EXPECT_SCRIPT_CONTENT" >> "$LOG_FILE"
 echo "$EXPECT_SCRIPT_CONTENT" | expect -f - >> "$LOG_FILE" 2>&1
 
 print_warn "VNC passwords have been set."
-# Ensure the command substitution here is correctly closed
 read -r -p "$(echo -e "${C_INPUT}Store these passwords in plaintext in $PASSWORD_FILE? (y/N) (SECURITY RISK!): ${C_RESET}")" store_pass
 store_pass="${store_pass:-N}" # Default to No
 if [[ "$store_pass" =~ ^[Yy]$ ]]; then
@@ -351,8 +340,8 @@ if [[ "$store_pass" =~ ^[Yy]$ ]]; then
     chmod 600 "$PASSWORD_FILE"
     print_info "Passwords stored in $PASSWORD_FILE (permissions set to 600)."
 else
+    # FIX: The line that truncated the file (>"$PASSWORD_FILE") is removed.
     print_info "Passwords not stored in plaintext file by user choice."
-    >"$PASSWORD_FILE" # Truncate/clear file
 fi
 echo # Newline
 
@@ -404,8 +393,6 @@ if [ -f "$XSTARTUP_FILE" ]; then
     cp "$XSTARTUP_FILE" "$BACKUP_XSTARTUP"
 fi
 
-# Ensure the EOF marker for the heredoc is on a line by itself, no leading/trailing spaces.
-# And ensure the closing parenthesis for the command substitution $() is correctly placed.
 XSTARTUP_CONTENT=$(cat <<EOF
 #!/bin/sh
 # This file is automatically generated by $SCRIPT_NAME
@@ -426,11 +413,10 @@ fi
 # For $SELECTED_DE_NAME:
 exec $SELECTED_DE_CMD
 EOF
-) # Closing parenthesis for XSTARTUP_CONTENT=$(cat <<EOF...)
+)
 
 print_info "The following content will be written to $XSTARTUP_FILE:"
 echo -e "${C_CMD}--- xstartup content ---${C_RESET}"
-# Indent for display in console, but not in the file or log
 echo "$XSTARTUP_CONTENT" | sed 's/^/    /' | while IFS= read -r line; do echo -e "${C_CMD}$line${C_RESET}"; done
 echo -e "${C_CMD}--- end xstartup content ---${C_RESET}"
 echo "Writing to $XSTARTUP_FILE:" >> "$LOG_FILE"
@@ -445,7 +431,6 @@ echo # Newline
 # --- Step 5: Start VNC Server ---
 print_title "Step 5: Start VNC Server"
 print_info "Attempting to start VNC server on display $VNC_DISPLAY with geometry $VNC_GEOMETRY and depth $VNC_DEPTH..."
-# Removed "-localhost no" as it was causing "Unrecognized option: no" with Xtightvnc
 print_cmd "vncserver $VNC_DISPLAY -geometry $VNC_GEOMETRY -depth $VNC_DEPTH"
 
 VNC_START_OUTPUT=$(vncserver "$VNC_DISPLAY" -geometry "$VNC_GEOMETRY" -depth "$VNC_DEPTH" 2>&1)
@@ -477,7 +462,6 @@ echo # Newline
 
 # --- Step 6: Firewall Configuration (UFW) ---
 print_title "Step 6: Firewall Configuration (UFW)"
-# Ensure VNC_PORT_NUMBER is calculated correctly using arithmetic expansion
 VNC_PORT_NUMBER=$((5900 + ${VNC_DISPLAY#:}) ) # e.g., :1 -> 1, so 5900 + 1 = 5901
 
 if command -v ufw &> /dev/null; then
@@ -502,7 +486,6 @@ echo # Newline
 # --- Step 7: Final Information ---
 print_title "Step 7: VNC Setup Complete - Information"
 SERVER_HOSTNAME=$(hostname)
-# Attempt to get a primary, non-localhost IP. Fallback if complex.
 SERVER_IP=$(hostname -I | awk '{print $1}' | sed 's/ //g')
 if [ -z "$SERVER_IP" ]; then SERVER_IP="<Could_not_determine_IP>"; fi
 
@@ -528,7 +511,7 @@ echo -e "\n${C_INFO}Managing the VNC Server:${C_RESET}"
 echo -e "${C_INFO}  To STOP the VNC server on display $VNC_DISPLAY: ${C_CMD}vncserver -kill $VNC_DISPLAY${C_RESET}"
 echo -e "${C_INFO}  To START it again (using current settings): ${C_CMD}vncserver $VNC_DISPLAY -geometry $VNC_GEOMETRY -depth $VNC_DEPTH${C_RESET}"
 echo -e "${C_INFO}  To list all running VNC servers for you: ${C_CMD}vncserver -list${C_RESET}"
-echo -e "${C_INFO}  To see listening VNC ports (TCP):       ${C_CMD}ss -tulnp | grep -E 'Xtightvnc|${VNC_PORT_NUMBER}'${C_RESET}"
+echo -e "${C_INFO}  To see listening VNC ports (TCP):        ${C_CMD}ss -tulnp | grep -E 'Xtightvnc|${VNC_PORT_NUMBER}'${C_RESET}"
 
 echo -e "\n${C_INFO}Customizing VNC Session:${C_RESET}"
 echo -e "${C_INFO}  The VNC startup script is: ${C_BOLD}$XSTARTUP_FILE${C_RESET}"
@@ -538,7 +521,7 @@ echo -e "${C_INFO}  Geometry (Resolution): Set to ${C_BOLD}$VNC_GEOMETRY${C_RESE
 echo -e "\n${C_INFO}Troubleshooting:${C_RESET}"
 echo -e "${C_INFO}  This script's detailed log: ${C_BOLD}$LOG_FILE${C_RESET}"
 if [ -n "$VNC_SERVER_LOG_FILE_GUESS" ] && [ -f "$VNC_SERVER_LOG_FILE_GUESS" ]; then
-    echo -e "${C_INFO}  VNC server's own log:     ${C_BOLD}$VNC_SERVER_LOG_FILE_GUESS${C_RESET}"
+    echo -e "${C_INFO}  VNC server's own log:      ${C_BOLD}$VNC_SERVER_LOG_FILE_GUESS${C_RESET}"
 else
     echo -e "${C_INFO}  VNC server's own log is typically at: ${C_BOLD}$VNC_DIR/${VNC_HOSTNAME_FOR_FILES}${VNC_DISPLAY}.log${C_RESET}"
 fi
