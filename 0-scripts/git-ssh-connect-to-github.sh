@@ -132,6 +132,7 @@ ls -l ~/.ssh/id_*.pub 2>/dev/null || echo "No SSH public keys found."
 green "\nStep 4: Checking/Generating SSH key..." # Corrected typo "Generatign"
 if [ ! -f ~/.ssh/id_ed25519 ]; then
   green "No ed25519 key found. Generating one..."
+  green "Press Enter at both prompts for default filename and for empty passphrase (which is fine)"
   # We already checked and potentially set the email in Step 1, so we can retrieve it again
   GIT_USER_EMAIL=$(git config --global user.email)
 
@@ -195,7 +196,7 @@ else
   # We don't exit here, maybe the user just needs the other steps.
 fi
 
-pause_msg " Copy the key displayed above, then go to:\nhttps://github.com  Settings  SSH and GPG keys  New SSH key.\nPaste the key there and save it before continuing."
+pause_msg "Copy the key displayed above, then go to:\nhttps://github.com  Settings  SSH and GPG keys  New SSH key.\nPaste the key there and save it before continuing."
 
 # Step 8: Test SSH connection
 green "\nStep 8: Testing SSH connection to GitHub..."
