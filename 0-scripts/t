@@ -50,7 +50,7 @@ get_terminal_size() {
 show_help() {
     printf "Tmux Wrapper.   Usage: t [option] [args...]
 Options:
-  h|help          Quick key binding defaults summary
+  h|help          Quick key binding defaults summary (type 't' on it's own to see this help)
   list            List commands: buffers, clients, panes, sessions, windows
   s|t|start       Start a new tmux session (if not already in one); ${BLUE}tmux new-session${NC}
   a <name>        Attach to session <name> (or to last session if no name); ${BLUE}tmux attach-session -t <name>${NC}
@@ -58,7 +58,8 @@ Options:
   nh|n\\\\\"          New Horizontal pane split 'C-b \"' (can't do n\" to mimic C-b syntax, so use n\\\\\" on console, or just use nh)
   ng              New Grid (2x2 layout in current window or new session)
   nv|n%%           New Vertical pane split 'C-b %%' (nh|nv will create from new, or in existing session)
-  f|b             Pane switch: f (forwards 'C-b f'), or b (backwards 'C-b b');  tmux select-pane -t :.+ (forwards), or :.- (backwards)
+  f|b             Pane switch: f (forwards 'C-b f'), or b (backwards 'C-b b')
+                  tmux select-pane -t :.+ (forwards), or :.- (backwards)
   c|n|p|choose    Windows: c (create 'C-b c'), n (next window 'C-b n'), p (previous window 'C-b p'), choose (choose window screen)
   btop            Open btop in second pane but stay in the calling pane
   vi <filepath>   Open vi and edit (i.e. stay in the vi pane)
@@ -583,7 +584,7 @@ main() {
         rs|rses) rename_session "$1" ;;
         rw|rwin) rename_window "$1" ;;
         swi) switch_session "$1" ;;
-        h) show_tmux_keys ;;    # hb) show_byobu_help ;;  No longer using byobu, keys clash with too many apps
+        h|help) show_tmux_keys ;;    # hb) show_byobu_help ;;  No longer using byobu, keys clash with too many apps
         ck) show_commands; show_keys ;;
         cmds) show_commands ;;
         keys) show_keys ;;

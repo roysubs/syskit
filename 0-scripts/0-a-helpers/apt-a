@@ -24,10 +24,10 @@ show_help() {
     echo -e "                       (e.g. /bin, /usr/bin, /opt/*/bin - uses apt-file)."
     echo
     echo -e "  ${GREEN}v <package(s)>${NC}      View detailed info for package(s) (show, depends, contents)."
-    echo -e "  ${GREEN}d <package(s)>${NC}       Depends: list packages required by specified package(s)."
-    echo -e "  ${GREEN}dr <package(s)>${NC}      Reverse Depends: list packages that depend on specified package(s)."
-    echo -e "  ${GREEN}cl <package(s)>${NC}      Changelog: display changelog for package(s)."
-    echo -e "  ${GREEN}why <package(s)>${NC}     Why is package installed? (manual/auto, reverse dependencies)."
+    echo -e "  ${GREEN}d <package(s)>${NC}      Depends: list packages required by specified package(s)."
+    echo -e "  ${GREEN}dr <package(s)>${NC}     Reverse Depends: list packages that depend on specified package(s)."
+    echo -e "  ${GREEN}cl <package(s)>${NC}     Changelog: display changelog for package(s)."
+    echo -e "  ${GREEN}why <package(s)>${NC}    Why is package installed? (manual/auto, reverse dependencies)."
     echo
     echo -e "  ${GREEN}h${NC}                   History: show apt install/remove/upgrade history."
     echo -e "  ${GREEN}lu${NC}                  List Upgradable packages."
