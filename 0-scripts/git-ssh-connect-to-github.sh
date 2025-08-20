@@ -50,8 +50,8 @@ green "\nStep 1: Checking Git user name and email..."
 GIT_USER_NAME=$(git config --global user.name || echo "")
 GIT_USER_EMAIL=$(git config --global user.email || echo "")
 
-echo "Current Git User Name: ${GIT_USER_NAME:-Not Set}" # Use :- to display "Not Set" if variable is empty
-echo "Current Git User Email: ${GIT_USER_EMAIL:-Not Set}"
+echo "Current Git User Name:   ${GIT_USER_NAME:-Not Set}" # Use :- to display "Not Set" if variable is empty
+echo "Current Git User Email:  ${GIT_USER_EMAIL:-Not Set}"
 
 if [ -z "$GIT_USER_NAME" ] || [ -z "$GIT_USER_EMAIL" ]; then
   red "\nGit user name or email is not set globally. These are needed for SSH key generation and commits."
@@ -108,7 +108,7 @@ if [ -z "$GIT_USER_NAME" ] || [ -z "$GIT_USER_EMAIL" ]; then
     exit 1 # Exit on invalid input
   fi
 else
-  green " Git user name and email are already set globally."
+  green "  Git user name and email are already set globally."
 fi
 
 # Pause before continuing to the next steps
@@ -132,7 +132,7 @@ ls -l ~/.ssh/id_*.pub 2>/dev/null || echo "No SSH public keys found."
 green "\nStep 4: Checking/Generating SSH key..." # Corrected typo "Generatign"
 if [ ! -f ~/.ssh/id_ed25519 ]; then
   green "No ed25519 key found. Generating one..."
-  green "Press Enter at both prompts for default filename and for empty passphrase (which is fine)"
+  yellow "Press Enter at both prompts for default filename.\nPressing Enter twice for an empty passphrase is also fine."
   # We already checked and potentially set the email in Step 1, so we can retrieve it again
   GIT_USER_EMAIL=$(git config --global user.email)
 
@@ -196,13 +196,14 @@ else
   # We don't exit here, maybe the user just needs the other steps.
 fi
 
-pause_msg "Copy the key displayed above, then go to:\nhttps://github.com  Settings  SSH and GPG keys  New SSH key.\nPaste the key there and save it before continuing."
+pause_msg "Copy the key displayed above, then go to:\nhttps://github.com\nThen, Settings >> SSH and GPG keys >> New SSH key.\nPaste the key there and save it before continuing."
 
 # Step 8: Test SSH connection
 green "\nStep 8: Testing SSH connection to GitHub..."
-yellow "You might see a message: \"The authenticity of host 'github.com' can't be established.\""
-yellow "This is normal for the first connection. Verify the fingerprint if you wish, then type 'yes' to continue."
-yellow "GitHub's public key will then be added to your known_hosts file."
+yellow "You might see the message: \"The authenticity of host 'github.com' can't be established.\""
+yellow "This is normal for the first connection."
+yellow "If you are ok with with accepting this, verify the fingerprint and type 'yes' to continue."
+yellow "GitHub's public key will then be added to your 'known_hosts' file."
 # Use || true because ssh -T is expected to exit with 1 if successful authentication happens but no PTY is allocated (which is normal).
 # It will exit with a different code on authentication failure or other errors.
 # We just want to see the output and not stop the script if the exit code is 1.
@@ -271,3 +272,4 @@ echo "To commit changes and push, run the following commands:"
 green "git add ."
 green "git commit -m \"your message\""
 green "git push"
+echo
