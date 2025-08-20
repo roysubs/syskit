@@ -2,6 +2,7 @@
 # Author: Roy Wiseman 2025-02
 set -e
 
+echo
 echo "When you close a repo, every timestamp locally is that of the moment of the clone."
 echo "Usually, it's more useful to see the modified date as they exist on the remote repo."
 echo "This script will fetch the correct timestamps from the remote repo (e.g., GitHub) so"
