@@ -2,11 +2,11 @@
 # Author: Roy Wiseman 2025-02
 set -e
 
-echo "When you close a repo, every timestamp locally is that of the moment of the clone"
-echo "Very often, it's useful look at files by when they were modified. This script will"
-echo "fetch the timestamps that are on the remote repo (like GitHub) representing the"
-echo "time that the file last committed a change and apply those meaningful timestamps"
-echo "to every file in the local repo."
+echo "When you close a repo, every timestamp locally is that of the moment of the clone."
+echo "Usually, it's more useful to see the modified date as they exist on the remote repo."
+echo "This script will fetch the correct timestamps from the remote repo (e.g., GitHub) so"
+echo "that the local copies will show when they were last modified and apply to every file"
+echo "in the local repo."
 
 # Ensure we are in the root of a Git project
 if [[ ! -d .git ]]; then
