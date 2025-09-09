@@ -497,7 +497,7 @@ case "$option" in
         if [[ ! "$confirm_commit" =~ ^[Yy]$ ]]; then
             echo -e "\033[1;33mCommit cancelled by user.\033[0m"
             # If this 'acp)' is a function in a larger script, use 'return 1'. If it's standalone, 'exit 1'.
-            return 1
+            exit 1
         fi
 
         echo "Attempting to commit changes..."
