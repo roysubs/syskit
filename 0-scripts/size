@@ -9,6 +9,10 @@ top_n_subdirs_count=0
 top_n_subfiles_count=0
 use_apparent_size_default=true # Script's default is apparent size
 
+# --- Colors ---
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
 CMD="bc"
 if ! command -v $CMD &>/dev/null; then
     read -p "$CMD not found. Install (y/N)? " -n 1 -r REPLY && echo
@@ -42,12 +46,12 @@ Options:
         Show this help message.
 
 Examples:
-  size              → Show apparent size of current directory
-  size -d /var      → Show disk usage of /var
-  size -c /mnt      → Show apparent size + counts of /mnt
-  size -t 5 /usr    → Show the 5 largest files in /usr
+  size           → Show apparent size of current directory
+  size -d /var   → Show disk usage of /var
+  size -c /mnt   → Show apparent size + counts of /mnt
+  size -t 5 /usr   → Show the 5 largest files in /usr
   size -ts 10 /home → Show the 10 largest subdirectories in /home
-  size -t 5 -tsf 5  → Show largest files in current dir AND in its subdirs
+  size -t 5 -tsf 5 → Show largest files in current dir AND in its subdirs
 "
 }
 
@@ -183,18 +187,22 @@ use_percent=$(echo "$df_output" | awk '{print $5}')
 find_opts_arr=()
 if [ "$xdev_enabled" = true ]; then find_opts_arr+=("-xdev"); fi
 
-# Output main info
+# --- Output main info ---
 if [[ "$is_directory" = true ]]; then
     if [ "$count" = true ]; then
         dir_count=$(find "$path" "${find_opts_arr[@]}" -type d 2>/dev/null | wc -l | awk '{printf "%'\''d\n", $1}')
         file_count=$(find "$path" "${find_opts_arr[@]}" -type f 2>/dev/null | wc -l | awk '{printf "%'\''d\n", $1}')
-        echo "$path is ${size_info} (with $file_count files, $dir_count directories)"
+        echo -e "$path is ${YELLOW}${size_info}${NC} (with ${YELLOW}${file_count} files${NC}, ${YELLOW}${dir_count} directories${NC})"
     else
-        echo "$path is ${size_info}"
+        echo -e "$path is ${YELLOW}${size_info}${NC}"
     fi
 elif [[ "$is_file" = true ]]; then
     # For a file, count is 1 file, 0 dirs
-    echo "$path is ${size_info}$([[ "$count" = true ]] && echo ' (1 file, 0 directories)')"
+    count_str=""
+    if [[ "$count" = true ]]; then
+        count_str=" (with ${YELLOW}1 file${NC}, ${YELLOW}0 directories${NC})"
+    fi
+    echo -e "$path is ${YELLOW}${size_info}${NC}${count_str}"
 fi
 
 echo "Located on $device, $use_percent used ($used of $total_size, $available available)"
