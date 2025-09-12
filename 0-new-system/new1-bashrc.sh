@@ -193,6 +193,7 @@ def() {
 }
 
 # Helpers for various configuration scripts:
+alias bashload='source ~/.bashrc'  # Reload / dotsource .bashrc
 alias bashrc='vi ~/.bashrc'          # Edit .bashrc (user)
 alias inputrc='vi ~/.inputrc'        # Edit .inputrc (user)
 alias vimrc='vi ~/.vimrc'            # Edit .vimrc (user)
@@ -277,6 +278,56 @@ if [ -f ~/.bashrc_personal ]; then . ~/.bashrc_personal; fi
 0ms() { cd "$HOME/syskit/0-docker/0-media-stack" || return; ls; }    # Jump to docker media-stack setup folder
 0mc() { cd "$HOME/.config/media-stack/" || return; ls; }      # Jump to ~/.config/media-stack, all config folders for media-stack
 0v()  { cd "$HOME/.vnc" || return; ls; }                      # Jump to ~/.vnc
+
+# CD Quick Jump Tool
+# Translates a PowerShell cd function to a bash equivalent
+# Quick CD Jump Tool
+c() {
+    if [[ -z "$1" ]]; then
+        cat <<EOF
+'c' quick jump. Usage: c [destination]
+
+-- syskit --
+  0, syskit      : \$HOME/syskit
+  s, scripts     : syskit/0-scripts
+  h, help        : syskit/0-help
+  dk, docker     : syskit/0-docker
+  g, games       : syskit/0-games
+  i, install     : syskit/0-install
+  w, web         : syskit/0-web-apps
+
+-- System --
+  home           : \$HOME
+  d, downloads   : \$HOME/Downloads
+  docs           : \$HOME/Documents
+  etc            : /etc
+  conf           : \$HOME/.config
+  tmp            : /tmp
+  log            : /var/log
+  bin            : /usr/local/bin
+EOF
+        return
+    fi
+
+    case "$1" in
+        0|syskit)    cd "$HOME/syskit" ;;
+        s|scripts)   cd "$HOME/syskit/0-scripts" ;;
+        h|help)      cd "$HOME/syskit/0-help" ;;
+        dk|docker)   cd "$HOME/syskit/0-docker" ;;
+        g|games)     cd "$HOME/syskit/0-games" ;;
+        i|install)   cd "$HOME/syskit/0-install" ;;
+        w|web)       cd "$HOME/syskit/0-web-apps" ;;
+        home)        cd "$HOME" ;;
+        d|downloads) cd "$HOME/Downloads" ;;
+        docs)        cd "$HOME/Documents" ;;
+        etc)         cd "/etc" ;;
+        conf)        cd "$HOME/.config" ;;
+        t|tmp|temp)  cd "/tmp" ;;
+        log)         cd "/var/log" ;;
+        bin)         cd "/usr/local/bin" ;;
+        *)           echo "Unknown destination: '$1'" ;;
+    esac
+}
 
 EOF_BASHRC_CONTENT
 )

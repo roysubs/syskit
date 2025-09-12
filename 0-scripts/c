@@ -1,0 +1,87 @@
+# CD Quick Jump Tool
+# Translates a PowerShell cd function to a bash equivalent
+c() {
+    # If no argument is provided, display the help menu.
+    if [ -z "$1" ]; then
+        # Using printf for cleaner, formatted output
+        printf "'c' CD Quick Jump Tool.\n"
+        printf "Available command destinations:\n\n"
+        printf "  -- syskit --\n"
+        printf "  0, syskit      : syskit Root (\$HOME/syskit)\n"
+        printf "  s, scripts     : syskit Scripts\n"
+        printf "  h, help        : syskit help files\n"
+        printf "  dk, docker     : syskit docker projects\n"
+        printf "  g, games       : syskit games\n"
+        printf "  i, install     : syskit install scripts\n"
+        printf "  w, web         : syskit web apps\n\n"
+        printf "  -- System --\n"
+        printf "  home           : User Home folder (or just 'cd')\n"
+        printf "  d, downloads   : Downloads folder\n"
+        printf "  docs           : Documents folder\n"
+        printf "  etc            : /etc directory\n"
+        printf "  conf           : User .config folder\n"
+        printf "  tmp            : /tmp directory\n"
+        printf "  log            : /var/log directory\n"
+        printf "  bin            : /usr/local/bin\n"
+        return
+    fi
+
+    # Case statement to handle the destination shortcut
+    case "$1" in
+        # syskit shortcuts
+        0|syskit)
+            cd "$HOME/syskit"
+            ;;
+        s|scripts)
+            cd "$HOME/syskit/0-scripts"
+            ;;
+        h|help)
+            cd "$HOME/syskit/0-help"
+            ;;
+        dk|docker)
+            cd "$HOME/syskit/0-docker"
+            ;;
+        g|games)
+            cd "$HOME/syskit/0-games"
+            ;;
+        i|install)
+            cd "$HOME/syskit/0-install"
+            ;;
+        w|web)
+            cd "$HOME/syskit/0-web-apps"
+            ;;
+
+        # System shortcuts (Linux equivalents)
+        home)
+            cd "$HOME"
+            ;;
+        d|downloads)
+            cd "$HOME/Downloads"
+            ;;
+        docs)
+            cd "$HOME/Documents"
+            ;;
+        etc)
+            cd "/etc"
+            ;;
+        conf)
+            cd "$HOME/.config"
+            ;;
+        t|tmp|temp)
+            cd "/tmp"
+            ;;
+        log)
+            cd "/var/log"
+            ;;
+        bin)
+            cd "/usr/local/bin"
+            ;;
+
+        # Default case for unknown shortcuts
+        *)
+            echo "Unknown destination: '$1'"
+            ;;
+    esac
+}
+
+
