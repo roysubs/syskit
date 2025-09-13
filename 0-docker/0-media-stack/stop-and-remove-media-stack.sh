@@ -1,6 +1,10 @@
 #!/bin/bash
 # Author: Roy Wiseman 2025-04
 
+RED='\e[0;31m'
+GREEN='\e[0;32m' # For the success message later on
+NC='\033[0m'
+
 set -e
 
 CONFIG_ROOT="$HOME/.config/media-stack"   # CONFIG_DIR="$(pwd)/config"
