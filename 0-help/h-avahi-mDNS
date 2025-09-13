@@ -1,0 +1,65 @@
+#!/bin/bash
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <(cat <<'EOF'
+
+Avahi, mDNS, and Network Name Resolution
+========================================
+
+This document clarifies the interaction between Samba, Avahi, and Windows name resolution, explaining common issues like slow pings and unexpected share visibility.
+
+The Core Problems
+-----------------
+
+1.  **Slow Name Resolution**: Pinging a local server by its short name (e.g., `ping myserver`) takes many seconds to start, but eventually works.
+2.  **Unexpected Share Visibility**: Samba shares (especially `[homes]`) appear in the Windows Network browser even when `browseable = no` is set in `smb.conf`.
+
+The Three Services Involved
+---------------------------
+
+The issues are caused by three different services doing three different jobs.
+
+- ### 1. Samba (`nmbd` service)
+    - **Job**: Handles legacy name resolution using **NetBIOS** / **LLMNR**.
+    - **Effect**: It's responsible for successfully resolving the **short name** (`myserver`). The slowness is because Windows tries standard DNS first, waits for it to fail, and *then* falls back to the NetBIOS broadcast that `nmbd` answers. This service is **not** Avahi.
+
+- ### 2. Avahi (mDNS Name Resolution)
+    - **Job**: Handles modern zero-configuration name resolution using **mDNS**.
+    - **Effect**: It's responsible for resolving the **.local name** (`myserver.local`). This is a modern standard used by Linux, macOS (as Bonjour), and many network devices, but is not natively supported by Windows.
+
+- ### 3. Avahi (Service Discovery)
+    - **Job**: Broadcasts the *services* running on the server (file shares, printers, etc.) to the local network.
+    - **Effect**: This is why Samba shares appear when they shouldn't. Avahi advertises the Samba service to the network, and Windows sees the advertisement, bypassing Samba's `browseable = no` setting.
+
+Troubleshooting and Solutions
+-----------------------------
+
+- ### Problem A: Fix Unwanted Share Visibility
+    - **Cause**: Avahi's Service Discovery is advertising your Samba shares.
+    - **Solution**: Disable Avahi's service definition for Samba on the server. This is the most precise fix.
+
+    1.  **Check if Avahi is running (on Debian/Ubuntu)**:
+        ```bash
+        systemctl status avahi-daemon
+        ```
+    2.  **Disable the Samba service advertisement file**:
+        ```bash
+        sudo mv /etc/avahi/services/samba.service /etc/avahi/services/samba.service.disabled
+        ```
+
+- ### Problem B: Fix the Slow Ping Delay
+    - **Cause**: Windows is trying its primary DNS first and waiting for it to time out before falling back to NetBIOS.
+    - **Solution**: Edit the `hosts` file on the **Windows client machine** to create a manual, instant lookup entry.
+
+    1.  Find the `hosts` file at: `C:\Windows\System32\drivers\etc\hosts`
+    2.  Open it with Notepad **as an Administrator**.
+    3.  Add a line mapping the server's IP to its name.
+        ```
+        # Example line to add
+        192.168.1.55    hp2
+        ```
+    4.  Save the file. The `ping hp2` command will now be instant.
+
+EOF
+) | less -R

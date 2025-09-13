@@ -12,7 +12,7 @@ NC='\e[0m' # No Color
 # Define a regex pattern for valid explicit options
 # Used to distinguish options from a service name when no option is given
 # Ensure all shorthands and full names from the case statement are included here
-VALID_OPTIONS_REGEX="^(status|st|start|sp|stop|e|enable|d|disable|r|restart|rl|reload|rrr|reload-or-restart|is-a|is-active|is-e|is-enabled|l|list|lu|list-units|ls|list-services|lf|list-files|list-failed|deps|list-dependencies|cat|show|mask|unmask|daemon-reload|reload-daemon|reboot|poweroff|suspend|hibernate|common)$"
+VALID_OPTIONS_REGEX="^(s|status|st|start|sp|stop|e|enable|d|disable|r|restart|rl|reload|rrr|reload-or-restart|is-a|is-active|is-e|is-enabled|l|list|lu|list-units|ls|list-services|lf|list-files|list-failed|deps|list-dependencies|cat|show|mask|unmask|daemon-reload|reload-daemon|reboot|poweroff|suspend|hibernate|common)$"
 
 # --- Argument parsing for --sudo ---
 declare -a SCRIPT_ARGS=() # Holds arguments other than --sudo
@@ -37,7 +37,7 @@ show_help() {
     echo
     echo "Options:"
     echo "  --sudo                 Execute the systemctl command with sudo privileges."
-    echo "  status <service(s)>    Default status action, e.g., '$script_name cron' will show status)"
+    echo "  s|status <service(s)>    Default status action, e.g., '$script_name cron' will show status)"
     echo "  st|start <service(s)>  Start the specified service(s)"
     echo "  sp|stop <service(s)>   Stop the specified service(s)"
     echo "  e|enable <service(s)>  Enable the specified service(s) (start on boot)"
@@ -180,7 +180,7 @@ fi
 
 
 case "$option" in
-    status)
+    s|status)
         check_service_arg "${service_args_for_systemctl[@]}"
         run_command systemctl status "${service_args_for_systemctl[@]}"
         ;;

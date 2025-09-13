@@ -11,31 +11,35 @@
 # CONFIG_ROOT=./config
 
 services:
-  qbittorrent:
+  qbittorrentvpn:
     image: binhex/arch-qbittorrentvpn
-    container_name: qbittorrent
+    container_name: qbittorrentvpn
+    cap_add:
+      - NET_ADMIN # Required for VPN containers to modify network interfaces
     environment:
       # --- General Settings from .env ---
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
 
-      # --- Explicitly Disable VPN ---
-      - VPN_ENABLED=no
+      # --- VPN Settings from .env ---
+      - VPN_ENABLED=${VPN_ENABLED}
+      - VPN_CLIENT=${VPN_CLIENT} # Correct variable for WireGuard
+      - VPN_PROV=${VPN_PROV}
+      - LAN_NETWORK=${VPN_LAN_NETWORK}
 
       # --- Other Settings ---
       - WEBUI_PORT=8080
     volumes:
-      # Use a simple config path for the non-VPN setup
-      - ${CONFIG_ROOT}/qbittorrent:/config
-      # Mounts your media library
+      # Mounts the config root, including the wireguard sub-directory
+      - ${CONFIG_ROOT}/qbittorrentvpn:/config
+      # THIS IS THE CRUCIAL MAPPING FOR YOUR DOWNLOADS
       - ${MEDIA_PATH}:/data/downloads
     ports:
       - "8080:8080" # Web UI
       - "6881:6881" # Torrent port (TCP)
       - "6881:6881/udp" # Torrent port (UDP)
     restart: unless-stopped
-
 
       #   radarr: # Movie Manager
       #     image: lscr.io/linuxserver/radarr:latest

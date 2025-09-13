@@ -15,14 +15,28 @@ Samba Quick Notes
     - Check Samba Version:
       `samba --version`
 
-- **Configure Samba**:
+- **Quick Configure Samba**:
     - Edit the Samba configuration file: `sudo nano /etc/samba/smb.conf`
-    - Example share configuration:
+    - Latest versions have a quick entry for `homes`
       ```ini
-      [ShareName]
-      path = /path/to/directory
-      read only = no
-      guest ok = yes
+      [homes]
+      comment = Home Directories
+      browseable = no
+      read only = yes       # Set to 'no' to be able to write to them
+      create mask = 0700    # Set to '0755' to create files with group=rw
+      directory mask = 0700 # Set to '0755' to create dirs with group=rw
+      valid users = %S      # Ensures only account owner can enter that dir
+      ```
+    - New share configuration example:
+      ```ini
+      [Downloads]
+      path = /home/boss/Downloads
+      browseable = yes      # To make visible in 'Network' from Windows
+      read only = no        # Set to 'no' for write access (or use 'writeable' both work)
+      guest ok = yes        # ?
+      valid users = boss
+      create mask = 0664
+      directory mask = 0775
       ```
     - Save and close the file.
 

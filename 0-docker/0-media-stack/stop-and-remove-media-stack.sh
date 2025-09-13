@@ -38,11 +38,40 @@ echo "It will then removes networks (the dedicated network created for your comp
 echo "By default, 'docker compose down' does not remove named volumes. This is to prevent data loss."
 echo "To also remove named volumes, explicitly add the --volumes (or -v) flag:"
 echo "    docker compose down --volumes.   # Anonymous volumes attached to containers are removed with the containers."
+
+
+
 read -p "Stop and remove the containers (docker compose down) [y/N]: " del_env
 if [[ "$del_env" =~ ^[Yy]$ ]]; then
-  docker compose -f docker-compose.yaml down
-  echo "docker media stack has been stopped."
+  DOCKER_COMPOSE_FILE="docker-compose.yaml" # Define the compose file name
+
+  if [ -f "$ENV_FILE" ]; then
+    echo "✅ Found .env file. Using it for a clean shutdown..."
+    docker compose -f "$DOCKER_COMPOSE_FILE" --env-file "$ENV_FILE" down
+    echo "Docker stack stopped successfully."
+  else
+    echo "⚠️ .env file not found. Attempting a forceful removal of containers..."
+
+    if ! command -v yq &> /dev/null; then
+        echo -e "❌ ${RED}'yq' is not installed. Cannot parse container names for forceful removal.${NC}"
+        echo "Please install yq (your start script can do this) or create an .env file manually."
+        exit 1
+    fi
+
+    # Parse container names directly from the docker-compose file
+    CONTAINER_NAMES=($(yq -r '.services | keys | .[]' "$DOCKER_COMPOSE_FILE"))
+
+    if [ ${#CONTAINER_NAMES[@]} -gt 0 ]; then
+        echo "Found containers to remove: ${CONTAINER_NAMES[*]}"
+        docker rm -f "${CONTAINER_NAMES[@]}"
+        echo "✅ All containers forcefully removed."
+        echo "Note: Networks created by Docker Compose may still exist. Run 'docker network prune' to clean them up."
+    else
+        echo "Could not find any services defined in '$DOCKER_COMPOSE_FILE'."
+    fi
+  fi
 fi
+
 
 read -p "Delete the .env file with VPN credentials? [y/N]: " del_env
 if [[ "$del_env" =~ ^[Yy]$ ]]; then
