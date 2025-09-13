@@ -289,9 +289,11 @@ c() {
 
 -- syskit --
   0, syskit      : \$HOME/syskit
+  n, new         : syskit/0-new-install
   s, scripts     : syskit/0-scripts
   h, help        : syskit/0-help
   dk, docker     : syskit/0-docker
+  m, media       : syskit/0-docker/0-media-stack
   g, games       : syskit/0-games
   i, install     : syskit/0-install
   w, web         : syskit/0-web-apps
@@ -311,9 +313,11 @@ EOF
 
     case "$1" in
         0|syskit)    cd "$HOME/syskit" ;;
+        n|new)       cd "$HOME/syskit/0-new-install" ;;
         s|scripts)   cd "$HOME/syskit/0-scripts" ;;
         h|help)      cd "$HOME/syskit/0-help" ;;
         dk|docker)   cd "$HOME/syskit/0-docker" ;;
+        m|media)     cd "$HOME/syskit/0-docker/0-media-stack" ;;
         g|games)     cd "$HOME/syskit/0-games" ;;
         i|install)   cd "$HOME/syskit/0-install" ;;
         w|web)       cd "$HOME/syskit/0-web-apps" ;;
