@@ -1,0 +1,2 @@
+grep -oP '\$\{([A-Z0-9_]+)\}' docker-compose.yaml | sed 's/[${}]//g' | sort -u | sed 's/$/=/' > .env.example
+cat .env.example

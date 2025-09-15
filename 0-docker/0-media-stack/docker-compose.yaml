@@ -10,31 +10,60 @@
 # TZ=Europe/London
 # CONFIG_ROOT=./config
 
+
 services:
   qbittorrent:
-    image: binhex/arch-qbittorrentvpn
     container_name: qbittorrent
+    image: binhex/arch-qbittorrentvpn
+    # Use privileged mode and sysctls for robust WireGuard support as per documentation
+    privileged: true
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
     environment:
-      # --- General Settings from .env ---
+      # These are all read from the .env file created by the script
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-
-      # --- Explicitly Disable VPN ---
-      - VPN_ENABLED=no
-
-      # --- Other Settings ---
+      - VPN_ENABLED=${VPN_ENABLED}
+      - VPN_CLIENT=${VPN_CLIENT}
+      - VPN_PROV=${VPN_PROV}
+      - LAN_NETWORK=${LAN_NETWORK}
       - WEBUI_PORT=8080
+      # Enable the execution of startup scripts
+      - ENABLE_STARTUP_SCRIPTS=yes
     volumes:
-      # Use a simple config path for the non-VPN setup
-      - ${CONFIG_ROOT}/qbittorrent:/config
-      # Mounts your media library
+      - ${CONFIG_PATH}:/config
       - ${MEDIA_PATH}:/data/downloads
     ports:
-      - "8080:8080" # Web UI
-      - "6881:6881" # Torrent port (TCP)
-      - "6881:6881/udp" # Torrent port (UDP)
+      - "8080:8080"      # Web UI
+      - "6881:6881"      # Torrenting port (TCP)
+      - "6881:6881/udp"  # Torrenting port (UDP)
     restart: unless-stopped
+
+
+# services:
+#   qbittorrent:
+#     image: binhex/arch-qbittorrentvpn
+#     container_name: qbittorrent
+#     environment:
+#       # --- General Settings from .env ---
+#       - PUID=${PUID}
+#       - PGID=${PGID}
+#       - TZ=${TZ}
+#       # --- Explicitly Disable VPN ---
+#       - VPN_ENABLED=no
+#       # --- Other Settings ---
+#       - WEBUI_PORT=8080
+#     volumes:
+#       # Use a simple config path for the non-VPN setup
+#       - ${CONFIG_ROOT}/qbittorrent:/config
+#       # Mounts your media library
+#       - ${MEDIA_PATH}:/data/downloads
+#     ports:
+#       - "8080:8080" # Web UI
+#       - "6881:6881" # Torrent port (TCP)
+#       - "6881:6881/udp" # Torrent port (UDP)
+#     restart: unless-stopped
 
 
       #   radarr: # Movie Manager
