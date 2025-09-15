@@ -1,5 +1,6 @@
 #!/bin/bash
-# Author: Roy Wiseman, with Gemini "Robust Automation" Script 2025-09-14
+# Author: Roy Wiseman, with Gemini "Robust Automation" Script 2025-09-15
+# A unified script to correctly install, configure, and start the qBittorrent container.
 
 # --- Configuration and Colors ---
 RED='\e[0;31m'
@@ -35,12 +36,6 @@ run_pre_flight_checks() {
         echo -e "${RED}❌ Container \"$container_name\" already exists. Please run the stop script first.${NC}"
         exit 1
     fi
-    # Check for common orphan container from previous versions
-    if docker ps -a --format '{{.Names}}' | grep -wq "qbittorrentvpn"; then
-        echo -e "${RED}❌ Found old container \"qbittorrentvpn\" that will conflict.${NC}"
-        echo -e "${YELLOW}Please remove it by running: ${GREEN}docker rm qbittorrentvpn${NC}"
-        exit 1
-    fi
     echo "✅ No conflicting container names found."
 }
 
@@ -59,6 +54,7 @@ gather_user_settings() {
 
 handle_vpn_choice_and_setup() {
     echo -e "\n${BLUE}--- 4. VPN Configuration ---${NC}"
+    # This section remains unchanged.
     if grep -qi microsoft /proc/sys/kernel/osrelease; then
         echo -e "${YELLOW}WSL environment detected. VPN setup inside the container is not supported.${NC}"
         read -p "Continue with a non-VPN setup? (Y/n): " wsl_confirm
@@ -93,17 +89,15 @@ handle_vpn_choice_and_setup() {
 create_startup_script() {
     echo -e "\n${BLUE}--- 5. Creating Automation Script ---${NC}"
     local startup_dir="${CONFIG_PATH}/scripts/startup"
-    local startup_script="${startup_dir}/set-save-path.sh"
+    local startup_script="${startup_dir}/set-all-paths.sh" # Renamed for clarity
     mkdir -p "$startup_dir"
 
-    # This script runs inside the container and is now more robust.
+    # This new, robust script runs inside the container to set all paths correctly.
     cat > "$startup_script" << 'EOF'
 #!/bin/bash
 CONF_FILE="/config/qBittorrent/config/qBittorrent.conf"
-TARGET_LINE="Downloads\\DefaultSavePath=/data/downloads"
-KEY="Downloads\\DefaultSavePath"
 ATTEMPTS=0
-MAX_ATTEMPTS=6 # Wait up to 30 seconds (6 * 5s)
+MAX_ATTEMPTS=6 # Wait up to 30 seconds
 
 echo "[startup_script] Waiting for qBittorrent config file..."
 while [ ! -f "$CONF_FILE" ]; do
@@ -114,44 +108,67 @@ while [ ! -f "$CONF_FILE" ]; do
     sleep 5
     ATTEMPTS=$((ATTEMPTS+1))
 done
+echo "[startup_script] Config file found. Ensuring all media paths are correct..."
 
-echo "[startup_script] Config file found. Ensuring correct save path..."
+# --- Define desired paths within the container ---
+CONTAINER_MEDIA_LIBRARY_PATH="/data/media-library"
+CONTAINER_TEMP_DOWNLOAD_PATH="/data/media-library/0-downloading"
+CONTAINER_INCOMPLETE_TORRENTS_PATH="/data/media-library/0-torrents-incomplete"
+CONTAINER_COMPLETE_TORRENTS_PATH="/data/media-library/0-torrents-complete"
+# ---
 
-# Check if the correct setting is already present
-if grep -q "$TARGET_LINE" "$CONF_FILE"; then
-    echo "[startup_script] Default save path is already correct."
-    exit 0
-fi
+# Helper function to find a section and add/update a key
+update_setting() {
+    local section=$1
+    local key=$2
+    local value=$3
+    local full_line="$key=$value"
+    local escaped_key=$(echo "$key" | sed 's/\\/\\\\/g')
+    local escaped_line=$(echo "$full_line" | sed 's/\\/\\\\/g; s/\//\\\//g') # Escape slashes for sed
 
-# Check if the key exists with a different value
-if grep -q "$KEY=" "$CONF_FILE"; then
-    echo "[startup_script] Found existing save path, updating it..."
-    sed -i "s|$KEY=.*|$TARGET_LINE|" "$CONF_FILE"
-    echo "[startup_script] Save path updated."
-else
-    echo "[startup_script] Save path key not found, adding it under [Preferences]..."
-    # This command inserts the line after the [Preferences] heading
-    sed -i "/\[Preferences\]/a $TARGET_LINE" "$CONF_FILE"
-    echo "[startup_script] Save path added."
-fi
+    # Check if the key exists, and if so, update it
+    if grep -q "^$escaped_key=" "$CONF_FILE"; then
+        sed -i "s#^$escaped_key=.*#$escaped_line#" "$CONF_FILE"
+        echo "[startup_script] Updated: $key"
+    # If not, add it under the correct section header
+    else
+        sed -i "/^\[$section\]/a $escaped_line" "$CONF_FILE"
+        echo "[startup_script] Added: $key"
+    fi
+}
+
+update_setting "Preferences" "Downloads\\DefaultSavePath" "$CONTAINER_MEDIA_LIBRARY_PATH"
+update_setting "BitTorrent" "Session\\DefaultSavePath" "$CONTAINER_MEDIA_LIBRARY_PATH"
+update_setting "BitTorrent" "Session\\TempPath" "$CONTAINER_TEMP_DOWNLOAD_PATH"
+update_setting "BitTorrent" "Session\\TorrentExportDirectory" "$CONTAINER_INCOMPLETE_TORRENTS_PATH"
+update_setting "BitTorrent" "Session\\FinishedTorrentExportDirectory" "$CONTAINER_COMPLETE_TORRENTS_PATH"
+update_setting "BitTorrent" "Session\\TempPathEnabled" "true"
+
+echo "[startup_script] All paths have been verified and set."
 EOF
     chmod +x "$startup_script"
-    echo "✅ Automation script for save path created."
+    echo "✅ Automation script for all save paths created."
 }
 
-setup_media_directory() {
-    echo -e "\n${BLUE}--- 6. Setting up Media Directory ---${NC}"
-    if [ ! -d "$MEDIA_PATH" ]; then
-        read -p "Media path \"$MEDIA_PATH\" does not exist. Create it? (y/N): " create_dir
-        if [[ "$create_dir" =~ ^[Yy]$ ]]; then
-            mkdir -p "$MEDIA_PATH" || { echo "❌ Failed to create directory."; exit 1; }
-        else
-            echo "❌ Directory not found. Exiting."; exit 1
-        fi
-    fi
-    echo "Setting ownership on media directory..."
+setup_media_directories() {
+    echo -e "\n${BLUE}--- 6. Setting up Media Directories ---${NC}"
+    # Define and create the full, structured directory path on the host
+    local host_media_library_path="$MEDIA_PATH/media-library"
+    
+    echo "Creating media directory structure in '$MEDIA_PATH'..."
+    mkdir -p \
+        "$host_media_library_path/0-downloading" \
+        "$host_media_library_path/0-torrents-incomplete" \
+        "$host_media_library_path/0-torrents-complete" \
+        "$host_media_library_path/movies" \
+        "$host_media_library_path/tv"
+    
+    echo "Setting ownership for user $PUID:$PGID on '$MEDIA_PATH'..."
+    # The -R flag ensures all newly created subdirectories get the correct permissions
     sudo chown -R "$PUID:$PGID" "$MEDIA_PATH"
+    echo "✅ Host directories and permissions are ready."
 }
+
 
 create_env_file() {
     echo -e "\n${BLUE}--- 7. Creating .env file ---${NC}"
@@ -174,7 +191,6 @@ create_env_file() {
             echo "LAN_NETWORK=$LAN_NETWORK"
         } >> "$ENV_FILE"
     else
-        # Add blank variables to prevent "not set" warnings from docker-compose
         {
             echo "VPN_CLIENT="
             echo "VPN_PROV="
@@ -197,12 +213,12 @@ launch_stack() {
 post_install_instructions() {
     echo -e "\n${YELLOW}--- Setup Complete ---${NC}"
     echo -e "Your qBittorrent instance is running and will be available shortly."
-    echo -e "The download path has been automatically set to point to: ${GREEN}${MEDIA_PATH}${NC}"
+    echo -e "The download and media paths have been automatically set up inside: ${GREEN}${MEDIA_PATH}/media-library${NC}"
     echo -e "\nTo access the Web UI, go to: ${GREEN}http://localhost:8080${NC}"
     echo -e ""
     echo -e "${YELLOW}To find the temporary password for the first login, run:${NC}"
     echo -e "${GREEN}cat ${CONFIG_PATH}/supervisord.log | grep \"temporary password\"${NC}"
-    
+
     echo -e "\n${BLUE}Attempting to retrieve temporary password automatically (please wait)...${NC}"
     sleep 10 # Give the container time to start and generate the log
     if [ -f "${CONFIG_PATH}/supervisord.log" ]; then
@@ -223,7 +239,7 @@ main() {
     gather_user_settings
     handle_vpn_choice_and_setup
     create_startup_script
-    setup_media_directory
+    setup_media_directories # Updated function name
     create_env_file
     launch_stack
     post_install_instructions
@@ -231,5 +247,3 @@ main() {
 }
 
 main "$@"
-
-
