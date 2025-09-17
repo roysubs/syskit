@@ -289,14 +289,17 @@ c() {
 
 -- syskit --
   0, syskit      : \$HOME/syskit
-  n, new         : syskit/0-new-install
+  n, new         : syskit/0-new-system
   s, scripts     : syskit/0-scripts
   h, help        : syskit/0-help
   dk, docker     : syskit/0-docker
-  m, media       : syskit/0-docker/0-media-stack
   g, games       : syskit/0-games
   i, install     : syskit/0-install
   w, web         : syskit/0-web-apps
+
+-- custom --
+  m, media       : syskit/0-docker/0-media-stack
+  mc, media conf : ~/.config/media-stack/qbittorrent
 
 -- System --
   home           : \$HOME
@@ -313,14 +316,15 @@ EOF
 
     case "$1" in
         0|syskit)    cd "$HOME/syskit" ;;
-        n|new)       cd "$HOME/syskit/0-new-install" ;;
+        n|new)       cd "$HOME/syskit/0-new-system" ;;
         s|scripts)   cd "$HOME/syskit/0-scripts" ;;
         h|help)      cd "$HOME/syskit/0-help" ;;
         dk|docker)   cd "$HOME/syskit/0-docker" ;;
-        m|media)     cd "$HOME/syskit/0-docker/0-media-stack" ;;
         g|games)     cd "$HOME/syskit/0-games" ;;
         i|install)   cd "$HOME/syskit/0-install" ;;
         w|web)       cd "$HOME/syskit/0-web-apps" ;;
+        m|media)     cd "$HOME/syskit/0-docker/0-media-stack" ;;
+        mc|media-conf) cd "$HOME/.config/media-stack/qbittorrent" ;;
         home)        cd "$HOME" ;;
         d|downloads) cd "$HOME/Downloads" ;;
         docs)        cd "$HOME/Documents" ;;
