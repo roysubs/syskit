@@ -288,28 +288,28 @@ c() {
 'c' quick jump. Usage: c [destination]
 
 -- syskit --
-  0, syskit      : \$HOME/syskit
-  n, new         : syskit/0-new-system
-  s, scripts     : syskit/0-scripts
-  h, help        : syskit/0-help
-  dk, docker     : syskit/0-docker
-  g, games       : syskit/0-games
-  i, install     : syskit/0-install
-  w, web         : syskit/0-web-apps
+  0, syskit  : \$HOME/syskit
+  n, new     : syskit/0-new-system
+  s, scripts : syskit/0-scripts
+  h, help    : syskit/0-help
+  dk, docker : syskit/0-docker
+  g, games   : syskit/0-games
+  i, install : syskit/0-install
+  w, web     : syskit/0-web-apps
 
 -- custom --
-  m, media       : syskit/0-docker/0-media-stack
-  mc, media conf : ~/.config/media-stack/qbittorrent
+  ms, mdk, mediadk   : syskit/0-docker/0-media-stack
+  q, mq, qbit, qconf : ~/.config/media-stack/qbittorrent
 
 -- System --
-  home           : \$HOME
-  d, downloads   : \$HOME/Downloads
-  docs           : \$HOME/Documents
-  etc            : /etc
-  conf           : \$HOME/.config
-  tmp            : /tmp
-  log            : /var/log
-  bin            : /usr/local/bin
+  home         : \$HOME
+  d, down      : \$HOME/Downloads
+  docs         : \$HOME/Documents
+  etc          : /etc
+  cf, conf     : \$HOME/.config
+  t, tmp, temp : /tmp
+  log          : /var/log
+  bin          : /usr/local/bin
 EOF
         return
     fi
@@ -323,13 +323,13 @@ EOF
         g|games)     cd "$HOME/syskit/0-games" ;;
         i|install)   cd "$HOME/syskit/0-install" ;;
         w|web)       cd "$HOME/syskit/0-web-apps" ;;
-        m|media)     cd "$HOME/syskit/0-docker/0-media-stack" ;;
-        mc|media-conf) cd "$HOME/.config/media-stack/qbittorrent" ;;
-        home)        cd "$HOME" ;;
-        d|downloads) cd "$HOME/Downloads" ;;
+        ms|mdk|mediadk)   cd "$HOME/syskit/0-docker/0-media-stack" ;;
+        q|mq|qbit|qconf)  cd "$HOME/.config/media-stack/qbittorrent" ;;
+        d|down|downloads) cd "$HOME/Downloads" ;;
         docs)        cd "$HOME/Documents" ;;
+        home)        cd "$HOME" ;;
         etc)         cd "/etc" ;;
-        conf)        cd "$HOME/.config" ;;
+        cf|conf)     cd "$HOME/.config" ;;
         t|tmp|temp)  cd "/tmp" ;;
         log)         cd "/var/log" ;;
         bin)         cd "/usr/local/bin" ;;
