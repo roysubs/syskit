@@ -1,7 +1,62 @@
-# Author: Roy Wiseman 2025-02
-# Manually add this to .vimrc to toggle colorschemes
-# Ctrl+F9 toggle backwards, and Ctrl+F10 to toggle forwards
-# Work in progress, will update this to be a script that auto-injects this to .vimrc
+" v2
+" --- Simplified Colorscheme Cycler ---
+
+" Get all available colorschemes once and store them.
+let s:colorschemes = getcompletion('', 'colorscheme')
+" Initialize the index to the current colorscheme, or -1 if not found.
+let s:color_index = index(s:colorschemes, get(g:, 'colors_name', ''))
+
+" Single function to handle cycling in either direction.
+" A direction of 1 means forward, -1 means backward.
+function! s:Cycle(direction)
+  if empty(s:colorschemes)
+    echohl ErrorMsg | echo "No colorschemes found!" | echohl None
+    return
+  endif
+
+  let original_index = s:color_index
+  let len = len(s:colorschemes)
+
+  " Loop through all schemes to find the next valid one.
+  for i in range(len)
+    " Calculate the next index, wrapping around the list.
+    let s:color_index = (s:color_index + a:direction + len) % len
+    let scheme_name = s:colorschemes[s:color_index]
+
+    " Try to apply the colorscheme.
+    try
+      execute 'colorscheme' scheme_name
+      redraw
+      echohl MoreMsg
+      echomsg "Colorscheme: " . scheme_name . " (" . (s:color_index + 1) . "/" . len . ")"
+      echohl None
+      return " Success
+    catch
+      " If it fails, the loop will just continue to the next one.
+    endtry
+  endfor
+
+  " If we loop through all schemes and none work, show a warning.
+  echohl WarningMsg | echo "Could not load any valid colorscheme." | echohl None
+  " Restore the original index so we don't get stuck.
+  let s:color_index = original_index
+endfunction
+
+" Key mappings
+nnoremap <silent> <C-F10> :call <SID>Cycle(1)<CR>
+nnoremap <silent> <C-F9>  :call <SID>Cycle(-1)<CR>
+
+
+"""""""""
+
+
+
+
+
+" Author: Roy Wiseman 2025-02
+" Manually add this to .vimrc to toggle colorschemes
+" Ctrl+F9 toggle backwards, and Ctrl+F10 to toggle forwards
+" Work in progress, will update this to be a script that auto-injects this to .vimrc
 
 " Helper function to get all available colorschemes
 function! s:GetAllColorschemes()
