@@ -288,14 +288,14 @@ c() {
 'c' quick jump. Usage: c [destination]
 
 -- syskit --
-  0, syskit  : \$HOME/syskit
-  n, new     : syskit/0-new-system
-  s, scripts : syskit/0-scripts
-  h, help    : syskit/0-help
-  dk, docker : syskit/0-docker
-  g, games   : syskit/0-games
-  i, install : syskit/0-install
-  w, web     : syskit/0-web-apps
+  0, k syskit : \$HOME/syskit
+  n, new      : syskit/0-new-system
+  s, scripts  : syskit/0-scripts
+  h, help     : syskit/0-help
+  dk, docker  : syskit/0-docker
+  g, games    : syskit/0-games
+  i, install  : syskit/0-install
+  w, web      : syskit/0-web-apps
 
 -- custom --
   ms, mdk, mediadk   : syskit/0-docker/0-media-stack
@@ -306,16 +306,16 @@ c() {
   d, down      : \$HOME/Downloads
   docs         : \$HOME/Documents
   etc          : /etc
-  cf, conf     : \$HOME/.config
+  c, cf, conf  : \$HOME/.config
   t, tmp, temp : /tmp
-  log          : /var/log
+  l, log       : /var/log
   bin          : /usr/local/bin
 EOF
         return
     fi
 
     case "$1" in
-        0|syskit)    cd "$HOME/syskit" ;;
+        0|k|syskit)  cd "$HOME/syskit" ;;   # Use '0'/'k' as 's' taken by scripts
         n|new)       cd "$HOME/syskit/0-new-system" ;;
         s|scripts)   cd "$HOME/syskit/0-scripts" ;;
         h|help)      cd "$HOME/syskit/0-help" ;;
@@ -329,9 +329,9 @@ EOF
         docs)        cd "$HOME/Documents" ;;
         home)        cd "$HOME" ;;
         etc)         cd "/etc" ;;
-        cf|conf)     cd "$HOME/.config" ;;
+        c|cf|conf)   cd "$HOME/.config" ;;
         t|tmp|temp)  cd "/tmp" ;;
-        log)         cd "/var/log" ;;
+        l|log)       cd "/var/log" ;;
         bin)         cd "/usr/local/bin" ;;
         *)           echo "Unknown destination: '$1'" ;;
     esac
@@ -509,7 +509,7 @@ echo "Finished updating $BASHRC_FILE."
 if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
     # Script is sourced
     echo
-    echo "This script was sourced. Sourcing $BASHRC_FILE to apply changes to the current environment..."
+    echo -e "This script was sourced.\nSourcing $BASHRC_FILE to apply changes to the current environment..."
     # Ensure BASHRC_FILE is sourced correctly even if path contains spaces
     # shellcheck source=/dev/null
     source "$BASHRC_FILE"
