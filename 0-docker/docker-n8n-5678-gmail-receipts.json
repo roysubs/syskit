@@ -1,0 +1,343 @@
+{
+  "name": "Gmail Receipt Scanner V2 (Manual)",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Manual Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "id": "e9367e9f-72f1-477d-b572-8805f45c9258"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "query": "=subject:(receipt OR invoice OR \"order confirmation\") after:{{ $node[\"Set Date Range & Options\"].json.startDate.split('-').join('/') }} before:{{ $node[\"Set Date Range & Options\"].json.endDate.split('-').join('/') }}",
+        "return": "messageId",
+        "options": {
+          "limit": 500
+        }
+      },
+      "name": "Gmail Search for Receipts",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        700,
+        300
+      ],
+      "id": "6d962c64-6725-4c03-b0e6-59b4c05ed8df",
+      "credentials": {
+        "gmailOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $json.messageId }}"
+      },
+      "name": "Get Full Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        940,
+        300
+      ],
+      "id": "e0ca2b08-8e65-4b13-a447-975ef7c9e19d",
+      "credentials": {
+        "gmailOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const email = $json;\nconst fromHeader = email.from.text;\n\n// Sanitize vendor and subject for use in filenames\nconst sanitize = (str) => str ? str.replace(/[\\/\\?%*:|\"<>]/g, '-') : '';\n\nlet vendor = fromHeader.includes('<') ? fromHeader.split('<')[0].trim().replace(/\"/g, '') : fromHeader.split('@')[0];\nlet subject = email.subject;\n\nconst body = email.text;\nlet amount = null;\n\n// Regex patterns to find the total amount\nconst patterns = [\n  /(?:Total|Amount|Price|Subtotal|Charged|AUD|\\$|€|£):?\\s*[\\$€£]?\\s*([0-9,]+\\.[0-9]{2})/i,\n  /([0-9,]+\\.[0-9]{2})\\s*was charged/i,\n  /you paid\\s*[\\$€£]?\\s*([0-9,]+\\.[0-9]{2})/i\n];\n\nfor (const pattern of patterns) {\n  const match = body.match(pattern);\n  if (match && match[1]) {\n    amount = parseFloat(match[1].replace(',', ''));\n    break;\n  }\n}\n\n// Attachment check\nconst hasAttachment = email.attachments && email.attachments.length > 0;\nlet attachmentInfo = null;\n\nif (hasAttachment) {\n  const pdfAttachment = email.attachments.find(att => att.mimeType === 'application/pdf');\n  if (pdfAttachment) {\n    attachmentInfo = {\n      id: pdfAttachment.id,\n      filename: pdfAttachment.filename\n    };\n  }\n}\n\nreturn {\n  vendor: sanitize(vendor),\n  date: email.date,\n  subject: sanitize(subject),\n  amount: amount,\n  hasAttachment: !!attachmentInfo,\n  attachmentInfo: attachmentInfo,\n  messageId: email.messageId\n};\n"
+      },
+      "name": "Extract Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        1160,
+        300
+      ],
+      "id": "5ec2289f-2f88-433b-85cd-a9b0c95a02e8"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.hasAttachment }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "If PDF exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1380,
+        300
+      ],
+      "id": "27857ed8-e565-4f35-ab35-3b9576cf3891"
+    },
+    {
+      "parameters": {
+        "operation": "downloadAttachment",
+        "messageId": "={{ $('Extract Data').item.json.messageId }}",
+        "attachmentId": "={{ $('Extract Data').item.json.attachmentInfo.id }}"
+      },
+      "name": "Download PDF",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        200
+      ],
+      "id": "d04a60b5-7c93-41bb-a5a5-3d9fc3496eb5",
+      "credentials": {
+        "gmailOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "destination": "id",
+        "destinationId": "",
+        "options": {
+          "fileName": "={{ DateTime.fromISO($('Extract Data').item.json.date).toFormat('yyyy-MM-dd') }} {{ $('Extract Data').item.json.vendor }} {{ $('Extract Data').item.json.subject }}.pdf"
+        }
+      },
+      "name": "Save PDF to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 1,
+      "position": [
+        1820,
+        200
+      ],
+      "id": "67041f92-563d-4c54-b3c9-f19b16895318",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": "",
+        "sheetName": "",
+        "operation": "append",
+        "columns": {
+          "values": [
+            {
+              "column": "Date",
+              "expression": "={{ $node[\"Extract Data\"].json.date }}"
+            },
+            {
+              "column": "Vendor",
+              "expression": "={{ $node[\"Extract Data\"].json.vendor }}"
+            },
+            {
+              "column": "Amount",
+              "expression": "={{ $node[\"Extract Data\"].json.amount }}"
+            },
+            {
+              "column": "Subject",
+              "expression": "={{ $node[\"Extract Data\"].json.subject }}"
+            },
+            {
+              "column": "PDF Link",
+              "expression": "={{ $node[\"Save PDF to Drive\"] ? $node[\"Save PDF to Drive\"].json.webViewLink : '' }}"
+            }
+          ]
+        }
+      },
+      "name": "Append to Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 1,
+      "position": [
+        2040,
+        300
+      ],
+      "id": "020c6418-8d4a-493e-9086-4f964082269a",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "messageLabel",
+        "messageId": "={{ $('Extract Data').item.json.messageId }}",
+        "labels": {
+          "add": [
+            ""
+          ]
+        }
+      },
+      "name": "Add 'Processed' Label",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        2280,
+        300
+      ],
+      "id": "84898fd7-a026-444a-939b-e8477d8536ad",
+      "credentials": {
+        "gmailOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "startDate",
+              "value": "2022-01-01"
+            },
+            {
+              "name": "endDate",
+              "value": "2023-12-31"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Set Date Range & Options",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ],
+      "id": "ef8b9355-6674-4ab2-b256-4ed8c4f938f3"
+    }
+  ],
+  "connections": {
+    "Manual Start": {
+      "main": [
+        [
+          {
+            "node": "Set Date Range & Options",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Search for Receipts": {
+      "main": [
+        [
+          {
+            "node": "Get Full Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Full Email": {
+      "main": [
+        [
+          {
+            "node": "Extract Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Data": {
+      "main": [
+        [
+          {
+            "node": "If PDF exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If PDF exists": {
+      "main": [
+        [
+          {
+            "node": "Download PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append to Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download PDF": {
+      "main": [
+        [
+          {
+            "node": "Save PDF to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save PDF to Drive": {
+      "main": [
+        [
+          {
+            "node": "Append to Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append to Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "Add 'Processed' Label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Date Range & Options": {
+      "main": [
+        [
+          {
+            "node": "Gmail Search for Receipts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
+
+

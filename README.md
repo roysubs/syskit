@@ -9,7 +9,7 @@ syskit Bootstrap Project
 
 The `syskit` repo can rapidly bootstrap any Linux system:
 
-  • Run `source ./update-bashrc-vimrc-paths.sh` in the root of `syskit`.
+  • Run `source ./setup-syskit.sh` in the project root to configure `.bashrc`, `.vimrc`, and `PATH`.
 
   • Essential `.bashrc`, `.vimrc`, and`.inputrc` configuration (all idempotent and non-invasive).
 
@@ -33,7 +33,7 @@ Bootstrap Process
     • Custom .bashrc setup provides the very useful h and def functions
     • Ensures required tools are installed: curl, git, vim, mdcat, etc (wip)
     • Ensures Bash and Readline behave consistently across sessions
-    • Adds 0-scripts to PATH for access to core scripts: a, b, d, f, g, z, dk, etc
+    • Adds the `./0-scripts` folder to `PATH` to access core scripts
 
  2. 🐚 .bashrc and Shell Environment
 
