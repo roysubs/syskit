@@ -28,13 +28,6 @@ DEFAULT_DATA_DIR="$HOME/nextcloud-data"
 COMPOSE_FILE=""  # Will be set after CONFIG_DIR is determined
 ENV_FILE=""      # Will be set after CONFIG_DIR is determined
 
-# ───[ Argument Parsing ]──────────────────────────────────────────
-CUSTOM_DOMAIN=""
-if [ $# -gt 0 ]; then
-    CUSTOM_DOMAIN="$1"
-    echo -e "${GREEN}✅ Custom domain detected: ${CUSTOM_DOMAIN}${NC}"
-fi
-
 # ───[ Helper Functions ]──────────────────────────────────────────
 check_dependencies() {
     echo -e "${BLUE_BOLD}═══════════════════════════════════════════════${NC}"
@@ -89,19 +82,19 @@ check_existing_installation() {
                 echo -e "${YELLOW}🔄 Rebuilding containers (preserving data)...${NC}"
                 # Stop using docker-compose from config dir if it exists
                 if [ -f "$DEFAULT_CONFIG_DIR/docker-compose.yml" ]; then
-                    cd "$DEFAULT_CONFIG_DIR" && docker compose down 2>/dev/null || true
+                    cd "$DEFAULT_CONFIG_DIR" && docker compose down --remove-orphans 2>/dev/null || true
                 fi
-                docker stop nextcloud caddy nextcloud-postgres nextcloud-redis 2>/dev/null || true
-                docker rm nextcloud caddy nextcloud-postgres nextcloud-redis 2>/dev/null || true
+                docker stop nextcloud caddy nextcloud-postgres nextcloud-redis duckdns-updater 2>/dev/null || true
+                docker rm nextcloud caddy nextcloud-postgres nextcloud-redis duckdns-updater 2>/dev/null || true
                 REBUILD_MODE="rebuild"
                 ;;
             3)
                 echo -e "${YELLOW}🔄 Complete teardown (preserving data/config)...${NC}"
                 if [ -f "$DEFAULT_CONFIG_DIR/docker-compose.yml" ]; then
-                    cd "$DEFAULT_CONFIG_DIR" && docker compose down 2>/dev/null || true
+                    cd "$DEFAULT_CONFIG_DIR" && docker compose down --remove-orphans 2>/dev/null || true
                 fi
-                docker stop nextcloud caddy nextcloud-postgres nextcloud-redis 2>/dev/null || true
-                docker rm nextcloud caddy nextcloud-postgres nextcloud-redis 2>/dev/null || true
+                docker stop nextcloud caddy nextcloud-postgres nextcloud-redis duckdns-updater 2>/dev/null || true
+                docker rm nextcloud caddy nextcloud-postgres nextcloud-redis duckdns-updater 2>/dev/null || true
                 
                 # Clean postgres data to force fresh database
                 if [ -d "$DEFAULT_CONFIG_DIR/postgres" ]; then
@@ -116,7 +109,7 @@ check_existing_installation() {
                 if [ "$confirm" = "DELETE EVERYTHING" ]; then
                     echo -e "${RED}💣 Deleting everything...${NC}"
                     if [ -f "$DEFAULT_CONFIG_DIR/docker-compose.yml" ]; then
-                        cd "$DEFAULT_CONFIG_DIR" && docker compose down -v 2>/dev/null || true
+                        cd "$DEFAULT_CONFIG_DIR" && docker compose down -v --remove-orphans 2>/dev/null || true
                     fi
                     docker stop nextcloud caddy nextcloud-postgres nextcloud-redis duckdns-updater 2>/dev/null || true
                     docker rm nextcloud caddy nextcloud-postgres nextcloud-redis duckdns-updater 2>/dev/null || true
@@ -207,8 +200,23 @@ find_available_port() {
 setup_domain() {
     echo -e "${CYAN}[5/10] Configuring domain settings...${NC}"
     
-    if [ -n "$CUSTOM_DOMAIN" ]; then
-        # Custom domain provided as argument
+    echo -e "${BOLD}Domain Configuration:${NC}"
+    echo -e "You can use either:"
+    echo -e "  ${CYAN}1)${NC} Your own custom domain (e.g., yourdomain.com)"
+    echo -e "  ${CYAN}2)${NC} DuckDNS - Free dynamic DNS service"
+    echo
+    
+    read -p "Do you have your own domain? (y/N): " has_domain
+    
+    if [[ "$has_domain" =~ ^[Yy]$ ]]; then
+        # Custom domain
+        echo
+        read -p "Enter your domain (e.g., yourdomain.com): " CUSTOM_DOMAIN
+        if [ -z "$CUSTOM_DOMAIN" ]; then
+            echo -e "${RED}❌ Domain cannot be empty. Exiting.${NC}"
+            exit 1
+        fi
+        
         USE_DUCKDNS="no"
         DOMAIN="$CUSTOM_DOMAIN"
         FULL_DOMAIN="cloud.${DOMAIN}"
@@ -216,8 +224,9 @@ setup_domain() {
         DUCKDNS_TOKEN=""
         DUCKDNS_SUBDOMAIN=""
     else
-        # Use DuckDNS by default
-        echo -e "${YELLOW}No custom domain provided. Setting up DuckDNS (free dynamic DNS)...${NC}"
+        # Use DuckDNS
+        echo
+        echo -e "${CYAN}Setting up DuckDNS (free dynamic DNS)...${NC}"
         echo
         echo -e "${BOLD}DuckDNS Setup:${NC}"
         echo -e "1. Go to: ${CYAN}https://www.duckdns.org/${NC}"
@@ -370,7 +379,7 @@ services:
 
   # ───[ Nextcloud Application ]───────────────────────────────────
   nextcloud:
-    image: nextcloud:29-apache
+    image: nextcloud:30-apache
     container_name: nextcloud
     restart: unless-stopped
     depends_on:
@@ -521,6 +530,19 @@ launch_stack() {
         exit 1
     fi
     echo
+    
+    # Run Nextcloud upgrade
+    echo -e "${CYAN}Running Nextcloud upgrade (if needed)...${NC}"
+    docker exec -u www-data nextcloud php occ upgrade 2>&1 | tee /tmp/nextcloud-upgrade.log
+    
+    if grep -q "Nextcloud is already latest version" /tmp/nextcloud-upgrade.log; then
+        echo -e "${GREEN}✅ Nextcloud is up to date${NC}"
+    elif grep -q "Update successful" /tmp/nextcloud-upgrade.log; then
+        echo -e "${GREEN}✅ Nextcloud upgraded successfully${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Upgrade completed - check output above for details${NC}"
+    fi
+    echo
 }
 
 check_port_forwarding() {
@@ -561,77 +583,88 @@ show_final_instructions() {
     echo -e "${BLUE_BOLD}═══════════════════════════════════════════════${NC}"
     echo
     
-    echo -e "${BOLD}📍 Your Personal Cloud:${NC}"
-    echo -e "   Direct access:  ${CYAN}http://${LOCAL_IP}:${NEXTCLOUD_PORT}${NC}"
-    echo -e "   Public domain:  ${CYAN}https://${FULL_DOMAIN}${NC}"
-    echo
-    
-    echo -e "${YELLOW}⏱  SSL Certificate Status:${NC}"
-    echo -e "   Caddy is attempting to obtain SSL certificates from Let's Encrypt."
-    echo -e "   This can take 2-5 minutes. Check progress with: ${CYAN}docker logs caddy -f${NC}"
-    echo
-    
     echo -e "${BOLD}🔐 First-Time Setup:${NC}"
-    echo -e "1. Visit ${CYAN}http://${LOCAL_IP}:${NEXTCLOUD_PORT}${NC} (works immediately)"
+    echo -e "1. Visit your Nextcloud URL (below)"
     echo -e "2. Create your admin account"
-    echo -e "3. ${GREEN}IMPORTANT:${NC} The database is already configured as ${BOLD}PostgreSQL${NC}"
+    echo -e "3. The database is pre-configured with PostgreSQL"
     echo -e "4. Complete the setup wizard"
     echo
     
-    echo -e "${BOLD}📱 Access Your Cloud:${NC}"
-    echo -e "• Web:     ${CYAN}https://${FULL_DOMAIN}${NC} (once SSL is ready)"
-    echo -e "• Desktop: Download clients from nextcloud.com/install"
-    echo -e "• Mobile:  Download 'Nextcloud' app from app stores"
+    echo -e "${BOLD}🛠  Maintenance & Management:${NC}"
+    echo
+    echo -e "${CYAN}Update Nextcloud:${NC}"
+    echo -e "  cd ${CONFIG_DIR}"
+    echo -e "  docker compose pull nextcloud"
+    echo -e "  docker compose up -d nextcloud"
+    echo -e "  docker exec -u www-data nextcloud php occ upgrade"
+    echo
+    echo -e "${CYAN}Check for new Docker images:${NC}"
+    echo -e "  Visit: ${YELLOW}https://hub.docker.com/_/nextcloud/tags${NC}"
+    echo -e "  Or run: ${YELLOW}docker search nextcloud${NC}"
+    echo
+    echo -e "${CYAN}Repair Nextcloud (if issues occur):${NC}"
+    echo -e "  docker exec -u www-data nextcloud php occ maintenance:repair"
+    echo
+    echo -e "${CYAN}View logs:${NC}"
+    echo -e "  docker logs nextcloud -f"
+    echo -e "  docker logs caddy -f"
+    echo -e "  cd ${CONFIG_DIR} && docker compose logs -f"
+    echo
+    echo -e "${CYAN}Manage containers:${NC}"
+    echo -e "  cd ${CONFIG_DIR}"
+    echo -e "  docker compose stop"
+    echo -e "  docker compose start"
+    echo -e "  docker compose restart"
+    echo -e "  docker compose down"
+    echo
+    echo -e "${CYAN}Re-run this setup script:${NC}"
+    echo -e "  ${SCRIPT_DIR}/$(basename "$0")"
+    echo -e "  ${YELLOW}(Idempotent - safe to run multiple times!)${NC}"
     echo
     
-    echo -e "${BOLD}👥 Sharing with Friends:${NC}"
-    echo -e "• Create user accounts in: ${CYAN}Settings → Users${NC}"
-    echo -e "• Or use public share links for individual files/folders"
-    echo
-    
-    echo -e "${BOLD}🛠  Useful Commands:${NC}"
-    echo -e "• View logs:        ${CYAN}cd ${CONFIG_DIR} && docker compose logs -f${NC}"
-    echo -e "• View Caddy logs:  ${CYAN}docker logs caddy -f${NC}"
-    echo -e "• Stop stack:       ${CYAN}cd ${CONFIG_DIR} && docker compose down${NC}"
-    echo -e "• Start stack:      ${CYAN}cd ${CONFIG_DIR} && docker compose up -d${NC}"
-    echo -e "• Restart stack:    ${CYAN}cd ${CONFIG_DIR} && docker compose restart${NC}"
-    echo -e "• Re-run script:    ${CYAN}${SCRIPT_DIR}/$(basename "$0")${NC} ${BOLD}(idempotent!)${NC}"
-    echo
-    
-    echo -e "${BOLD}📁 Important Files:${NC}"
-    echo -e "• Config:          ${CYAN}${CONFIG_DIR}${NC}"
-    echo -e "• Data:            ${CYAN}${DATA_DIR}${NC}"
-    echo -e "• .env:            ${CYAN}${ENV_FILE}${NC}"
-    echo -e "• docker-compose:  ${CYAN}${COMPOSE_FILE}${NC}"
-    echo -e "• Caddyfile:       ${CYAN}${CONFIG_DIR}/caddy/Caddyfile${NC}"
+    echo -e "${BOLD}📁 Important Directories:${NC}"
+    echo -e "  Config: ${CYAN}${CONFIG_DIR}${NC}"
+    echo -e "  Data:   ${CYAN}${DATA_DIR}${NC}"
     echo
     
     if [ "$USE_DUCKDNS" = "yes" ]; then
-        echo -e "${BOLD}🦆 DuckDNS Info:${NC}"
-        echo -e "• Your DuckDNS domain updates automatically every 5 minutes"
-        echo -e "• If your IP changes, the domain will follow"
+        echo -e "${BOLD}🦆 DuckDNS:${NC}"
+        echo -e "  Your domain updates automatically every 5 minutes"
+        echo -e "  If your IP changes, the domain follows automatically"
         echo
     fi
     
-    echo -e "${BOLD}🔒 Security Notes:${NC}"
-    echo -e "• Your connection will be encrypted with automatic HTTPS (via Caddy)"
-    echo -e "• Database passwords are stored in ${CYAN}${ENV_FILE}${NC} - keep it safe!"
-    echo -e "• Enable 2FA in Nextcloud: ${CYAN}Settings → Security${NC}"
+    echo -e "${BOLD}🔒 Security:${NC}"
+    echo -e "  ✅ HTTPS with automatic SSL (via Let's Encrypt + Caddy)"
+    echo -e "  ✅ Database passwords in ${CYAN}${ENV_FILE}${NC}"
+    echo -e "  ✅ Enable 2FA in: Nextcloud → Settings → Security"
     echo
     
-    echo -e "${BOLD}🚀 Adding More Services to Caddy Later:${NC}"
-    echo -e "• Edit: ${CYAN}${CONFIG_DIR}/caddy/Caddyfile${NC}"
-    echo -e "• Add new service blocks (see Caddy docs)"
-    echo -e "• Reload: ${CYAN}docker compose restart caddy${NC}"
+    echo -e "${BOLD}🚀 Adding More Services:${NC}"
+    echo -e "  Edit: ${CYAN}${CONFIG_DIR}/caddy/Caddyfile${NC}"
+    echo -e "  Add new service blocks, then: ${CYAN}docker compose restart caddy${NC}"
     echo
     
-    echo -e "${BOLD}🔄 Idempotent Design:${NC}"
-    echo -e "• Run this script again anytime to:"
-    echo -e "  - Check status"
-    echo -e "  - Rebuild containers (preserving data)"
-    echo -e "  - Perform a fresh install"
+    echo -e "${BLUE_BOLD}═══════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}${BOLD}    📍 Connect to Your Cloud${NC}"
+    echo -e "${BLUE_BOLD}═══════════════════════════════════════════════${NC}"
     echo
-    
+    echo -e "${BOLD}🌐 Web Access:${NC}"
+    echo -e "  ${YELLOW}https://${FULL_DOMAIN}${NC}"
+    echo -e "  ${CYAN}http://${LOCAL_IP}:${NEXTCLOUD_PORT}${NC} (local network only)"
+    echo
+    echo -e "${BOLD}💻 Desktop Apps:${NC}"
+    echo -e "  Download from: ${CYAN}https://nextcloud.com/install/#install-clients${NC}"
+    echo -e "  Available for: Windows, macOS, Linux"
+    echo
+    echo -e "${BOLD}📱 Mobile Apps:${NC}"
+    echo -e "  iOS:     Search 'Nextcloud' in App Store"
+    echo -e "  Android: Search 'Nextcloud' in Play Store"
+    echo
+    echo -e "${BOLD}👥 Sharing with Friends:${NC}"
+    echo -e "  • Create accounts: Settings → Users"
+    echo -e "  • Share links: Right-click any file → Share"
+    echo
     echo -e "${GREEN}${BOLD}Welcome to your personal cloud! 🌥️${NC}"
     echo
 }
