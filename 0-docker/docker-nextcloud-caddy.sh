@@ -24,8 +24,9 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_CONFIG_DIR="$HOME/.config/nextcloud-stack"
 DEFAULT_DATA_DIR="$HOME/nextcloud-data"
-COMPOSE_FILE="docker-compose.yml"
-ENV_FILE=".env"
+# Store compose and env files in config directory to keep repo clean
+COMPOSE_FILE=""  # Will be set after CONFIG_DIR is determined
+ENV_FILE=""      # Will be set after CONFIG_DIR is determined
 
 # ───[ Argument Parsing ]──────────────────────────────────────────
 CUSTOM_DOMAIN=""
@@ -86,14 +87,19 @@ check_existing_installation() {
                 ;;
             2)
                 echo -e "${YELLOW}🔄 Rebuilding containers (preserving data)...${NC}"
-                docker compose down 2>/dev/null || true
+                # Stop using docker-compose from config dir if it exists
+                if [ -f "$DEFAULT_CONFIG_DIR/docker-compose.yml" ]; then
+                    cd "$DEFAULT_CONFIG_DIR" && docker compose down 2>/dev/null || true
+                fi
                 docker stop nextcloud caddy nextcloud-postgres nextcloud-redis 2>/dev/null || true
                 docker rm nextcloud caddy nextcloud-postgres nextcloud-redis 2>/dev/null || true
                 REBUILD_MODE="rebuild"
                 ;;
             3)
                 echo -e "${YELLOW}🔄 Complete teardown (preserving data/config)...${NC}"
-                docker compose down 2>/dev/null || true
+                if [ -f "$DEFAULT_CONFIG_DIR/docker-compose.yml" ]; then
+                    cd "$DEFAULT_CONFIG_DIR" && docker compose down 2>/dev/null || true
+                fi
                 docker stop nextcloud caddy nextcloud-postgres nextcloud-redis 2>/dev/null || true
                 docker rm nextcloud caddy nextcloud-postgres nextcloud-redis 2>/dev/null || true
                 
@@ -109,7 +115,9 @@ check_existing_installation() {
                 read -p "Are you ABSOLUTELY sure? Type 'DELETE EVERYTHING' to confirm: " confirm
                 if [ "$confirm" = "DELETE EVERYTHING" ]; then
                     echo -e "${RED}💣 Deleting everything...${NC}"
-                    docker compose down -v 2>/dev/null || true
+                    if [ -f "$DEFAULT_CONFIG_DIR/docker-compose.yml" ]; then
+                        cd "$DEFAULT_CONFIG_DIR" && docker compose down -v 2>/dev/null || true
+                    fi
                     docker stop nextcloud caddy nextcloud-postgres nextcloud-redis duckdns-updater 2>/dev/null || true
                     docker rm nextcloud caddy nextcloud-postgres nextcloud-redis duckdns-updater 2>/dev/null || true
                     sudo rm -rf "$DEFAULT_CONFIG_DIR"
@@ -253,8 +261,14 @@ gather_directories() {
     DATA_DIR="${data_input:-$DEFAULT_DATA_DIR}"
     DATA_DIR="${DATA_DIR/#\~/$HOME}"
     
+    # Set paths for compose and env files in config directory
+    COMPOSE_FILE="${CONFIG_DIR}/docker-compose.yml"
+    ENV_FILE="${CONFIG_DIR}/.env"
+    
     echo -e "${GREEN}✅ Config: ${CONFIG_DIR}${NC}"
     echo -e "${GREEN}✅ Data: ${DATA_DIR}${NC}"
+    echo -e "${GREEN}✅ Docker Compose: ${COMPOSE_FILE}${NC}"
+    echo -e "${GREEN}✅ Environment: ${ENV_FILE}${NC}"
     
     # Create directories
     mkdir -p "$CONFIG_DIR"/{nextcloud,postgres,redis,caddy/data,caddy/config}
@@ -487,6 +501,9 @@ launch_stack() {
     echo -e "${YELLOW}This may take a few minutes on first run...${NC}"
     echo
     
+    # Change to config directory where docker-compose.yml and .env are located
+    cd "$CONFIG_DIR"
+    
     if [ "$USE_DUCKDNS" = "yes" ]; then
         # Launch with DuckDNS updater
         docker compose --env-file "$ENV_FILE" --profile duckdns up -d
@@ -573,19 +590,20 @@ show_final_instructions() {
     echo
     
     echo -e "${BOLD}🛠  Useful Commands:${NC}"
-    echo -e "• View logs:        ${CYAN}docker compose logs -f${NC}"
+    echo -e "• View logs:        ${CYAN}cd ${CONFIG_DIR} && docker compose logs -f${NC}"
     echo -e "• View Caddy logs:  ${CYAN}docker logs caddy -f${NC}"
-    echo -e "• Stop stack:       ${CYAN}docker compose down${NC}"
-    echo -e "• Start stack:      ${CYAN}docker compose up -d${NC}"
-    echo -e "• Restart stack:    ${CYAN}docker compose restart${NC}"
-    echo -e "• Re-run script:    ${CYAN}./$(basename "$0")${NC} ${BOLD}(idempotent!)${NC}"
+    echo -e "• Stop stack:       ${CYAN}cd ${CONFIG_DIR} && docker compose down${NC}"
+    echo -e "• Start stack:      ${CYAN}cd ${CONFIG_DIR} && docker compose up -d${NC}"
+    echo -e "• Restart stack:    ${CYAN}cd ${CONFIG_DIR} && docker compose restart${NC}"
+    echo -e "• Re-run script:    ${CYAN}${SCRIPT_DIR}/$(basename "$0")${NC} ${BOLD}(idempotent!)${NC}"
     echo
     
     echo -e "${BOLD}📁 Important Files:${NC}"
     echo -e "• Config:          ${CYAN}${CONFIG_DIR}${NC}"
     echo -e "• Data:            ${CYAN}${DATA_DIR}${NC}"
-    echo -e "• .env:            ${CYAN}$(pwd)/${ENV_FILE}${NC}"
-    echo -e "• docker-compose:  ${CYAN}$(pwd)/${COMPOSE_FILE}${NC}"
+    echo -e "• .env:            ${CYAN}${ENV_FILE}${NC}"
+    echo -e "• docker-compose:  ${CYAN}${COMPOSE_FILE}${NC}"
+    echo -e "• Caddyfile:       ${CYAN}${CONFIG_DIR}/caddy/Caddyfile${NC}"
     echo
     
     if [ "$USE_DUCKDNS" = "yes" ]; then
@@ -636,4 +654,3 @@ main() {
 }
 
 main "$@"
-
