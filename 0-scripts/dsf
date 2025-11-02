@@ -23,7 +23,7 @@ else
     COLOR_BOLD_BLUE=''
     COLOR_RESET=''
 fi
-BAR_CHAR="█" # U+2588 FULL BLOCK. Ensure your terminal font supports this.
+BAR_CHAR="#" # Plain ASCII for maximum compatibility
 MAX_BAR_WIDTH=50 # Max characters for the bar graph
 
 # --- Function Definitions ---
@@ -199,7 +199,7 @@ MAX_NAME_LEN=$(awk -F'\t' '{print $2}' "$SORTED_AND_TRIMMED_OUTPUT" | sed 's:.*/
 [[ -z "$MAX_NAME_LEN" || "$MAX_NAME_LEN" -lt 1 ]] && MAX_NAME_LEN=20
 
 # --- Output Display ---
-printf "\n📦 File Size Bar Graph in %s\n\n" "$DISPLAY_DIR"
+printf "\n📊 File Size Bar Graph in %s\n\n" "$DISPLAY_DIR"
 
 TOTAL_BYTES_SUM=0
 
@@ -244,3 +244,4 @@ fi
 
 # Temporary files are cleaned up by the trap
 exit 0
+
