@@ -15,6 +15,7 @@ COLOR_RESET="\033[0m"      # Reset color to default
 # 3. The FSTYPE (2nd field) is one of the common virtual/pseudo types.
 # This regex seems correct based on the previous debugging output.
 EXCLUDE_REGEX='^[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +/$|^[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +/(sys|proc|dev|run|snap|var/lib/docker)/|^(sysfs|proc|devtmpfs|devpts|tmpfs|securityfs|cgroup|pstore|bpf|autofs|mqueue|hugetlbfs|debugfs|tracefs|configfs|ramfs|fusectl|nsfs|portal|overlay|squashfs|binfmt_misc|rpc_pipefs|fuse.*|nfsd) '
+EXCLUDE_REGEX='^[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +(/|/sys|/proc|/dev|/run|/snap|/var/lib/docker)/|^[^ ]+ +(sysfs|proc|devtmpfs|devpts|tmpfs|securityfs|cgroup|pstore|bpf|autofs|mqueue|hugetlbfs|debugfs|tracefs|configfs|ramfs|fusectl|nsfs|portal|overlay|squashfs|binfmt_misc|rpc_pipefs|fuse.*|nfsd) '
 
 
 # --- Processing ---
