@@ -128,9 +128,9 @@ press_enter
 print_header "Step 2: Checking for Uncommitted Changes"
 
 echo -e "${BLUE}Note:${NC} Uncommitted changes are ${BOLD}NOT${NC} the cause of branch divergence."
-echo "They're just local edits you haven't committed yet."
-echo "The divergence is caused by different ${BOLD}commit histories${NC} (we'll check that next)."
-echo ""
+echo -e "They're just local edits you haven't committed yet."
+echo -e "The divergence is caused by different ${BOLD}commit histories${NC} (we'll check that next)."
+echo -e ""
 
 if ! git diff-index --quiet HEAD --; then
     print_warning "You have uncommitted changes in your working directory:"

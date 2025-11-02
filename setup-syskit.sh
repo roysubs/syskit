@@ -9,7 +9,7 @@ This script must be sourced.
 e.g.,   . ${0##*/}
 or      source ${0##*/}
 
-This will update as follows:
+This will setup the following:
 - ./0-new-system/new1-vimrc.sh      : Add essential definitions for vim and neovim
 - ./0-new-system/new2-update-h-scripts.sh : Markdown help files, use h-<tab> to view
 - ./0-new-system/new1-bashrc.sh     : Add essential definitions to ~/.bashrc
