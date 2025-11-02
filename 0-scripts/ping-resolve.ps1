@@ -4,7 +4,7 @@
     Pings a range of IP addresses and resolves hostnames for active IPs.
 
 .DESCRIPTION
-    This script first uses 'ping-iprange.ps1' to identify active IP addresses
+    This script first uses 'ping-iprange-PS5.ps1' to identify active IP addresses
     within a specified start and end range. For each active IP address found,
     it then attempts to perform a reverse DNS lookup to determine its hostname.
     The results, showing IP addresses and their resolved hostnames, are displayed
@@ -18,7 +18,7 @@
     The ending IP address of the range to scan. This is mandatory for operation.
 
 .PARAMETER PingScriptPath
-    The path to the 'ping-iprange.ps1' script. Defaults to './ping-iprange.ps1'
+    The path to the 'ping-iprange-PS5.ps1' script. Defaults to './ping-iprange-PS5.ps1'
     (assuming it's in the same directory as this script).
 
 .PARAMETER Help
@@ -60,7 +60,7 @@ param (
     [System.Net.IPAddress]$EndAddress,
 
     [Parameter(ParameterSetName = 'ResolveRange', Mandatory = $false, HelpMessage = "Path to the 'ping-iprange.ps1' script.")]
-    [string]$PingScriptPath = "./ping-iprange.ps1", # Assuming ping-iprange.ps1 is the correct name
+    [string]$PingScriptPath = "./ping-iprange-PS5.ps1", # Assuming ping-iprange.ps1 is the correct name
 
     [Parameter(ParameterSetName = 'ShowHelp', HelpMessage = "Display this help message.")]
     [Switch]$Help

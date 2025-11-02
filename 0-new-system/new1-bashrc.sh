@@ -291,7 +291,7 @@ c() {
   0, k syskit : \$HOME/syskit
   n, new      : syskit/0-new-system
   s, scripts  : syskit/0-scripts
-  h, help     : syskit/0-help
+  hp, help    : syskit/0-help
   dk, docker  : syskit/0-docker
   g, games    : syskit/0-games
   i, install  : syskit/0-install
@@ -302,14 +302,14 @@ c() {
   q, mq, qbit, qconf : ~/.config/media-stack/qbittorrent
 
 -- System --
-  home         : \$HOME
+  h            : \$HOME (same as just 'cd')
   d, down      : \$HOME/Downloads
   docs         : \$HOME/Documents
   etc          : /etc
   c, cf, conf  : \$HOME/.config
   t, tmp, temp : /tmp
   l, log       : /var/log
-  bin          : /usr/local/bin
+  b bin        : /usr/local/bin
 EOF
         return
     fi
@@ -318,7 +318,7 @@ EOF
         0|k|syskit)  cd "$HOME/syskit" ;;   # Use '0'/'k' as 's' taken by scripts
         n|new)       cd "$HOME/syskit/0-new-system" ;;
         s|scripts)   cd "$HOME/syskit/0-scripts" ;;
-        h|help)      cd "$HOME/syskit/0-help" ;;
+        hp|help)     cd "$HOME/syskit/0-help" ;;
         dk|docker)   cd "$HOME/syskit/0-docker" ;;
         g|games)     cd "$HOME/syskit/0-games" ;;
         i|install)   cd "$HOME/syskit/0-install" ;;
@@ -327,15 +327,16 @@ EOF
         q|mq|qbit|qconf)  cd "$HOME/.config/media-stack/qbittorrent" ;;
         d|down|downloads) cd "$HOME/Downloads" ;;
         docs)        cd "$HOME/Documents" ;;
-        home)        cd "$HOME" ;;
+        h|home)      cd "$HOME" ;;
         etc)         cd "/etc" ;;
         c|cf|conf)   cd "$HOME/.config" ;;
         t|tmp|temp)  cd "/tmp" ;;
         l|log)       cd "/var/log" ;;
-        bin)         cd "/usr/local/bin" ;;
+        b|bin)         cd "/usr/local/bin" ;;
         *)           echo "Unknown destination: '$1'" ;;
     esac
 }
+alias cs='c s'
 
 EOF_BASHRC_CONTENT
 )

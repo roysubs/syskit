@@ -1,7 +1,7 @@
 #!/bin/bash
 # Author: Roy Wiseman 2025-01
 
-# File visualizer: bar graph for files in the current or specified directory
+# dsf - "this directory size of files", like 'ds', but bar graph to compare file sizes in the current or specified directory
 
 # --- Configuration ---
 DEFAULT_DIR="."
