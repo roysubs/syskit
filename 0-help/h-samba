@@ -52,7 +52,7 @@ Samba Quick Notes
     - For UFW (Uncomplicated Firewall):
       `sudo ufw allow samba`
     - For Firewalld (Fedora/CentOS):
-      `sudo firewall-cmd --permanent --add-service=samba`
+      `sudo firewall-cmd --permanent --add-service=samba`  
       `sudo firewall-cmd --reload`
 
 - **Access Samba Shares**:

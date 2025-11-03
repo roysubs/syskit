@@ -77,7 +77,7 @@ Or from inside the container (often no `sudo` needed):
 ### 🧩 Common Commands
 
 | Command | Description |
-|----------|--------------|
+|---------|-------------|
 | `php occ status` | Show current version, maintenance mode, etc. |
 | `php occ app:list` | List all apps and their status |
 | `php occ app:enable <app>` / `app:disable <app>` | Enable or disable apps |
@@ -91,6 +91,11 @@ Or from inside the container (often no `sudo` needed):
 | `php occ log:watch` | Stream Nextcloud logs live in terminal |
 | `php occ maintenance:repair` | Run automatic repairs |
 | `php occ background:status` | Check cron/background job configuration |
+| `sudo -u www-data php occ upgrade` | Upgrade php and occ |
+
+
+Upgrade from outside container:
+`docker exec -u www-data nextcloud php occ upgrade`
 
 ---
 
@@ -112,7 +117,7 @@ Follow logs in real time:
 |---------|--------------|-----------------|
 | Manage Docker | ✅ | ❌ |
 | Edit mounted config files | ✅ | ✅ (host is safer) |
-| Run `occ` commands | ⚠️ (via docker exec) | ✅ |
+| Run `occ` commands | ⚠️ (via docker exec) | `    ✅ |
 | Restart web server | ❌ | ✅ (`service apache2 restart`) |
 | Backup volumes | ✅ | ❌ |
 
@@ -128,7 +133,74 @@ Follow logs in real time:
 
 ---
 
-## 🧠 9. Quick Troubleshooting
+## 9. Federated Sharing (Distributed Folders) between Nextcloud instances
+
+Share folders between two separate Nextcloud servers as if they were one!
+
+### 📋 What is Federated Sharing?
+
+**Federated Sharing** (Federation) allows you to share folders with users on *other* Nextcloud instances using their **Federated Cloud ID**.
+
+A Federated Cloud ID looks like an email address:
+```
+username@nextcloud-domain.com
+```
+
+**Example:**
+- Your ID: `admin@mydomain.duckdns.org`
+- Friend's ID: `john@friendcloud.duckdns.org`
+
+### ⚙️ 1nable Federation
+
+Go to: **Settings → Administration → Sharing**
+
+Check these options:
+- ✅ **"Allow users on this server to send shares to other servers"**
+- ✅ **"Allow users on this server to receive shares from other servers"**
+
+> Federation is usually enabled by default.
+
+### 📤 Share a Folder with Another Nextcloud
+
+1. Right-click the folder you want to share → **Details**
+2. Click the **Sharing** tab
+3. In the search box, enter your friend's **Federated Cloud ID**:
+```
+   username@their-nextcloud-domain.com
+```
+4. Set permissions (**Can edit**, **Can view**, etc.)
+5. Click **Share**
+
+### 📥 Accept the Share (Recipient Side)
+
+Your friend will receive a notification in their Nextcloud:
+
+1. Click the notification
+2. Click **Accept**
+3. The shared folder appears in their **"Shared with you"** section
+
+Both users can now access and modify the folder in real-time! 🌐
+
+### 🔍 Finding Your Federated Cloud ID
+
+Your Federated Cloud ID is displayed at:
+- **Settings → Personal info**
+- Look for **"Federated Cloud ID"**
+
+Example: `admin@yorwise.duckdns.org`
+
+Share this with anyone who wants to share folders with you!
+
+### ✨ Benefits
+
+- 📁 Share folders across different Nextcloud servers
+- 🔄 Real-time sync between instances
+- 🌍 Collaborate with anyone running their own Nextcloud
+- 🔒 Secure, encrypted sharing
+
+---
+
+## 🧠 10. Quick Troubleshooting
 
 | Symptom | Likely Cause | Fix |
 |----------|---------------|-----|
@@ -140,7 +212,7 @@ Follow logs in real time:
 
 ---
 
-## 📚 10. References
+## 📚 11. References
 
 - [Nextcloud Docker Hub Page](https://hub.docker.com/_/nextcloud)
 - [Nextcloud Admin Manual](https://docs.nextcloud.com/server/latest/admin_manual/)
@@ -148,6 +220,4 @@ Follow logs in real time:
 
 ---
 
-*Maintainer: [Your Name]*  
-*Last updated: {{date}}*
 
