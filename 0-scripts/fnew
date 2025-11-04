@@ -182,7 +182,7 @@ end_time=$(date +%s.%N)
 elapsed_time=$(LC_NUMERIC=C printf "%.3f" "$(echo "$end_time - $start_time" | bc -l)")
 
 # Display summary in green with bold command
-printf "${BOLD}# ${NC}${GREEN}%s${NC}\n" "$full_cmd"
+printf "${BOLD}#${NC}${GREEN}%s${NC}\n" "$full_cmd"
 echo -e "Found ${YELLOW}${file_count}${NC} newest files in '${dir}'"
 if [[ ${#excludes[@]} -gt 0 ]]; then
     echo -e "Excluded patterns: ${GREEN}${excludes[*]}${NC}"
