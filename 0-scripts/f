@@ -8,6 +8,7 @@
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 WHITE='\033[1;37m'
+BOLD='\033[1m'
 
 usage() {
     echo "Usage: f [OPTIONS] [PATH] [ARGUMENTS]"
@@ -16,7 +17,9 @@ usage() {
     echo
     echo "General Options:"
     echo "  h, help               Show this help message"
-    echo "  --cmd                 Show the command to be executed before running"
+    echo "  -c, --cmd             Show the command that was executed after running"
+    echo "  -s, --sudo            Run find/grep commands with sudo"
+    echo "  -e, --exclude DIR     Exclude a specific directory from search (can be used multiple times)"
     echo
     echo "Find Options (uses 'find' command):"
     echo "  hf, h-find            Show various find syntax examples"
@@ -45,14 +48,17 @@ usage() {
     echo "  gf, grep-files PATTERN [PATH]     Recursively grep for PATTERN, list matching filenames only"
     echo
     echo "Examples:"
-    echo "  f b 5 /home                 Find 5 biggest files in /home"
-    echo "  f n /var/log                Find 10 newest files in /var/log"
-    echo "  f s +100M /var              Find files larger than 100MB in /var"
-    echo "  f m 7 ~                     Find files modified in the last 7 days in home directory"
-    echo "  f x 'chmod 644 {}'          Find files and change permissions to 644"
-    echo "  f g \"myFunction\" ./src      Find files under ./src containing \"myFunction\""
-    echo "  f gl \"ERROR_CODE\" /var/log  Recursively search lines with \"ERROR_CODE\" in /var/log"
-    echo "  f gfi \"debug_mode\" .        Case-insensitively list files containing \"debug_mode\" in current dir"
+    echo "  f b 5 /home                           Find 5 biggest files in /home"
+    echo "  f -s b 5 /home                        Find 5 biggest files in /home with sudo"
+    echo "  f b 50 -s -c -e \"Downloads\"           Find 50 biggest files, exclude Downloads, with sudo"
+    echo "  f b 50 -c -s -e \"Downloads\" -e \".git\" Exclude multiple directories"
+    echo "  f n /var/log                          Find 10 newest files in /var/log"
+    echo "  f s +100M /var -e \"cache\"             Find files larger than 100MB in /var, exclude cache"
+    echo "  f m 7 ~                               Find files modified in the last 7 days in home directory"
+    echo "  f x 'chmod 644 {}'                    Find files and change permissions to 644"
+    echo "  f g \"myFunction\" ./src                Find files under ./src containing \"myFunction\""
+    echo "  f gl \"ERROR_CODE\" /var/log            Recursively search lines with \"ERROR_CODE\" in /var/log"
+    echo "  f gfi \"debug_mode\" .                  Case-insensitively list files containing \"debug_mode\" in current dir"
     exit 1
 }
 
@@ -117,6 +123,8 @@ $(tput setaf 2)Tip: For complex logic, combine grep with find, awk, sed. Check '
 # Default values
 N=10
 SHOW_CMD=false
+USE_SUDO=""
+EXCLUDE_DIRS=()
 SEARCH_PATH="."
 FAST_ARG="" # Changed from FAST to FAST_ARG to avoid conflict
 
@@ -128,8 +136,22 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             usage
             ;;
-        --cmd)
+        -c|--cmd)
             SHOW_CMD=true
+            shift
+            ;;
+        -s|--sudo)
+            USE_SUDO="sudo"
+            shift
+            ;;
+        -e|--exclude)
+            if [[ -n "$2" ]]; then 
+                EXCLUDE_DIRS+=("$2")
+                shift
+            else 
+                echo "Error: Directory name required for -e/--exclude"; 
+                exit 1
+            fi
             shift
             ;;
         hf|h-find) # Find examples
@@ -265,6 +287,13 @@ if [ ${#POSITIONAL[@]} -gt 0 ]; then
     fi
 fi
 
+# Build exclusion string from array
+EXCLUDE_STR=""
+if [ ${#EXCLUDE_DIRS[@]} -gt 0 ]; then
+    for dir in "${EXCLUDE_DIRS[@]}"; do
+        EXCLUDE_STR="$EXCLUDE_STR -path \"*/$dir\" -prune -o"
+    done
+fi
 
 # If no action is specified, show usage
 if [[ -z "$ACTION" ]]; then
@@ -273,48 +302,60 @@ fi
 
 execute_command() {
     local cmd="$1"
+    
+    # Start timer if --cmd is enabled
     if [[ "$SHOW_CMD" == "true" ]]; then
-        local display_cmd=$(echo "$cmd" | sed 's/\\n/\\\\n/g')
-        echo -e "${WHITE}#${NC} ${GREEN}$display_cmd${NC}"
-        echo -e "${WHITE}Press any key to execute...${NC}"
-        read -n 1 -s
-        echo -e "${WHITE}Command is executing...${NC}"
+        start_time=$(date +%s)
     fi
+    
+    # Execute the command
     eval "$cmd"
+    
+    # Show command and execution time after execution if requested
+    if [[ "$SHOW_CMD" == "true" ]]; then
+        echo
+        local display_cmd=$(echo "$cmd" | sed 's/\\n/\\\\n/g')
+        echo -e "${BOLD}#${NC}${GREEN}$display_cmd${NC}"
+        
+        # Calculate and display execution time
+        end_time=$(date +%s)
+        elapsed=$((end_time - start_time))
+        echo "Execution time: ${elapsed} seconds"
+    fi
 }
 
 # Perform the selected action
 case "$ACTION" in
     biggest)
-        CMD="find \"$SEARCH_PATH\" -type f $FAST_ARG -not -path \"*/\\.*\" -exec du -h {} \\; | sort -hr | head -n $N"
+        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR -type f $FAST_ARG -not -path \"*/\\.*\" -exec du -h {} \\; | sort -hr | head -n $N"
         execute_command "$CMD"
         ;;
     newest)
-        CMD="find \"$SEARCH_PATH\" -type f $FAST_ARG -not -path \"*/\\.*\" -printf '%TY-%Tm-%Td %TH:%TM:%TS %p\\n' | awk '{split(\$2,t,\".\"); print \$1\" \"t[1]\" \"\$3}' | sort -r | head -n $N"
+        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR -type f $FAST_ARG -not -path \"*/\\.*\" -printf '%TY-%Tm-%Td %TH:%TM:%TS %p\\n' | awk '{split(\$2,t,\".\"); print \$1\" \"t[1]\" \"\$3}' | sort -r | head -n $N"
         execute_command "$CMD"
         ;;
     oldest)
-        CMD="find \"$SEARCH_PATH\" -type f $FAST_ARG -not -path \"*/\\.*\" -printf '%TY-%Tm-%Td %TH:%TM:%TS %p\\n' | awk '{split(\$2,t,\".\"); print \$1\" \"t[1]\" \"\$3}' | sort | head -n $N"
+        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR -type f $FAST_ARG -not -path \"*/\\.*\" -printf '%TY-%Tm-%Td %TH:%TM:%TS %p\\n' | awk '{split(\$2,t,\".\"); print \$1\" \"t[1]\" \"\$3}' | sort | head -n $N"
         execute_command "$CMD"
         ;;
     empty)
-        CMD="find \"$SEARCH_PATH\" -type f -empty $FAST_ARG"
+        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR -type f -empty $FAST_ARG"
         execute_command "$CMD"
         ;;
     empty-dirs)
-        CMD="find \"$SEARCH_PATH\" -type d -empty $FAST_ARG"
+        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR -type d -empty $FAST_ARG"
         execute_command "$CMD"
         ;;
     duplicates)
-        CMD="find \"$SEARCH_PATH\" -type f $FAST_ARG -not -empty -printf '%s\\n' | sort -rn | uniq -d | xargs -I{} find \"$SEARCH_PATH\" -type f -size {}c -print0 | xargs -0 md5sum | sort | uniq -w32 --all-repeated=separate"
+        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR -type f $FAST_ARG -not -empty -printf '%s\\n' | sort -rn | uniq -d | xargs -I{} $USE_SUDO find \"$SEARCH_PATH\" -type f -size {}c -print0 | xargs -0 md5sum | sort | uniq -w32 --all-repeated=separate"
         execute_command "$CMD"
         ;;
     permissions)
-        CMD="find \"$SEARCH_PATH\" -perm $MODE $FAST_ARG"
+        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR -perm $MODE $FAST_ARG"
         execute_command "$CMD"
         ;;
     size)
-        CMD="find \"$SEARCH_PATH\" -size $SIZE $FAST_ARG"
+        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR -size $SIZE $FAST_ARG"
         execute_command "$CMD"
         ;;
     type)
@@ -324,31 +365,31 @@ case "$ACTION" in
             l|link|symlink) TYPE_ARG="-type l" ;;
             *) echo "Unknown type: $TYPE_VAL"; exit 1 ;;
         esac
-        CMD="find \"$SEARCH_PATH\" $TYPE_ARG $FAST_ARG"
+        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR $TYPE_ARG $FAST_ARG"
         execute_command "$CMD"
         ;;
     modified)
-        CMD="find \"$SEARCH_PATH\" -type f -mtime -$DAYS $FAST_ARG"
+        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR -type f -mtime -$DAYS $FAST_ARG"
         execute_command "$CMD"
         ;;
     accessed)
-        CMD="find \"$SEARCH_PATH\" -type f -atime -$DAYS $FAST_ARG"
+        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR -type f -atime -$DAYS $FAST_ARG"
         execute_command "$CMD"
         ;;
     exec)
-        CMD="find \"$SEARCH_PATH\" -type f $FAST_ARG -exec $COMMAND \\;"
+        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR -type f $FAST_ARG -exec $COMMAND \\;"
         execute_command "$CMD"
         ;;
     regex) # Find by filename regex
-        CMD="find \"$SEARCH_PATH\" -regextype posix-extended -regex \"$PATTERN\" $FAST_ARG"
+        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR -regextype posix-extended -regex \"$PATTERN\" $FAST_ARG"
         execute_command "$CMD"
         ;;
     grep_in_found_files) # Original 'g' option
-        CMD="find \"$SEARCH_PATH\" -type f $FAST_ARG -exec grep --color=auto -l \"$PATTERN\" {} \\;"
+        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR -type f $FAST_ARG -exec grep --color=auto -l \"$PATTERN\" {} \\;"
         execute_command "$CMD"
         ;;
     symlinks)
-        CMD="find \"$SEARCH_PATH\" -type l $FAST_ARG -exec test ! -e {} \\; -print"
+        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR -type l $FAST_ARG -exec test ! -e {} \\; -print"
         execute_command "$CMD"
         ;;
     find_examples) # Was 'examples'
@@ -412,19 +453,19 @@ $(tput setaf 2)Note: Always quote patterns with wildcards or spaces to avoid she
         display_grep_examples
         ;;
     grep_lines)
-        CMD="grep --color=always -rIHn \"$PATTERN\" \"$SEARCH_PATH\"" # I=ignore binary, H=show filename, n=line number
+        CMD="$USE_SUDO grep --color=always -rIHn \"$PATTERN\" \"$SEARCH_PATH\"" # I=ignore binary, H=show filename, n=line number
         execute_command "$CMD"
         ;;
     grep_lines_i)
-        CMD="grep --color=always -rIHin \"$PATTERN\" \"$SEARCH_PATH\"" # i=case-insensitive
+        CMD="$USE_SUDO grep --color=always -rIHin \"$PATTERN\" \"$SEARCH_PATH\"" # i=case-insensitive
         execute_command "$CMD"
         ;;
     grep_lines_w)
-        CMD="grep --color=always -rIHwn \"$PATTERN\" \"$SEARCH_PATH\"" # w=whole word
+        CMD="$USE_SUDO grep --color=always -rIHwn \"$PATTERN\" \"$SEARCH_PATH\"" # w=whole word
         execute_command "$CMD"
         ;;
     grep_files)
-        CMD="grep --color=auto -rIl \"$PATTERN\" \"$SEARCH_PATH\"" # l=list filenames, I=ignore binary
+        CMD="$USE_SUDO grep --color=auto -rIl \"$PATTERN\" \"$SEARCH_PATH\"" # l=list filenames, I=ignore binary
         execute_command "$CMD"
         ;;
     *)
