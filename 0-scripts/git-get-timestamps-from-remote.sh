@@ -3,7 +3,7 @@
 set -e
 
 echo
-echo "When you close a repo, every timestamp locally is that of the moment of the clone."
+echo "When you clone a repo, every timestamp locally is that of the moment of the clone."
 echo "Usually, it's more useful to see the modified date as they exist on the remote repo."
 echo "This script will fetch the correct timestamps from the remote repo (e.g., GitHub) so"
 echo "that the local copies will show when they were last modified and apply to every file"
