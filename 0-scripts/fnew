@@ -1,43 +1,84 @@
 #!/usr/bin/env bash
 # Author: Roy Wiseman 2025-01
+# Updated: 2025-11-04 - Enhanced with fday display features
+
+# ANSI color codes
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'  # Bright yellow
+NC='\033[0m' # No Color
+BOLD='\033[1m'
 
 # --- Help Function ---
 show_help() {
 cat << EOF
 Lists the N newest files in a specified directory.
 
-Usage: $(basename "$0") [directory] [number_of_files] [sudo_command]
-       $(basename "$0") -h | --help
-
+Usage: $(basename "$0") [directory] [number_of_files] [-s] [--exclude pattern] [-h]
+       
 Arguments:
-  directory:        (Optional) Target directory to search.
-                    Defaults to the current directory (".").
-  number_of_files:  (Optional) Number of newest files to list.
-                    Defaults to 10.
-  sudo_command:     (Optional) Command to prefix 'find' if sudo privileges are needed
-                    (e.g., "sudo"). Defaults to no prefix.
+  directory:        Target directory to search (default: current directory).
+  number_of_files:  Number of newest files to list (default: 10).
+  -sudo | -s        Use sudo for find command.
+  --exclude | -e    Exclude paths matching pattern (can be used multiple times).
+                    Example: --exclude .git --exclude '*.tmp'
+  -h | --help       Show this help.
+
+Note: directory/number can be in any order and will be determined dynamically.
 
 Examples:
   $(basename "$0") /var/log 5
   $(basename "$0") . 20
-  $(basename "$0") /root 50 sudo
+  $(basename "$0") /root 50 -s
+  $(basename "$0") /home 15 --exclude .git --exclude node_modules
   $(basename "$0") -h
 EOF
 }
 
-# --- Argument Parsing for Help ---
-if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-    show_help
-    exit 0
-fi
+# --- Default values ---
+dir="."
+num=10
+use_sudo=""
+excludes=()
 
-# --- Configuration ---
-# Directory to search. Defaults to current directory if no argument is provided.
-dir="${1:-.}"
-# Number of newest files to list. Defaults to 10 if no second argument is provided.
-num="${2:-10}"
-# Set to "sudo" if sudo privileges are needed for find. Defaults to empty.
-use_sudo_prefix="${3:-}"
+# Function to check if a value is a positive integer
+is_number() {
+    [[ "$1" =~ ^[0-9]+$ ]]
+}
+
+# --- Argument Parsing ---
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        --sudo|-s)
+            use_sudo="sudo"
+            shift
+            ;;
+        --exclude|-e)
+            if [[ -n "$2" && "$2" != -* ]]; then
+                excludes+=("$2")
+                shift 2
+            else
+                echo "Error: --exclude requires a pattern argument"
+                exit 1
+            fi
+            ;;
+        *)
+            if is_number "$1"; then
+                num="$1"
+            elif [[ -d "$1" ]]; then
+                dir="$1"
+            elif [[ "$1" != -* ]]; then
+                # Try to interpret as directory even if it doesn't exist yet
+                # This allows error message to be more specific
+                dir="$1"
+            fi
+            shift
+            ;;
+    esac
+done
 
 # --- Basic Input Validation ---
 if [[ ! -d "$dir" ]]; then
@@ -45,32 +86,39 @@ if [[ ! -d "$dir" ]]; then
     echo "Use $(basename "$0") -h or --help for usage instructions." >&2
     exit 1
 fi
+
 if ! [[ "$num" =~ ^[0-9]+$ && "$num" -gt 0 ]]; then
     echo "Error: Number of files '$num' must be a positive integer." >&2
     echo "Use $(basename "$0") -h or --help for usage instructions." >&2
     exit 1
 fi
 
+# Build exclude conditions for find
+exclude_args=""
+exclude_display=""
+for exclude in "${excludes[@]}"; do
+    exclude_args="$exclude_args -not -path '*/$exclude/*' -not -path '*/$exclude'"
+    exclude_display="$exclude_display -not -path '*/$exclude/*' -not -path '*/$exclude'"
+done
+
 # --- Main execution ---
 
-echo "Listing the ${num} newest files in '${dir}' (use $(basename "$0") -h for options):"
+# Start timer (GNU date for %N nanoseconds)
+start_time=$(date +%s.%N)
 
 # Find will output Unix timestamp (seconds since epoch, with fractional part) and path
 # %T@ provides a sortable timestamp. %p is the path.
-find_output_format="%T@ %p\n"
+find_output_format="%T@ %p\\n"
 
-# Prepare the find command parts
-find_base_cmd_array=("find" "$dir" "-xdev" "-type" "f" "-printf" "$find_output_format")
+# Prepare the find command
+find_cmd="$use_sudo find \"$dir\" -xdev -type f$exclude_args -printf '$find_output_format'"
 
 # AWK script to format the timestamp using gawk's built-in 'strftime' function
-# This is much more efficient than calling the external 'date' command for each line.
-# It takes lines like "1609459200.123456 /path/to/file"
-# and converts them to "YYYY-MM-DD HH:MM:SS /path/to/file"
-# This script assumes GNU Awk (gawk) is available.
+# Note: The summary display shows '{format timestamps}' for brevity, but this is the actual script:
 awk_formatter_script='
 {
     timestamp_full = $1;  # First field is the timestamp (e.g., 1609459200.123456)
-    
+
     # Reconstruct the filepath from the 2nd field to the end
     filepath = "";
     for (i = 2; i <= NF; i++) {
@@ -78,49 +126,28 @@ awk_formatter_script='
     }
 
     # Use gawk strftime for formatting. It needs an integer timestamp.
-    # The fractional part of timestamp_full (from %T@) ensures correct sorting before head.
-    int_timestamp = int(timestamp_full); 
-    
+    int_timestamp = int(timestamp_full);
+
     formatted_date = strftime("%Y-%m-%d %H:%M:%S", int_timestamp);
-    
+
     print formatted_date " " filepath;
 }
 '
 
-# Display the conceptual command
-displayed_cmd_desc="# Effective command stages: "
-if [[ -n "$use_sudo_prefix" ]]; then
-    displayed_cmd_desc+="$use_sudo_prefix "
-fi
-displayed_cmd_desc+="$(printf "%q " "${find_base_cmd_array[@]}")" # Shows the find part
-displayed_cmd_desc+="| sort -rnk1,1 | head -n \"${num}\" | gawk '{...strftime()...}'" # Quoted num
-
-echo "${displayed_cmd_desc}"
-echo # Blank line for readability
-
-# Start timer (GNU date for %N nanoseconds)
-start_time=$(date +%s.%N)
+# Build full display command for summary (simplified for readability)
+full_cmd="$use_sudo find \"$dir\" -xdev -type f$exclude_display -printf '%T@ %p\\n' | sort -rnk1,1 | head -n $num | gawk '{see fnew awk_formatter_script}'"
 
 # Execute the command pipeline
 set -o pipefail # Exit immediately if a command in the pipeline fails
 pipeline_output=""
 pipeline_exit_status=0
 
-# Construct the full pipeline
-# Using gawk instead of awk for strftime
-if [[ -n "$use_sudo_prefix" ]]; then
-    pipeline_output=$($use_sudo_prefix "${find_base_cmd_array[@]}" | \
-                        sort -rnk1,1 | \
-                        head -n "$num" | \
-                        gawk "$awk_formatter_script")
-    pipeline_exit_status=$?
-else
-    pipeline_output=$("${find_base_cmd_array[@]}" | \
-                        sort -rnk1,1 | \
-                        head -n "$num" | \
-                        gawk "$awk_formatter_script")
-    pipeline_exit_status=$?
-fi
+# Execute the full pipeline
+pipeline_output=$(eval "$find_cmd" | \
+                    sort -rnk1,1 | \
+                    head -n "$num" | \
+                    gawk "$awk_formatter_script")
+pipeline_exit_status=$?
 
 set +o pipefail # Reset pipefail option
 
@@ -129,12 +156,20 @@ if [[ -n "$pipeline_output" ]]; then
     echo "$pipeline_output"
 fi
 
+# Count the number of results (handle empty output)
+if [[ -n "$pipeline_output" ]]; then
+    file_count=$(echo "$pipeline_output" | wc -l)
+else
+    file_count=0
+fi
+
 # Check if the pipeline encountered an issue
 if [[ $pipeline_exit_status -ne 0 ]]; then
     echo # Ensure newline if error message comes after output
     # Status 141 is common if head closes the pipe, often not a critical error if output is present
     if [[ $pipeline_exit_status -eq 141 && -n "$pipeline_output" ]]; then
-        echo "Info: Command pipeline ended with status 141 (likely 'head' closing pipe as expected)." >&2
+        # Don't show this info message in normal operation, keep it clean
+        :
     else
         echo "Warning: The command pipeline exited with status ${pipeline_exit_status}." >&2
         echo "         This might indicate an issue. Check for errors from 'find', 'sort', 'head' or 'gawk'." >&2
@@ -146,4 +181,11 @@ end_time=$(date +%s.%N)
 # LC_NUMERIC=C ensures dot as decimal separator for bc
 elapsed_time=$(LC_NUMERIC=C printf "%.3f" "$(echo "$end_time - $start_time" | bc -l)")
 
-echo -e "\nExecution time: ${elapsed_time} seconds"
+# Display summary in green with bold command
+printf "${BOLD}# ${NC}${GREEN}%s${NC}\n" "$full_cmd"
+echo -e "Found ${YELLOW}${file_count}${NC} newest files in '${dir}'"
+if [[ ${#excludes[@]} -gt 0 ]]; then
+    echo -e "Excluded patterns: ${GREEN}${excludes[*]}${NC}"
+fi
+echo -e "Execution time: ${YELLOW}${elapsed_time}${NC} seconds"
+
