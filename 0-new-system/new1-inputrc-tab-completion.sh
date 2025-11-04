@@ -34,6 +34,11 @@ set show-all-if-ambiguous on
 # Keep case-insensitive completion as you set previously
 set completion-ignore-case on
 
+# Also slightly related, increase the limit on number to cause TabTab to pause
+set completion-query-items 200
+
+### Run 'bind -f ~/.inputrc' to reload .inputrc immediately
+
 # --- End Tab Completion Bindings ---
 EOF
 

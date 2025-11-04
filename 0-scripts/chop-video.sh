@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Author: Roy Wiseman 2025-01
 # Modified by Gemini @ Google 2025-09-15 (v16)
+# Enhanced with PowerShell improvements 2025-11-03 (v17)
 
-# This script is a universal video processing tool for YouTube URLs/IDs and local files.
+# This script is a universal video processing tool for YouTube, X, TikTok, Instagram, Facebook, NPO, and local files.
 # It includes presets for quality/size-based encoding, optional trimming, and robust error handling.
-# Features: --rename flag, detailed final summary, VPN detection, and optimized FFmpeg seeking for speed.
+# Features: --rename flag, detailed final summary, VPN detection, optimized FFmpeg seeking for accuracy,
+# stream copy mode for fast trimming, and automatic yt-dlp updates.
 
 set -e
 set -o pipefail
@@ -13,8 +15,8 @@ set -o pipefail
 DEFAULT_OUTDIR="$HOME"
 DEFAULT_QUALITY_PROFILE="sd" # Options: phone_small, phone_fast, sd, hd, source_mp4, half, quarter, 10mb
 YTDLP_CMD=""                 # Global variable to hold the yt-dlp command path
-youtube_title=""             # Global variable to store fetched YouTube title for later rename
-youtube_duration=""          # Global variable to store fetched YouTube duration for summary
+fetched_title=""             # Global variable to store fetched title for later rename
+fetched_duration=""          # Global variable to store fetched duration for summary
 
 # ---------------[ HELPER FUNCTIONS ]---------------
 
@@ -22,13 +24,13 @@ youtube_duration=""          # Global variable to store fetched YouTube duration
 show_help() {
     cat <<EOF
 Usage: $(basename "$0") [OPTIONS] <source> [start_time] [end_time]
-Processes a video file from a local path or YouTube URL/ID.
+Processes a video file from a local path or a supported URL.
 It performs optional trimming and re-encoding to a specified quality or target size.
 
 OPTIONS:
   --out DIR         Set the output directory (default: home directory ~). Use "." for current directory.
-  --quality PROFILE Set the quality profile.
-  --rename          For YouTube videos, automatically rename the final file using the fetched title.
+  --quality PROFILE Set the quality profile. If omitted when trimming, a fast stream copy will be performed.
+  --rename          For web videos, automatically rename the final file using the fetched title.
                     This will overwrite any existing file with the same name.
   -h, --help        Show this help message.
 
@@ -42,15 +44,29 @@ QUALITY PROFILES:
   quarter:      Aims for 1/4 original file size with the best possible quality.
   10mb:         Compresses to just under 10MB for Discord/social media.
 
+SUPPORTED PLATFORMS:
+  - YouTube (videos, shorts, live)
+  - X / Twitter
+  - TikTok
+  - Instagram (posts and reels)
+  - Facebook (reels and videos)
+  - NPO (Dutch public broadcaster)
+
 TIME FORMAT:
   Supports hh:mm:ss (01:03:18), mm:ss (2:05), or seconds (125), including milliseconds.
 
 EXAMPLES:
-  # Download a YouTube video by ID, trim it, and automatically rename it using its title.
-  $(basename "$0") --rename 5v3bbkJW0gQ 1:09 2:15 --quality half
+  # Fast-trim a video using stream copy (no re-encoding, perfect quality, fast).
+  $(basename "$0") video.mp4 1:09 1:15
+
+  # Download, trim, and re-encode a YouTube video.
+  $(basename "$0") --quality sd 'https://www.youtube.com/watch?v=YSE5jvSu5hk' 5:20 5:56
 
   # Process a local file and save to the current directory.
   $(basename "$0") --out . --quality 10mb video.mp4
+
+  # Download a video from Instagram without any re-encoding.
+  $(basename "$0") 'https://www.instagram.com/reel/ABC123/'
 EOF
 }
 
@@ -83,33 +99,78 @@ command_exists() {
 # Function to check for common signs of a VPN connection
 check_for_vpn() {
     # Check for common VPN interface names (e.g., tun0, ppp0)
-    if ip addr | grep -q -E 'tun[0-9]+|ppp[0-9]+'; then
+    if ip addr 2>/dev/null | grep -q -E 'tun[0-9]+|ppp[0-9]+'; then
         return 0 # VPN likely detected
     fi
     # Check if the default route's interface name suggests a VPN
     local default_interface
-    default_interface=$(ip route | grep '^default' | awk '{print $5}')
+    default_interface=$(ip route 2>/dev/null | grep '^default' | awk '{print $5}')
     if [[ -n "$default_interface" ]] && echo "$default_interface" | grep -q -i 'vpn'; then
         return 0 # VPN likely detected
     fi
     return 1 # No obvious VPN signs detected
 }
 
-# Extracts YouTube video ID from various input formats.
-get_video_id() {
+# Extracts media ID from various input formats with platform prefix.
+get_media_id() {
     local input="$1"
+    
+    # YouTube
     if [[ "$input" =~ v=([a-zA-Z0-9_-]{11}) ]]; then
-        echo "${BASH_REMATCH[1]}"
+        echo "yt_${BASH_REMATCH[1]}"
         return
     fi
     if [[ "$input" =~ (youtu\.be/|shorts/|live/|embed/)([a-zA-Z0-9_-]{11}) ]]; then
-        echo "${BASH_REMATCH[2]}"
+        echo "yt_${BASH_REMATCH[2]}"
         return
     fi
     if [[ "$input" =~ ^[a-zA-Z0-9_-]{11}$ ]]; then
-        echo "$input"
+        echo "yt_$input"
         return
     fi
+    
+    # X / Twitter
+    if [[ "$input" =~ (x\.com|twitter\.com)/[^/]+/status/([0-9]+) ]]; then
+        echo "x_${BASH_REMATCH[2]}"
+        return
+    fi
+    
+    # TikTok
+    if [[ "$input" =~ tiktok\.com/@[^/]+/video/([0-9]+) ]]; then
+        echo "tk_${BASH_REMATCH[1]}"
+        return
+    fi
+    
+    # Instagram
+    if [[ "$input" =~ instagram\.com/(p|reel)/([a-zA-Z0-9_-]+) ]]; then
+        echo "ig_${BASH_REMATCH[2]}"
+        return
+    fi
+    
+    # Facebook
+    if [[ "$input" =~ (facebook\.com|fb\.watch)/reel/([0-9]+) ]]; then
+        echo "fb_${BASH_REMATCH[2]}"
+        return
+    fi
+    if [[ "$input" =~ (facebook\.com|fb\.watch)/.+/videos/([0-9]+) ]]; then
+        echo "fb_${BASH_REMATCH[2]}"
+        return
+    fi
+    if [[ "$input" =~ (facebook\.com|fb\.watch)/watch/?\?v=([0-9]+) ]]; then
+        echo "fb_${BASH_REMATCH[2]}"
+        return
+    fi
+    
+    # NPO (Dutch public broadcaster)
+    if [[ "$input" =~ (npo\.nl|npostart\.nl)/.*/([^/]+)/afspelen$ ]]; then
+        echo "npo_${BASH_REMATCH[2]}"
+        return
+    fi
+    if [[ "$input" =~ (npo\.nl|npostart\.nl)/.*/([^/]+)$ ]]; then
+        echo "npo_${BASH_REMATCH[2]}"
+        return
+    fi
+    
     echo ""
 }
 
@@ -201,7 +262,7 @@ main_dep_install() {
     for cmd in bc date stat curl awk grep ffmpeg ffprobe realpath ip; do
         if ! command_exists "$cmd"; then
             msg_warn "Dependency '$cmd' is not found."
-            if [[ ("$cmd" == "ffmpeg" || "$cmd" == "ffprobe") && $(command -v apt-get) && $(command -v sudo) ]]; then
+            if [[ ("$cmd" == "ffmpeg" || "$cmd" == "ffprobe") && $(command -v apt-get 2>/dev/null) && $(command -v sudo 2>/dev/null) ]]; then
                 read -r -p "Attempt to install 'ffmpeg' using 'sudo apt-get install ffmpeg'? (y/N): " confirm
                 if [[ "$confirm" =~ ^[Yy]$ ]]; then
                     if sudo apt-get install -y ffmpeg; then msg_ok "$cmd installed."; else msg_error "Failed to install $cmd."; exit 1; fi
@@ -246,7 +307,7 @@ start_total_timer=$(date +%s.%N)
 
 # Parse command-line arguments
 outdir="$DEFAULT_OUTDIR"
-quality_profile="$DEFAULT_QUALITY_PROFILE"
+quality_profile=""  # Empty means use smart defaults
 auto_rename_flag=false
 positional_args=()
 while [[ "$#" -gt 0 ]]; do
@@ -285,10 +346,10 @@ set -- "${positional_args[@]}"
 source_input="$1"
 start_input="$2"
 end_input="$3"
-is_youtube_input=false
+is_web_source=false
 
 if [[ -z "$source_input" ]]; then
-    msg_error "A source (local file or YouTube URL/ID) is required."
+    msg_error "A source (local file or URL) is required."
     show_help
     exit 1
 fi
@@ -296,6 +357,14 @@ fi
 # Initial setup and checks
 main_dep_install
 msg_ok "All dependencies are satisfied."
+
+# Update yt-dlp
+msg "Updating yt-dlp..."
+if "$YTDLP_CMD" -U >/dev/null 2>&1; then
+    msg_ok "yt-dlp updated successfully (or already up-to-date)."
+else
+    msg_warn "yt-dlp update failed or encountered issues. Proceeding with current version."
+fi
 
 # Check for VPN after dependencies are confirmed
 if check_for_vpn; then
@@ -313,9 +382,14 @@ if [[ -n "$start_sec" && -n "$end_sec" && $(echo "$end_sec <= $start_sec" | bc -
     exit 1
 fi
 
+is_trimming=false
+if [[ -n "$start_sec" || -n "$end_sec" ]]; then
+    is_trimming=true
+fi
+
 output_filename_stem=""
 input_file=""
-video_id=""
+media_id=""
 YTDLP_OPTS=(--socket-timeout 60) # Add timeout for network robustness
 
 if [[ -f "$source_input" ]]; then
@@ -323,29 +397,29 @@ if [[ -f "$source_input" ]]; then
     input_file=$(realpath "$source_input")
     output_filename_stem="${outdir}/$(basename "${input_file%.*}")"
 else
-    is_youtube_input=true
-    msg "Source is not a local file. Attempting YouTube ID extraction..."
-    video_id=$(get_video_id "$source_input")
-    if [[ -n "$video_id" ]]; then
-        msg_ok "Detected Video ID: $video_id"
-        msg "Fetching video metadata..."
-        youtube_title=$("$YTDLP_CMD" "${YTDLP_OPTS[@]}" --get-title --skip-download --no-warnings "$video_id" || echo "")
-        youtube_duration=$("$YTDLP_CMD" "${YTDLP_OPTS[@]}" --get-duration --skip-download --no-warnings "$video_id" || echo "")
-        if [[ -n "$youtube_title" ]]; then
-            msg_ok "Fetched Title: $youtube_title"
-            msg_ok "Fetched Duration: $youtube_duration"
+    is_web_source=true
+    msg "Source is not a local file. Attempting URL detection..."
+    media_id=$(get_media_id "$source_input")
+    if [[ -n "$media_id" ]]; then
+        msg_ok "Detected Media ID: $media_id"
+        msg "Fetching media metadata..."
+        fetched_title=$("$YTDLP_CMD" "${YTDLP_OPTS[@]}" --get-title --skip-download --no-warnings "$source_input" 2>/dev/null || echo "")
+        fetched_duration=$("$YTDLP_CMD" "${YTDLP_OPTS[@]}" --get-duration --skip-download --no-warnings "$source_input" 2>/dev/null || echo "")
+        if [[ -n "$fetched_title" ]]; then
+            msg_ok "Fetched Title: $fetched_title"
+            msg_ok "Fetched Duration: $fetched_duration"
         else
-            msg_warn "Could not fetch video metadata. Renaming will not be possible."
+            msg_warn "Could not fetch media metadata. Renaming will not be possible."
         fi
-        output_filename_stem="${outdir}/${video_id}"
+        output_filename_stem="${outdir}/${media_id}"
         downloaded_source_file="${output_filename_stem}_source.mp4"
         start_download_timer=$(date +%s.%N)
         if [[ ! -f "$downloaded_source_file" ]]; then
-            msg "Downloading video to: $downloaded_source_file"
-            if "$YTDLP_CMD" "${YTDLP_OPTS[@]}" -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --merge-output-format mp4 -o "$downloaded_source_file" "$video_id"; then
+            msg "Downloading media to: $downloaded_source_file"
+            if "$YTDLP_CMD" "${YTDLP_OPTS[@]}" -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --merge-output-format mp4 -o "$downloaded_source_file" "$source_input"; then
                 msg_ok "Download complete."
             else
-                msg_error "yt-dlp failed to download the video."
+                msg_error "yt-dlp failed to download the media."
                 if [ -f "$downloaded_source_file" ]; then rm "$downloaded_source_file"; fi
                 exit 1
             fi
@@ -355,7 +429,7 @@ else
         end_download_timer=$(date +%s.%N)
         input_file="$downloaded_source_file"
     else
-        msg_error "Invalid source. Please provide a valid local file path or YouTube URL/ID."
+        msg_error "Invalid source. Please provide a valid local file path or a supported URL."
         show_help
         exit 1
     fi
@@ -366,106 +440,170 @@ if [[ ! -s "$input_file" ]]; then
     exit 1
 fi
 
-# ---------------[ VIDEO PROCESSING (FFMPEG) ]---------------
+# Determine effective quality profile
+if [[ -n "$quality_profile" ]]; then
+    effective_quality="$quality_profile"
+elif [[ "$is_trimming" == true ]]; then
+    effective_quality="stream_copy"
+    msg "No quality specified with trimming. Using fast stream copy mode (no re-encoding)."
+elif [[ "$is_web_source" == true ]]; then
+    # Web source, no trimming, no quality specified = just download
+    msg_ok "Download complete. No trimming or re-encoding requested. Exiting."
+    final_output_path="$input_file"
+    end_processing_timer="$end_download_timer"
+    start_processing_timer="$end_download_timer"
+    # Skip to summary
+    SKIP_PROCESSING=true
+else
+    effective_quality="$DEFAULT_QUALITY_PROFILE"
+fi
 
+if [[ "$SKIP_PROCESSING" != true ]]; then
+# ---------------[ VIDEO PROCESSING (FFMPEG) ]---------------
 msg "Starting video processing..."
 start_processing_timer=$(date +%s.%N)
 
-video_width=$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=s=x:p=0 "$input_file")
-video_height=$(ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=s=x:p=0 "$input_file")
-source_size_bytes=$(stat -c%s "$input_file")
-
-if [[ -n "$start_sec" && -n "$end_sec" ]]; then
-    calc_duration_sec=$(echo "$end_sec - $start_sec" | bc)
-else
-    calc_duration_sec=$(ffprobe -v error -i "$input_file" -show_entries format=duration -of default=noprint_wrappers=1:nokey=1)
-fi
-
-if [[ -z "$video_width" || -z "$video_height" ]]; then msg_error "Could not get video dimensions."; exit 1; fi
-if [[ -z "$calc_duration_sec" || $(echo "$calc_duration_sec <= 0" | bc -l) -eq 1 ]]; then msg_error "Could not get a valid video duration."; exit 1; fi
-
-msg "Source dimensions: ${video_width}x${video_height}, Size: $(printf "%.2f" "$(echo "$source_size_bytes/1024/1024" | bc -l)") MB"
-
 ffmpeg_cmd_base=(ffmpeg -hide_banner -stats -y)
 ffmpeg_video_params=()
-ffmpeg_audio_params=(-c:a aac -b:a 128k)
-needs_re_encoding=true
+ffmpeg_audio_params=()
+ffmpeg_video_params_pass2=()
+ffmpeg_vf=""
 
-case "$quality_profile" in
-phone_small) FFMPEG_CONTENT_MAX_H=360; ffmpeg_video_params=(-c:v libx264 -crf 32 -preset fast) ;;
-phone_fast) FFMPEG_CONTENT_MAX_H=480; ffmpeg_video_params=(-c:v libx264 -crf 25 -preset veryfast) ;;
-sd) FFMPEG_CONTENT_MAX_H=720; ffmpeg_video_params=(-c:v libx264 -crf 19 -preset fast) ;;
-hd) FFMPEG_CONTENT_MAX_H=1080; ffmpeg_video_params=(-c:v libx264 -crf 13 -preset medium) ;;
-source_mp4) FFMPEG_CONTENT_MAX_H=2160; ffmpeg_video_params=(-c:v libx264 -crf 22 -preset medium); ffmpeg_audio_params=(-c:a aac -b:a 192k) ;;
-10mb | half | quarter)
-    target_size_bytes=0
-    case "$quality_profile" in
-    10mb) target_size_bytes=$(echo "9.8 * 1024 * 1024" | bc) ;;
-    half) target_size_bytes=$(echo "$source_size_bytes / 2" | bc) ;;
-    quarter) target_size_bytes=$(echo "$source_size_bytes / 4" | bc) ;;
-    esac
-    if [[ "$quality_profile" == "10mb" && $(echo "$source_size_bytes < $target_size_bytes" | bc -l) -eq 1 && -z "$start_sec" ]]; then
-        msg_warn "Source file is already under 10MB and no trimming is requested. No re-encoding needed."
-        needs_re_encoding=false
+if [[ "$effective_quality" != "stream_copy" ]]; then
+    video_width=$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=s=x:p=0 "$input_file")
+    video_height=$(ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=s=x:p=0 "$input_file")
+    source_size_bytes=$(stat -c%s "$input_file")
+
+    # Get the FULL duration of the input file for bitrate calculation
+    full_source_duration_sec=$(ffprobe -v error -i "$input_file" -show_entries format=duration -of default=noprint_wrappers=1:nokey=1)
+    
+    if [[ -z "$video_width" || -z "$video_height" ]]; then 
+        msg_error "Could not get video dimensions."
+        exit 1
+    fi
+    if [[ -z "$full_source_duration_sec" || $(echo "$full_source_duration_sec <= 0" | bc -l) -eq 1 ]]; then 
+        msg_error "Could not get a valid full video duration for bitrate calculation."
+        exit 1
+    fi
+
+    # Calculate the duration for processing (trimmed duration if trimming, full duration otherwise)
+    if [[ "$is_trimming" == true && -n "$start_sec" && -n "$end_sec" ]]; then
+        calc_duration_sec=$(echo "$end_sec - $start_sec" | bc)
     else
-        msg "Calculating bitrate for target size: $(printf "%.2f" "$(echo "$target_size_bytes/1024/1024" | bc -l)") MB over ${calc_duration_sec}s"
+        calc_duration_sec="$full_source_duration_sec"
+    fi
+
+    if [[ -z "$calc_duration_sec" || $(echo "$calc_duration_sec <= 0" | bc -l) -eq 1 ]]; then 
+        msg_error "Could not get a valid video duration for processing."
+        exit 1
+    fi
+
+    msg "Source dimensions: ${video_width}x${video_height}, Size: $(printf "%.2f" "$(echo "$source_size_bytes/1024/1024" | bc -l)") MB"
+
+    ffmpeg_audio_params=(-c:a aac -b:a 128k)
+
+    case "$effective_quality" in
+    phone_small) 
+        FFMPEG_CONTENT_MAX_H=360
+        ffmpeg_video_params=(-c:v libx264 -crf 32 -preset fast)
+        ;;
+    phone_fast) 
+        FFMPEG_CONTENT_MAX_H=480
+        ffmpeg_video_params=(-c:v libx264 -crf 25 -preset veryfast)
+        ;;
+    sd) 
+        FFMPEG_CONTENT_MAX_H=720
+        ffmpeg_video_params=(-c:v libx264 -crf 19 -preset fast)
+        ;;
+    hd) 
+        FFMPEG_CONTENT_MAX_H=1080
+        ffmpeg_video_params=(-c:v libx264 -crf 13 -preset medium)
+        ;;
+    source_mp4) 
+        FFMPEG_CONTENT_MAX_H=2160
+        ffmpeg_video_params=(-c:v libx264 -crf 22 -preset medium)
+        ffmpeg_audio_params=(-c:a aac -b:a 192k)
+        ;;
+    10mb|half|quarter)
+        target_size_bytes=0
+        if [[ "$effective_quality" == "10mb" ]]; then
+            target_size_bytes=$(echo "9.8 * 1024 * 1024" | bc)
+        else
+            # CORRECTED: Base target size on the proportional size of the clip, not the whole file
+            estimated_clipped_source_size_bytes=$(echo "($calc_duration_sec / $full_source_duration_sec) * $source_size_bytes" | bc)
+            if [[ "$effective_quality" == "half" ]]; then
+                target_size_bytes=$(echo "$estimated_clipped_source_size_bytes / 2" | bc)
+            elif [[ "$effective_quality" == "quarter" ]]; then
+                target_size_bytes=$(echo "$estimated_clipped_source_size_bytes / 4" | bc)
+            fi
+        fi
+        
+        target_size_mb=$(printf "%.2f" "$(echo "$target_size_bytes/1024/1024" | bc -l)")
+        msg "Calculating bitrate for target size: ${target_size_mb} MB over ${calc_duration_sec}s"
         audio_bitrate_k=128
         target_total_bitrate_k=$(echo "($target_size_bytes * 8 / $calc_duration_sec) / 1000" | bc)
         target_video_bitrate_k=$(echo "$target_total_bitrate_k - $audio_bitrate_k" | bc)
+        
         if (( $(echo "$target_video_bitrate_k < 100" | bc -l) )); then
             msg_warn "Calculated video bitrate is very low (${target_video_bitrate_k}k). Quality may be poor."
         fi
+        
         ffmpeg_video_params=(-c:v libx264 -b:v "${target_video_bitrate_k}k" -pass 1 -an -f null /dev/null)
         ffmpeg_video_params_pass2=(-c:v libx264 -b:v "${target_video_bitrate_k}k" -pass 2)
-    fi
-    FFMPEG_CONTENT_MAX_H=$video_height
-    ;;
-*)
-    msg_error "Unknown quality profile: $quality_profile"
-    show_help
-    exit 1
-    ;;
-esac
+        FFMPEG_CONTENT_MAX_H=$video_height
+        ;;
+    *)
+        msg_error "Unknown quality profile: $effective_quality"
+        show_help
+        exit 1
+        ;;
+    esac
 
-target_pad_width=$((video_width >= video_height ? 1280 : 720))
-target_pad_height=$((video_width >= video_height ? 720 : 1280))
-ffmpeg_vf="scale=-2:'min(ih,${FFMPEG_CONTENT_MAX_H})',scale=w='min(iw,${target_pad_width})':h='min(ih,${target_pad_height})':force_original_aspect_ratio=decrease,pad=w=${target_pad_width}:h=${target_pad_height}:x='(ow-iw)/2':y='(oh-ih)/2'"
+    target_pad_width=$((video_width >= video_height ? 1280 : 720))
+    target_pad_height=$((video_width >= video_height ? 720 : 1280))
+    ffmpeg_vf="scale=-2:'min(ih,${FFMPEG_CONTENT_MAX_H})',scale=w='min(iw,${target_pad_width})':h='min(ih,${target_pad_height})':force_original_aspect_ratio=decrease,pad=w=${target_pad_width}:h=${target_pad_height}:x='(ow-iw)/2':y='(oh-ih)/2'"
+else
+    # Stream copy mode
+    msg "Performing fast trim (stream copy mode - no re-encoding)..."
+    ffmpeg_video_params=(-c:v copy)
+    ffmpeg_audio_params=(-c:a copy)
+fi
 
-# OPTIMIZATION: Separate seek options from trim options for performance.
-fast_seek_opts=()
-output_trim_opts=()
+# CRITICAL: Use OUTPUT seeking (after -i) for accuracy and proper A/V sync
+# All timing arguments go in trim_args, which are applied AFTER the input
+trim_args=()
 time_suffix=""
-if [[ -n "$start_sec" && -n "$end_sec" ]]; then
+output_quality_label=$(if [[ "$effective_quality" == "stream_copy" ]]; then echo "trimmed"; else echo "$effective_quality"; fi)
+
+if [[ "$is_trimming" == true ]]; then
     start_label=$(to_hms_label "$start_sec")
     end_label=$(to_hms_label "$end_sec")
     time_suffix="_${start_label}_to_${end_label}"
-    ffmpeg_duration=$(echo "$end_sec - $start_sec" | bc)
-    # -ss before -i is a fast, but less accurate, seek.
-    fast_seek_opts=(-ss "$start_sec")
-    # -t is the duration of the output clip.
-    output_trim_opts=(-t "$ffmpeg_duration")
+    if [[ -n "$start_sec" && -n "$end_sec" ]]; then
+        ffmpeg_duration=$(echo "$end_sec - $start_sec" | bc)
+        trim_args=(-ss "$start_sec" -t "$ffmpeg_duration")
+    fi
 fi
-output_final_mp4="${output_filename_stem}_${quality_profile}${time_suffix}.mp4"
+
+output_final_mp4="${output_filename_stem}_${output_quality_label}${time_suffix}.mp4"
 
 msg "Processing video to: $output_final_mp4"
-if ! $needs_re_encoding; then
-    cp "$input_file" "$output_final_mp4"
-    msg_ok "File copied without re-encoding."
-elif [[ -n "${ffmpeg_video_params_pass2[*]+x}" ]]; then
-    "${ffmpeg_cmd_base[@]}" "${fast_seek_opts[@]}" -i "$input_file" "${output_trim_opts[@]}" -vf "$ffmpeg_vf" "${ffmpeg_video_params[@]}"
-    "${ffmpeg_cmd_base[@]}" "${fast_seek_opts[@]}" -i "$input_file" "${output_trim_opts[@]}" -vf "$ffmpeg_vf" "${ffmpeg_video_params_pass2[@]}" "${ffmpeg_audio_params[@]}" -movflags +faststart "$output_final_mp4"
-elif [[ "$quality_profile" == "10mb" && $(echo "$source_size_bytes < 10276044" | bc -l) -eq 1 && -n "${output_trim_opts[*]}" ]]; then
-    msg_warn "Source is under 10MB but trimming is requested. Trimming via stream copy..."
-    # Stream copy also benefits from fast seeking.
-    "${ffmpeg_cmd_base[@]}" "${fast_seek_opts[@]}" -i "$input_file" "${output_trim_opts[@]}" -c:v copy -c:a copy -movflags +faststart "$output_final_mp4"
+process_success=false
+
+if [[ -n "${ffmpeg_video_params_pass2[*]+x}" ]]; then
+    # Two-pass encoding
+    "${ffmpeg_cmd_base[@]}" -i "$input_file" "${trim_args[@]}" -vf "$ffmpeg_vf" "${ffmpeg_video_params[@]}"
+    "${ffmpeg_cmd_base[@]}" -i "$input_file" "${trim_args[@]}" -vf "$ffmpeg_vf" "${ffmpeg_video_params_pass2[@]}" "${ffmpeg_audio_params[@]}" -movflags +faststart "$output_final_mp4"
+    if [[ $? -eq 0 ]]; then process_success=true; fi
 else
-    # Standard single-pass CRF encoding.
-    "${ffmpeg_cmd_base[@]}" "${fast_seek_opts[@]}" -i "$input_file" "${output_trim_opts[@]}" -vf "$ffmpeg_vf" "${ffmpeg_video_params[@]}" "${ffmpeg_audio_params[@]}" -movflags +faststart "$output_final_mp4"
+    # Single-pass encoding or stream copy
+    "${ffmpeg_cmd_base[@]}" -i "$input_file" "${trim_args[@]}" $(if [[ -n "$ffmpeg_vf" ]]; then echo "-vf" "$ffmpeg_vf"; fi) "${ffmpeg_video_params[@]}" "${ffmpeg_audio_params[@]}" -movflags +faststart "$output_final_mp4"
+    if [[ $? -eq 0 ]]; then process_success=true; fi
 fi
 
 rm -f ffmpeg2pass-0.log ffmpeg2pass-0.log.mbtree
 
-if [[ $? -eq 0 && -s "$output_final_mp4" ]]; then
+if [[ "$process_success" == true && -s "$output_final_mp4" ]]; then
     final_size_mb=$(printf "%.2f" "$(echo "$(stat -c%s "$output_final_mp4") / 1024 / 1024" | bc -l)")
     msg_ok "Successfully processed video (Size: ${final_size_mb} MB)"
 else
@@ -474,15 +612,16 @@ else
 fi
 
 end_processing_timer=$(date +%s.%N)
+final_output_path="$output_final_mp4"
+fi  # End of SKIP_PROCESSING check
 
 # ---------------[ FINAL SUMMARY & RENAME ]---------------
 
 end_total_timer=$(date +%s.%N)
 msg_ok "Script finished."
 
-final_output_path="$output_final_mp4"
-if [[ -n "$youtube_title" && "$auto_rename_flag" == true ]]; then
-    normalized_title=$(normalize_filename "$youtube_title")
+if [[ -n "$fetched_title" && "$auto_rename_flag" == true ]]; then
+    normalized_title=$(normalize_filename "$fetched_title")
     proposed_new_name="${outdir}/${normalized_title}${time_suffix}.mp4"
 
     if [[ -n "$normalized_title" && "$proposed_new_name" != "$final_output_path" ]]; then
@@ -513,11 +652,11 @@ printf "Total Script Time: %.2f seconds\n" "$(echo "$end_total_timer - $start_to
 echo "-------------------------------------"
 echo
 echo "-------------------------------------"
-echo "                 Summary"
+echo "                    Summary"
 echo "-------------------------------------"
 echo -e "Input Source:  ${COLOR_YELLOW}$source_input${COLOR_RESET}"
-if [[ "$is_youtube_input" == true ]]; then
-    echo -e "               YouTube Video (Length: $youtube_duration)"
+if [[ "$is_web_source" == true ]]; then
+    echo -e "               Web Resource (Length: $fetched_duration)"
 else
     echo -e "               $(get_file_summary "$source_input")"
 fi

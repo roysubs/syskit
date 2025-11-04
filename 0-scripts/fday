@@ -1,12 +1,19 @@
 #!/bin/bash
 # Author: Roy Wiseman 2025-01
 
+# ANSI color codes
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+BOLD='\033[1m'
+
 # Show usage if -h is passed
 if [[ "$1" == "-h" ]]; then
-    echo "Usage: $(basename "$0") [days] [directory] [-s] [-h]"
-    echo "  days:       (optional) Number of days to look back (default: 1, today)."
-    echo "  directory:  (optional) Target directory (default: current directory)."
-    echo "  -s          (optional) Use sudo for find command."
+    echo "Usage: $(basename "$0") [days] [directory] [-s] [--exclude pattern] [-h]"
+    echo "  days:       Number of days to look back (default: 1, today)."
+    echo "  directory:  Target directory (default: current directory)."
+    echo "  -sudo | -s  Use sudo for find command."
+    echo "  --exclude | -e   Exclude paths matching pattern (can be used multiple times)."
+    echo "      Example: --exclude .git --exclude '*.tmp'"
     echo "  -h          Show this help."
     echo "Note: days/directory can be in any order and will be determined dynamically."
     exit 0
@@ -16,11 +23,7 @@ fi
 days=1
 dir="."
 use_sudo=""
-
-# Check for -s flag
-if [[ "$1" == "-s" || "$2" == "-s" || "$3" == "-s" ]]; then
-    use_sudo="sudo"
-fi
+excludes=()
 
 # Function to check if a value is a positive integer
 is_number() {
@@ -28,23 +31,51 @@ is_number() {
 }
 
 # Parse arguments dynamically
-for arg in "$@"; do
-    if is_number "$arg"; then
-        days="$arg"
-    elif [[ -d "$arg" ]]; then
-        dir="$arg"
-    fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --sudo|-s)
+            use_sudo="sudo"
+            shift
+            ;;
+        --exclude|-e)
+            if [[ -n "$2" && "$2" != -* ]]; then
+                excludes+=("$2")
+                shift 2
+            else
+                echo "Error: --exclude requires a pattern argument"
+                exit 1
+            fi
+            ;;
+        *)
+            if is_number "$1"; then
+                days="$1"
+            elif [[ -d "$1" ]]; then
+                dir="$1"
+            fi
+            shift
+            ;;
+    esac
 done
 
 # Convert days to find format (-mtime uses whole days, negative includes today)
 mtime=$((days - 1))
 start_time=$(date +%s)
 
-# Define the find command
-find_cmd="$use_sudo find \"$dir\" -xdev -type f -mtime -$days -printf '%T@ %p\n' | sort -n"
+# Build exclude conditions for find
+exclude_args=""
+exclude_display=""
+for exclude in "${excludes[@]}"; do
+    exclude_args="$exclude_args -not -path '*/$exclude/*' -not -path '*/$exclude'"
+    exclude_display="$exclude_display -not -path '*/$exclude/*' -not -path '*/$exclude'"
+done
 
-# Display the command before execution
-echo "Executing: $find_cmd | awk '{ timestamp = \$1; \$1 = \"\"; print strftime(\"%Y-%m-%d %H:%M:%S\", timestamp), substr(\$0,2) }'"
+# Define the find command
+find_cmd="$use_sudo find \"$dir\" -xdev -type f $exclude_args -mtime -$days -printf '%T@ %p\n' | sort -n"
+full_cmd="$use_sudo find \"$dir\" -xdev -type f$exclude_display -mtime -$days -printf '%T@ %p\\n' | sort -n | awk '{ timestamp = \$1; \$1 = \"\"; print strftime(\"%Y-%m-%d %H:%M:%S\", timestamp), substr(\$0,2) }'"
+
+# Display the command with formatting like f does
+printf "${BOLD}#${NC} ${GREEN}%s${NC}\n" "$full_cmd"
+
 echo
 
 # Execute the command and capture output
@@ -68,4 +99,3 @@ echo -e "\nFound $file_count files modified since $cutoff_date"
 end_time=$(date +%s)
 elapsed=$((end_time - start_time))
 echo "Execution time: ${elapsed} seconds"
-

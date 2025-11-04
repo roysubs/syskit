@@ -1,28 +1,90 @@
 #!/bin/bash
 # Author: Roy Wiseman 2025-01
 
+# ANSI color codes
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+WHITE='\033[1;37m'
+BOLD='\033[1m'
+
 # Check if first argument is exactly "-h", even if quoted
 if [[ "$1" == "-h" ]]; then
-    echo "Usage: $(basename $0) [directory] [number]" 
-    echo "  directory: (optional) Target directory to analyze. Defaults to current directory."
-    echo "  number:    (optional) Number of results to display. Defaults to 20."
+    echo "Usage: $(basename $0) [directory] [number] [--exclude pattern] [-h]"
+    echo "  directory:  Target directory to analyze (default: current directory)."
+    echo "  number:     Number of results to display (default: 20)."
+    echo "  --exclude | -e   Exclude paths matching pattern (can be used multiple times)."
+    echo "      Example: --exclude .git --exclude node_modules"
+    echo "  -h          Show this help."
+    echo "Note: directory/number can be in any order and will be determined dynamically."
     exit 0
 fi
-title="Find biggest files ($(basename $0) -h for options):"
 
-# Set directory and number of results
-dir="${1:-.}"
-num="${2:-20}"
+# Default values
+dir="."
+num=20
+excludes=()
+
+# Function to check if a value is a positive integer
+is_number() {
+    [[ "$1" =~ ^[0-9]+$ ]]
+}
+
+# Parse arguments dynamically
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --exclude|-e)
+            if [[ -n "$2" && "$2" != -* ]]; then
+                excludes+=("$2")
+                shift 2
+            else
+                echo "Error: --exclude requires a pattern argument"
+                exit 1
+            fi
+            ;;
+        *)
+            if is_number "$1"; then
+                num="$1"
+            elif [[ -d "$1" ]]; then
+                dir="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+title="Find biggest files ($(basename $0) -h for options):"
 
 # Start timer
 start_time=$(date +%s)
 
-# Construct and display command
-cmd="sudo du -ahx \"$dir\" | sort -rh | head -\"$num\""
-echo $title
-echo $cmd
+# Build exclude conditions for du (using grep -v to filter out)
+exclude_grep=""
+exclude_display=""
+if [[ ${#excludes[@]} -gt 0 ]]; then
+    for exclude in "${excludes[@]}"; do
+        if [[ -z "$exclude_grep" ]]; then
+            exclude_grep="grep -v '/$exclude/\\|/$exclude\$'"
+            exclude_display=" | grep -v '/$exclude/\\|/$exclude\$'"
+        else
+            exclude_grep="$exclude_grep | grep -v '/$exclude/\\|/$exclude\$'"
+            exclude_display="$exclude_display | grep -v '/$exclude/\\|/$exclude\$'"
+        fi
+    done
+fi
+
+# Construct command
+if [[ -n "$exclude_grep" ]]; then
+    cmd="sudo du -ahx \"$dir\" | $exclude_grep | sort -rh | head -\"$num\""
+    display_cmd="sudo du -ahx \"$dir\"$exclude_display | sort -rh | head -\"$num\""
+else
+    cmd="sudo du -ahx \"$dir\" | sort -rh | head -\"$num\""
+    display_cmd="$cmd"
+fi
+
+# Display title and command with formatting
+echo "$title"
+printf "${BOLD}#${NC} ${GREEN}%s${NC}\n" "$display_cmd"
 echo
-# echo -e "\033[0;32m$cmd\033[0m"
 
 # Execute command
 eval "$cmd"
@@ -33,4 +95,3 @@ elapsed=$((end_time - start_time))
 
 # Display execution time
 echo -e "\nExecution time: ${elapsed} seconds"
-
