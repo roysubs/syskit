@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Author: Roy Wiseman 2025-01
-# Modified by Gemini @ Google 2025-09-15 (v16)
 # Enhanced with PowerShell improvements 2025-11-03 (v17)
 
 # This script is a universal video processing tool for YouTube, X, TikTok, Instagram, Facebook, NPO, and local files.
