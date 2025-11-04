@@ -1,5 +1,7 @@
 #!/bin/bash
 # Author: Roy Wiseman 2025-01
+# Enhanced to filter out parent directories when their children are shown
+# Added -f and -d switches to show only files or directories
 
 # ANSI color codes
 GREEN='\033[0;32m'
@@ -9,13 +11,22 @@ BOLD='\033[1m'
 
 # Check if first argument is exactly "-h", even if quoted
 if [[ "$1" == "-h" ]]; then
-    echo "Usage: $(basename $0) [directory] [number] [--exclude pattern] [-h]"
-    echo "  directory:  Target directory to analyze (default: current directory)."
-    echo "  number:     Number of results to display (default: 20)."
-    echo "  --exclude | -e   Exclude paths matching pattern (can be used multiple times)."
-    echo "      Example: --exclude .git --exclude node_modules"
-    echo "  -h          Show this help."
+    echo "Usage: $(basename $0) [directory] [number] [options]"
+    echo "  directory:       Target directory to analyze (default: current directory)."
+    echo "  number:          Number of results to display (default: 20)."
+    echo ""
+    echo "Options:"
+    echo "  -f, --files      Show only files, no directories"
+    echo "  -d, --dirs       Show only directories, no files"
+    echo "  -e, --exclude    Exclude paths matching pattern (can be used multiple times)"
+    echo "                   Example: --exclude .git --exclude node_modules"
+    echo "  -h               Show this help"
+    echo ""
     echo "Note: directory/number can be in any order and will be determined dynamically."
+    echo "Examples:"
+    echo "  $(basename $0) 30 ~           # Find 30 biggest items in home directory"
+    echo "  $(basename $0) -f /var        # Find biggest files only in /var"
+    echo "  $(basename $0) -d 15          # Find 15 biggest directories in current dir"
     exit 0
 fi
 
@@ -23,6 +34,8 @@ fi
 dir="."
 num=20
 excludes=()
+files_only=false
+dirs_only=false
 
 # Function to check if a value is a positive integer
 is_number() {
@@ -41,6 +54,14 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             ;;
+        --files|-f)
+            files_only=true
+            shift
+            ;;
+        --dirs|-d)
+            dirs_only=true
+            shift
+            ;;
         *)
             if is_number "$1"; then
                 num="$1"
@@ -51,6 +72,12 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Check for conflicting flags
+if [[ "$files_only" == true && "$dirs_only" == true ]]; then
+    echo "Error: Cannot use both -f/--files and -d/--dirs at the same time"
+    exit 1
+fi
 
 # Start timer
 start_time=$(date +%s)
@@ -70,17 +97,116 @@ if [[ ${#excludes[@]} -gt 0 ]]; then
     done
 fi
 
-# Construct command
-if [[ -n "$exclude_grep" ]]; then
-    cmd="sudo du -ahx \"$dir\" | $exclude_grep | sort -rh | head -\"$num\""
-    display_cmd="sudo du -ahx \"$dir\"$exclude_display | sort -rh | head -\"$num\""
-else
-    cmd="sudo du -ahx \"$dir\" | sort -rh | head -\"$num\""
-    display_cmd="$cmd"
+# Add type filtering based on flags
+type_filter=""
+type_display=""
+if [[ "$files_only" == true ]]; then
+    # For files only, we need to check that it's not a directory
+    # du -a shows all files and directories, so we filter after
+    type_filter="while read size path; do if [[ -f \"\$path\" ]]; then echo \"\$size\t\$path\"; fi; done |"
+    type_display=" (files only)"
+elif [[ "$dirs_only" == true ]]; then
+    # For dirs only, we can use du without -a (shows only directories)
+    # We'll adjust the du command itself
+    type_display=" (directories only)"
 fi
 
-# Execute command
-eval "$cmd"
+# Construct and execute command with appropriate filtering
+# Determine du flags based on mode
+if [[ "$dirs_only" == true ]]; then
+    du_flags="hx"  # No -a flag means directories only
+else
+    du_flags="ahx"  # -a flag includes files
+fi
+
+if [[ -n "$exclude_grep" ]]; then
+    # With exclusions
+    if [[ "$files_only" == true ]]; then
+        # Files only mode with exclusions
+        eval "sudo du -ahx \"$dir\" | $exclude_grep" | while read size path; do 
+            if [[ -f "$path" ]]; then 
+                echo -e "$size\t$path"
+            fi
+        done | sort -rh | awk '
+        BEGIN {
+            count = 0
+            max = '"$num"'
+        }
+        {
+            if (count >= max) exit
+            print
+            count++
+        }'
+    else
+        # Default or dirs-only mode with exclusions
+        eval "sudo du -$du_flags \"$dir\" | $exclude_grep | sort -rh" | awk '
+        BEGIN {
+            count = 0
+            max = '"$num"'
+        }
+        {
+            if (count >= max) exit
+            
+            current = $2
+            skip = 0
+            
+            # Check if current path is a parent of any already seen path
+            for (path in seen) {
+                if (index(path, current "/") == 1) {
+                    skip = 1
+                    break
+                }
+            }
+            
+            # Only print and record if not a parent
+            if (!skip) {
+                print
+                seen[current] = 1
+                count++
+            }
+        }'
+    fi
+    display_cmd="sudo du -$du_flags \"$dir\"$exclude_display | sort -rh | head -\"$num\"$type_display"
+else
+    # Without exclusions
+    if [[ "$files_only" == true ]]; then
+        # Files only mode without exclusions
+        sudo du -ahx "$dir" | while read size path; do 
+            if [[ -f "$path" ]]; then 
+                echo -e "$size\t$path"
+            fi
+        done | sort -rh | head -"$num"
+    else
+        # Default or dirs-only mode without exclusions
+        sudo du -$du_flags "$dir" | sort -rh | awk '
+        BEGIN {
+            count = 0
+            max = '"$num"'
+        }
+        {
+            if (count >= max) exit
+            
+            current = $2
+            skip = 0
+            
+            # Check if current path is a parent of any already seen path
+            for (path in seen) {
+                if (index(path, current "/") == 1) {
+                    skip = 1
+                    break
+                }
+            }
+            
+            # Only print and record if not a parent
+            if (!skip) {
+                print
+                seen[current] = 1
+                count++
+            }
+        }'
+    fi
+    display_cmd="sudo du -$du_flags \"$dir\" | sort -rh | head -\"$num\"$type_display"
+fi
 
 # End timer and calculate duration
 end_time=$(date +%s)
@@ -88,7 +214,8 @@ elapsed=$((end_time - start_time))
 
 # Display execution time
 echo
-title="Find biggest files ($(basename $0) -h for options):"
+title="Find biggest files or directories ($(basename $0) -h for options)"
 echo "$title"
 printf "${BOLD}#${NC} ${GREEN}%s${NC}\n" "$display_cmd"
 echo -e "Execution time: ${elapsed} seconds"
+
