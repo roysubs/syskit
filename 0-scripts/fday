@@ -73,11 +73,6 @@ done
 find_cmd="$use_sudo find \"$dir\" -xdev -type f $exclude_args -mtime -$days -printf '%T@ %p\n' | sort -n"
 full_cmd="$use_sudo find \"$dir\" -xdev -type f$exclude_display -mtime -$days -printf '%T@ %p\\n' | sort -n | awk '{ timestamp = \$1; \$1 = \"\"; print strftime(\"%Y-%m-%d %H:%M:%S\", timestamp), substr(\$0,2) }'"
 
-# Display the command with formatting like f does
-printf "${BOLD}#${NC}${GREEN}%s${NC}\n" "$full_cmd"
-
-echo
-
 # Execute the command and capture output
 output=$(eval "$find_cmd" | awk '{
     timestamp = $1;
@@ -95,7 +90,8 @@ cutoff_date=$(date -d "$days days ago" "+%Y-%m-%d 00:00:00")
 echo "$output"
 
 # Display summary
-echo -e "\nFound $file_count files modified since $cutoff_date"
+printf "\n${BOLD}#${NC}${GREEN}%s${NC}\n" "$full_cmd"
+echo -e "Found $file_count files modified since $cutoff_date"
 end_time=$(date +%s)
 elapsed=$((end_time - start_time))
 echo "Execution time: ${elapsed} seconds"
