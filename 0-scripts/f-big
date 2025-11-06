@@ -1,10 +1,10 @@
 #!/bin/bash
 # Author: Roy Wiseman 2025-01
 # Enhanced to filter out parent directories when their children are shown
-# Added -f and -d switches to show only files or directories
 
 # ANSI color codes
 GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 WHITE='\033[1;37m'
 BOLD='\033[1m'
@@ -18,15 +18,17 @@ if [[ "$1" == "-h" ]]; then
     echo "Options:"
     echo "  -f, --files      Show only files, no directories"
     echo "  -d, --dirs       Show only directories, no files"
+    echo "  -q, --quiet      Suppress summary output (for piping)"
     echo "  -e, --exclude    Exclude paths matching pattern (can be used multiple times)"
     echo "                   Example: --exclude .git --exclude node_modules"
-    echo "  -h               Show this help"
+    echo "  -h,              Show this help"
     echo ""
     echo "Note: directory/number can be in any order and will be determined dynamically."
     echo "Examples:"
     echo "  $(basename $0) 30 ~           # Find 30 biggest items in home directory"
     echo "  $(basename $0) -f /var        # Find biggest files only in /var"
     echo "  $(basename $0) -d 15          # Find 15 biggest directories in current dir"
+    echo "  $(basename $0) -q | head -5   # Get top 5 results without summary"
     exit 0
 fi
 
@@ -36,6 +38,8 @@ num=20
 excludes=()
 files_only=false
 dirs_only=false
+quiet_mode=false
+actual_count=0
 
 # Function to check if a value is a positive integer
 is_number() {
@@ -62,6 +66,10 @@ while [[ $# -gt 0 ]]; do
             dirs_only=true
             shift
             ;;
+        --quiet|-q)
+            quiet_mode=true
+            shift
+            ;;
         *)
             if is_number "$1"; then
                 num="$1"
@@ -80,7 +88,7 @@ if [[ "$files_only" == true && "$dirs_only" == true ]]; then
 fi
 
 # Start timer
-start_time=$(date +%s)
+start_time=$(date +%s.%N)
 
 # Build exclude conditions for du (using grep -v to filter out)
 exclude_grep=""
@@ -119,6 +127,9 @@ else
     du_flags="ahx"  # -a flag includes files
 fi
 
+# Create temp file to store results so we can count them
+temp_results=$(mktemp)
+
 if [[ -n "$exclude_grep" ]]; then
     # With exclusions
     if [[ "$files_only" == true ]]; then
@@ -127,16 +138,7 @@ if [[ -n "$exclude_grep" ]]; then
             if [[ -f "$path" ]]; then 
                 echo -e "$size\t$path"
             fi
-        done | sort -rh | awk '
-        BEGIN {
-            count = 0
-            max = '"$num"'
-        }
-        {
-            if (count >= max) exit
-            print
-            count++
-        }'
+        done | sort -rh | head -"$num" > "$temp_results"
     else
         # Default or dirs-only mode with exclusions
         eval "sudo du -$du_flags \"$dir\" | $exclude_grep | sort -rh" | awk '
@@ -164,7 +166,7 @@ if [[ -n "$exclude_grep" ]]; then
                 seen[current] = 1
                 count++
             }
-        }'
+        }' > "$temp_results"
     fi
     display_cmd="sudo du -$du_flags \"$dir\"$exclude_display | sort -rh | head -\"$num\"$type_display"
 else
@@ -175,7 +177,7 @@ else
             if [[ -f "$path" ]]; then 
                 echo -e "$size\t$path"
             fi
-        done | sort -rh | head -"$num"
+        done | sort -rh | head -"$num" > "$temp_results"
     else
         # Default or dirs-only mode without exclusions
         sudo du -$du_flags "$dir" | sort -rh | awk '
@@ -203,19 +205,29 @@ else
                 seen[current] = 1
                 count++
             }
-        }'
+        }' > "$temp_results"
     fi
     display_cmd="sudo du -$du_flags \"$dir\" | sort -rh | head -\"$num\"$type_display"
 fi
 
-# End timer and calculate duration
-end_time=$(date +%s)
-elapsed=$((end_time - start_time))
+# Display the results and count them
+cat "$temp_results"
+actual_count=$(wc -l < "$temp_results")
+rm -f "$temp_results"
 
-# Display execution time
-echo
-title="Find biggest files or directories ($(basename $0) -h for options)"
-echo "$title"
-printf "${BOLD}#${NC} ${GREEN}%s${NC}\n" "$display_cmd"
-echo -e "Execution time: ${elapsed} seconds"
+# End timer and calculate duration with decimal precision
+end_time=$(date +%s.%N)
+elapsed=$(echo "$end_time - $start_time" | bc)
+# Format to 2 decimal places
+elapsed_formatted=$(printf "%.2f" $elapsed)
+
+# Display execution summary only if not in quiet mode
+if [[ "$quiet_mode" != true ]]; then
+    echo
+    title="Find biggest files ($(basename $0) -h for options):"
+    echo "$title"
+    printf "${BOLD}#${NC} ${GREEN}%s${NC}\n" "$display_cmd"
+    echo -e "Execution time: ${YELLOW}${elapsed_formatted}${NC} seconds"
+    echo -e "Objects found: ${YELLOW}${actual_count}${NC}"
+fi
 

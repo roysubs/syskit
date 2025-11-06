@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# Check if at least one argument (the video file) is provided
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <video_file.mp4> [hostname-or-ip]"
+    exit 1
+fi
+
+VIDEO_FILE="$1"
+REMOTE_HOST="$2"
+
+# Check if the video file exists
+if [ ! -f "$VIDEO_FILE" ]; then
+    echo "Error: Video file '$VIDEO_FILE' not found!"
+    exit 1
+fi
+
+# If no host specified, try to get the SSH client's IP
+if [ -z "$REMOTE_HOST" ]; then
+    # Get the SSH client IP from SSH_CLIENT environment variable
+    if [ -n "$SSH_CLIENT" ]; then
+        # SSH_CLIENT format: "client_ip client_port server_port"
+        REMOTE_HOST=$(echo $SSH_CLIENT | awk '{print $1}')
+        echo "No host specified. Using SSH client IP: $REMOTE_HOST"
+    else
+        echo "Error: No host specified and unable to detect SSH client IP."
+        echo "Please specify a hostname or IP address."
+        exit 1
+    fi
+fi
+
+# Get the absolute path of the video file
+VIDEO_PATH=$(realpath "$VIDEO_FILE")
+VIDEO_NAME=$(basename "$VIDEO_FILE")
+
+echo "Preparing to play: $VIDEO_NAME"
+echo "On remote host: $REMOTE_HOST"
+
+# Method 1: Try using X11 forwarding to play with a GUI player
+# This assumes the remote host has X11 and a video player installed
+echo "Attempting to play via X11 forwarding..."
+
+# First, try to set DISPLAY for X11 forwarding
+export DISPLAY="$REMOTE_HOST:0.0"
+
+# Check if we can use SSH with X11 forwarding back to the client
+if command -v mpv >/dev/null 2>&1; then
+    echo "Trying with mpv player..."
+    ssh -X "$REMOTE_HOST" "DISPLAY=:0.0 mpv --fs '$VIDEO_PATH'" 2>/dev/null && exit 0
+elif command -v vlc >/dev/null 2>&1; then
+    echo "Trying with VLC player..."
+    ssh -X "$REMOTE_HOST" "DISPLAY=:0.0 vlc --fullscreen '$VIDEO_PATH'" 2>/dev/null && exit 0
+elif command -v mplayer >/dev/null 2>&1; then
+    echo "Trying with mplayer..."
+    ssh -X "$REMOTE_HOST" "DISPLAY=:0.0 mplayer -fs '$VIDEO_PATH'" 2>/dev/null && exit 0
+fi
+
+# Method 2: Stream the video over network using netcat and pipe to player
+echo "X11 method failed. Trying streaming method..."
+echo "This will stream the video to the remote host's player."
+
+# Check if netcat is available
+if ! command -v nc >/dev/null 2>&1; then
+    echo "Error: netcat (nc) is required for streaming but not found."
+    echo "Install it with: sudo apt-get install netcat (on Debian/Ubuntu)"
+    exit 1
+fi
+
+# Generate a random port between 5000-5999
+PORT=$((5000 + RANDOM % 1000))
+
+echo "Starting stream on port $PORT..."
+echo "On the remote host, the video should start playing automatically."
+
+# Start streaming the file in background
+cat "$VIDEO_FILE" | nc -l -p $PORT &
+NC_PID=$!
+
+# Give netcat a moment to start
+sleep 1
+
+# SSH to remote host and play the stream
+ssh "$REMOTE_HOST" "
+    if command -v mpv >/dev/null 2>&1; then
+        echo 'Playing with mpv...'
+        mpv tcp://${HOSTNAME}:${PORT} --cache=yes
+    elif command -v vlc >/dev/null 2>&1; then
+        echo 'Playing with VLC...'
+        vlc tcp://${HOSTNAME}:${PORT}
+    elif command -v mplayer >/dev/null 2>&1; then
+        echo 'Playing with mplayer...'
+        mplayer -cache 8192 tcp://${HOSTNAME}:${PORT}
+    else
+        echo 'Error: No supported video player (mpv, vlc, mplayer) found on remote host.'
+        exit 1
+    fi
+"
+
+# Kill the netcat process when done
+kill $NC_PID 2>/dev/null
+
+echo "Playback completed or interrupted."

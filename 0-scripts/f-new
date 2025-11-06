@@ -1,36 +1,37 @@
 #!/usr/bin/env bash
 # Author: Roy Wiseman 2025-01
-# Updated: 2025-11-04 - Enhanced with fday display features
+# Updated: 2025-11-05 - Enhanced with fbig-style features and consistent formatting
 
 # ANSI color codes
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'  # Bright yellow
+YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
+WHITE='\033[1;37m'
 BOLD='\033[1m'
 
 # --- Help Function ---
 show_help() {
 cat << EOF
-Lists the N newest files in a specified directory.
+Usage: $(basename "$0") [directory] [number] [options]
+  directory:       Target directory to search (default: current directory).
+  number:          Number of newest files to list (default: 10).
 
-Usage: $(basename "$0") [directory] [number_of_files] [-s] [--exclude pattern] [-h]
-       
-Arguments:
-  directory:        Target directory to search (default: current directory).
-  number_of_files:  Number of newest files to list (default: 10).
-  -sudo | -s        Use sudo for find command.
-  --exclude | -e    Exclude paths matching pattern (can be used multiple times).
-                    Example: --exclude .git --exclude '*.tmp'
-  -h | --help       Show this help.
+Options:
+  -f, --files      Show only files, no directories
+  -d, --dirs       Show only directories, no files
+  -q, --quiet      Suppress summary output (for piping)
+  -s, --sudo       Use sudo for find command
+  -e, --exclude    Exclude paths matching pattern (can be used multiple times)
+                   Example: --exclude .git --exclude node_modules
+  -h, --help       Show this help
 
 Note: directory/number can be in any order and will be determined dynamically.
-
 Examples:
-  $(basename "$0") /var/log 5
-  $(basename "$0") . 20
-  $(basename "$0") /root 50 -s
-  $(basename "$0") /home 15 --exclude .git --exclude node_modules
-  $(basename "$0") -h
+  $(basename "$0") /var/log 5        # Find 5 newest items in /var/log
+  $(basename "$0") -f 20             # Find 20 newest files in current dir
+  $(basename "$0") -d /home          # Find newest directories in /home
+  $(basename "$0") -q | head -5      # Get top 5 results without summary
+  $(basename "$0") /root 50 -s       # Find 50 newest items in /root with sudo
 EOF
 }
 
@@ -39,6 +40,9 @@ dir="."
 num=10
 use_sudo=""
 excludes=()
+files_only=false
+dirs_only=false
+quiet_mode=false
 
 # Function to check if a value is a positive integer
 is_number() {
@@ -54,6 +58,18 @@ while [[ $# -gt 0 ]]; do
             ;;
         --sudo|-s)
             use_sudo="sudo"
+            shift
+            ;;
+        --files|-f)
+            files_only=true
+            shift
+            ;;
+        --dirs|-d)
+            dirs_only=true
+            shift
+            ;;
+        --quiet|-q)
+            quiet_mode=true
             shift
             ;;
         --exclude|-e)
@@ -80,6 +96,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Check for conflicting flags
+if [[ "$files_only" == true && "$dirs_only" == true ]]; then
+    echo "Error: Cannot use both -f/--files and -d/--dirs at the same time"
+    exit 1
+fi
+
 # --- Basic Input Validation ---
 if [[ ! -d "$dir" ]]; then
     echo "Error: Directory '$dir' not found." >&2
@@ -101,6 +123,21 @@ for exclude in "${excludes[@]}"; do
     exclude_display="$exclude_display -not -path '*/$exclude/*' -not -path '*/$exclude'"
 done
 
+# Determine type flag for find command
+type_flag=""
+type_display=""
+if [[ "$files_only" == true ]]; then
+    type_flag="-type f"
+    type_display=" (files only)"
+elif [[ "$dirs_only" == true ]]; then
+    type_flag="-type d"
+    type_display=" (directories only)"
+else
+    # Default: show both files and directories
+    type_flag=""
+    type_display=""
+fi
+
 # --- Main execution ---
 
 # Start timer (GNU date for %N nanoseconds)
@@ -111,10 +148,9 @@ start_time=$(date +%s.%N)
 find_output_format="%T@ %p\\n"
 
 # Prepare the find command
-find_cmd="$use_sudo find \"$dir\" -xdev -type f$exclude_args -printf '$find_output_format'"
+find_cmd="$use_sudo find \"$dir\" -xdev $type_flag$exclude_args -printf '$find_output_format'"
 
 # AWK script to format the timestamp using gawk's built-in 'strftime' function
-# Note: The summary display shows '{format timestamps}' for brevity, but this is the actual script:
 awk_formatter_script='
 {
     timestamp_full = $1;  # First field is the timestamp (e.g., 1609459200.123456)
@@ -135,7 +171,7 @@ awk_formatter_script='
 '
 
 # Build full display command for summary (simplified for readability)
-full_cmd="$use_sudo find \"$dir\" -xdev -type f$exclude_display -printf '%T@ %p\\n' | sort -rnk1,1 | head -n $num | gawk '{see fnew awk_formatter_script}'"
+full_cmd="$use_sudo find \"$dir\" -xdev $type_flag$exclude_display -printf '%T@ %p\\n' | sort -rnk1,1 | head -n $num | gawk '{awk_formatter_script}'"
 
 # Execute the command pipeline
 set -o pipefail # Exit immediately if a command in the pipeline fails
@@ -144,9 +180,9 @@ pipeline_exit_status=0
 
 # Execute the full pipeline
 pipeline_output=$(eval "$find_cmd" | \
-                    sort -rnk1,1 | \
-                    head -n "$num" | \
-                    gawk "$awk_formatter_script")
+    sort -rnk1,1 | \
+    head -n "$num" | \
+    gawk "$awk_formatter_script")
 pipeline_exit_status=$?
 
 set +o pipefail # Reset pipefail option
@@ -165,27 +201,29 @@ fi
 
 # Check if the pipeline encountered an issue
 if [[ $pipeline_exit_status -ne 0 ]]; then
-    echo # Ensure newline if error message comes after output
-    # Status 141 is common if head closes the pipe, often not a critical error if output is present
-    if [[ $pipeline_exit_status -eq 141 && -n "$pipeline_output" ]]; then
-        # Don't show this info message in normal operation, keep it clean
-        :
-    else
-        echo "Warning: The command pipeline exited with status ${pipeline_exit_status}." >&2
-        echo "         This might indicate an issue. Check for errors from 'find', 'sort', 'head' or 'gawk'." >&2
+    if [[ "$quiet_mode" != true ]]; then
+        # Status 141 is common if head closes the pipe, often not a critical error if output is present
+        if [[ $pipeline_exit_status -eq 141 && -n "$pipeline_output" ]]; then
+            # Don't show this info message in normal operation, keep it clean
+            :
+        else
+            echo "Warning: The command pipeline exited with status ${pipeline_exit_status}." >&2
+            echo "         This might indicate an issue. Check for errors from 'find', 'sort', 'head' or 'gawk'." >&2
+        fi
     fi
 fi
 
-# End timer and calculate duration
+# End timer and calculate duration with decimal precision
 end_time=$(date +%s.%N)
-# LC_NUMERIC=C ensures dot as decimal separator for bc
-elapsed_time=$(LC_NUMERIC=C printf "%.3f" "$(echo "$end_time - $start_time" | bc -l)")
+elapsed=$(echo "$end_time - $start_time" | bc)
+elapsed_formatted=$(printf "%.2f" $elapsed)
 
-# Display summary in green with bold command
-printf "${BOLD}#${NC}${GREEN}%s${NC}\n" "$full_cmd"
-echo -e "Found ${YELLOW}${file_count}${NC} newest files in '${dir}'"
-if [[ ${#excludes[@]} -gt 0 ]]; then
-    echo -e "Excluded patterns: ${GREEN}${excludes[*]}${NC}"
+# Display summary only if not in quiet mode
+if [[ "$quiet_mode" != true ]]; then
+    echo  # Always add exactly one blank line before summary
+    echo "Find newest files ($(basename $0) -h for options)"
+    printf "${BOLD}#${NC}${GREEN}%s${NC}\n" "$full_cmd"
+    echo -e "Execution time: ${YELLOW}${elapsed_formatted}${NC} seconds"
+    echo -e "Files found: ${YELLOW}${file_count}${NC}$type_display"
 fi
-echo -e "Execution time: ${YELLOW}${elapsed_time}${NC} seconds"
 

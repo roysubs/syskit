@@ -1,0 +1,232 @@
+#!/usr/bin/env bash
+# Author: Roy Wiseman 2025-01
+# Updated: 2025-11-06 - Enhanced with fnew-style features and consistent formatting
+
+# ANSI color codes
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No Color
+WHITE='\033[1;37m'
+BOLD='\033[1m'
+
+# --- Help Function ---
+show_help() {
+cat << EOF
+Usage: $(basename "$0") [days] [directory] [options]
+  days:            Number of days to look back (default: 1, today).
+  directory:       Target directory to search (default: current directory).
+
+Options:
+  -f, --files      Show only files, no directories
+  -d, --dirs       Show only directories, no files
+  -q, --quiet      Suppress summary output (for piping)
+  -s, --sudo       Use sudo for find command
+  -e, --exclude    Exclude paths matching pattern (can be used multiple times)
+                   Example: --exclude .git --exclude node_modules
+  -h, --help       Show this help
+
+Note: days/directory can be in any order and will be determined dynamically.
+Examples:
+  $(basename "$0") 7 /var/log        # Find items modified in last 7 days in /var/log
+  $(basename "$0") -f 3              # Find files modified in last 3 days in current dir
+  $(basename "$0") -d /home 14       # Find directories modified in last 14 days in /home
+  $(basename "$0") -q 2 | head -10   # Get top 10 results from last 2 days without summary
+  $(basename "$0") /root 30 -s       # Find items modified in last 30 days in /root with sudo
+EOF
+}
+
+# --- Default values ---
+days=1
+dir="."
+use_sudo=""
+excludes=()
+files_only=false
+dirs_only=false
+quiet_mode=false
+
+# Function to check if a value is a positive integer
+is_number() {
+    [[ "$1" =~ ^[0-9]+$ ]]
+}
+
+# --- Argument Parsing ---
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        --sudo|-s)
+            use_sudo="sudo"
+            shift
+            ;;
+        --files|-f)
+            files_only=true
+            shift
+            ;;
+        --dirs|-d)
+            dirs_only=true
+            shift
+            ;;
+        --quiet|-q)
+            quiet_mode=true
+            shift
+            ;;
+        --exclude|-e)
+            if [[ -n "$2" && "$2" != -* ]]; then
+                excludes+=("$2")
+                shift 2
+            else
+                echo "Error: --exclude requires a pattern argument"
+                exit 1
+            fi
+            ;;
+        *)
+            if is_number "$1"; then
+                days="$1"
+            elif [[ -d "$1" ]]; then
+                dir="$1"
+            elif [[ "$1" != -* ]]; then
+                # Try to interpret as directory even if it doesn't exist yet
+                # This allows error message to be more specific
+                dir="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Check for conflicting flags
+if [[ "$files_only" == true && "$dirs_only" == true ]]; then
+    echo "Error: Cannot use both -f/--files and -d/--dirs at the same time"
+    exit 1
+fi
+
+# --- Basic Input Validation ---
+if [[ ! -d "$dir" ]]; then
+    echo "Error: Directory '$dir' not found." >&2
+    echo "Use $(basename "$0") -h or --help for usage instructions." >&2
+    exit 1
+fi
+
+if ! [[ "$days" =~ ^[0-9]+$ && "$days" -gt 0 ]]; then
+    echo "Error: Number of days '$days' must be a positive integer." >&2
+    echo "Use $(basename "$0") -h or --help for usage instructions." >&2
+    exit 1
+fi
+
+# Build exclude conditions for find
+exclude_args=""
+exclude_display=""
+for exclude in "${excludes[@]}"; do
+    exclude_args="$exclude_args -not -path '*/$exclude/*' -not -path '*/$exclude'"
+    exclude_display="$exclude_display -not -path '*/$exclude/*' -not -path '*/$exclude'"
+done
+
+# Determine type flag for find command
+type_flag=""
+type_display=""
+if [[ "$files_only" == true ]]; then
+    type_flag="-type f"
+    type_display=" (files only)"
+elif [[ "$dirs_only" == true ]]; then
+    type_flag="-type d"
+    type_display=" (directories only)"
+else
+    # Default: show both files and directories
+    type_flag=""
+    type_display=""
+fi
+
+# --- Main execution ---
+
+# Start timer (GNU date for %N nanoseconds)
+start_time=$(date +%s.%N)
+
+# Find will output Unix timestamp (seconds since epoch, with fractional part) and path
+# %T@ provides a sortable timestamp. %p is the path.
+find_output_format="%T@ %p\\n"
+
+# Prepare the find command
+find_cmd="$use_sudo find \"$dir\" -xdev $type_flag$exclude_args -mtime -$days -printf '$find_output_format'"
+
+# AWK script to format the timestamp using gawk's built-in 'strftime' function
+awk_formatter_script='
+{
+    timestamp_full = $1;  # First field is the timestamp (e.g., 1609459200.123456)
+
+    # Reconstruct the filepath from the 2nd field to the end
+    filepath = "";
+    for (i = 2; i <= NF; i++) {
+        filepath = filepath (i == 2 ? "" : OFS) $i;
+    }
+
+    # Use gawk strftime for formatting. It needs an integer timestamp.
+    int_timestamp = int(timestamp_full);
+
+    formatted_date = strftime("%Y-%m-%d %H:%M:%S", int_timestamp);
+
+    print formatted_date " " filepath;
+}
+'
+
+# Build full display command for summary (simplified for readability)
+full_cmd="$use_sudo find \"$dir\" -xdev $type_flag$exclude_display -mtime -$days -printf '%T@ %p\\n' | sort -n | gawk '{awk_formatter_script}'"
+
+# Execute the command pipeline
+set -o pipefail # Exit immediately if a command in the pipeline fails
+pipeline_output=""
+pipeline_exit_status=0
+
+# Execute the full pipeline
+pipeline_output=$(eval "$find_cmd" | \
+    sort -n | \
+    gawk "$awk_formatter_script")
+pipeline_exit_status=$?
+
+set +o pipefail # Reset pipefail option
+
+# Print the captured output
+if [[ -n "$pipeline_output" ]]; then
+    echo "$pipeline_output"
+fi
+
+# Count the number of results (handle empty output)
+if [[ -n "$pipeline_output" ]]; then
+    object_count=$(echo "$pipeline_output" | wc -l)
+else
+    object_count=0
+fi
+
+# Check if the pipeline encountered an issue
+if [[ $pipeline_exit_status -ne 0 ]]; then
+    if [[ "$quiet_mode" != true ]]; then
+        # Status 141 is common if head closes the pipe, often not a critical error if output is present
+        if [[ $pipeline_exit_status -eq 141 && -n "$pipeline_output" ]]; then
+            # Don't show this info message in normal operation, keep it clean
+            :
+        else
+            echo "Warning: The command pipeline exited with status ${pipeline_exit_status}." >&2
+            echo "         This might indicate an issue. Check for errors from 'find', 'sort', or 'gawk'." >&2
+        fi
+    fi
+fi
+
+# End timer and calculate duration with decimal precision
+end_time=$(date +%s.%N)
+elapsed=$(echo "$end_time - $start_time" | bc)
+elapsed_formatted=$(printf "%.2f" $elapsed)
+
+# Calculate start time (midnight X days ago) for display
+cutoff_date=$(date -d "$days days ago" "+%Y-%m-%d 00:00:00")
+
+# Display summary only if not in quiet mode
+if [[ "$quiet_mode" != true ]]; then
+    echo  # Always add exactly one blank line before summary
+    echo "Find files by days ($(basename $0) -h for options)"
+    printf "${BOLD}#${NC}${GREEN}%s${NC}\n" "$full_cmd"
+    echo -e "Modified since: ${YELLOW}${cutoff_date}${NC}"
+    echo -e "Execution time: ${YELLOW}${elapsed_formatted}${NC} seconds"
+    echo -e "Objects found: ${YELLOW}${object_count}${NC}$type_display"
+fi
+
