@@ -206,6 +206,10 @@ if [[ $pipeline_exit_status -ne 0 ]]; then
         if [[ $pipeline_exit_status -eq 141 && -n "$pipeline_output" ]]; then
             # Don't show this info message in normal operation, keep it clean
             :
+        elif [[ $pipeline_exit_status -eq 1 ]]; then
+            # Exit status 1 usually means permission denied errors
+            echo "Note: Some directories were inaccessible (permission denied)." >&2
+            echo "      Use -s/--sudo to search all directories." >&2
         else
             echo "Warning: The command pipeline exited with status ${pipeline_exit_status}." >&2
             echo "         This might indicate an issue. Check for errors from 'find', 'sort', 'head' or 'gawk'." >&2
@@ -224,6 +228,6 @@ if [[ "$quiet_mode" != true ]]; then
     echo "Find newest files ($(basename $0) -h for options)"
     printf "${BOLD}#${NC}${GREEN}%s${NC}\n" "$full_cmd"
     echo -e "Execution time: ${YELLOW}${elapsed_formatted}${NC} seconds"
-    echo -e "Files found: ${YELLOW}${file_count}${NC}$type_display"
+    echo -e "Objects found: ${YELLOW}${file_count}${NC}$type_display"
 fi
 

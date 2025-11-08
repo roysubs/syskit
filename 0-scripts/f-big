@@ -9,8 +9,8 @@ NC='\033[0m' # No Color
 WHITE='\033[1;37m'
 BOLD='\033[1m'
 
-# Check if first argument is exactly "-h", even if quoted
-if [[ "$1" == "-h" ]]; then
+# Check if first argument is exactly "-h" or "--help"
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     echo "Usage: $(basename $0) [directory] [number] [options]"
     echo "  directory:       Target directory to analyze (default: current directory)."
     echo "  number:          Number of results to display (default: 20)."
@@ -19,9 +19,10 @@ if [[ "$1" == "-h" ]]; then
     echo "  -f, --files      Show only files, no directories"
     echo "  -d, --dirs       Show only directories, no files"
     echo "  -q, --quiet      Suppress summary output (for piping)"
+    echo "  -s, --sudo       Use sudo for du command"
     echo "  -e, --exclude    Exclude paths matching pattern (can be used multiple times)"
     echo "                   Example: --exclude .git --exclude node_modules"
-    echo "  -h,              Show this help"
+    echo "  -h, --help       Show this help"
     echo ""
     echo "Note: directory/number can be in any order and will be determined dynamically."
     echo "Examples:"
@@ -29,12 +30,14 @@ if [[ "$1" == "-h" ]]; then
     echo "  $(basename $0) -f /var        # Find biggest files only in /var"
     echo "  $(basename $0) -d 15          # Find 15 biggest directories in current dir"
     echo "  $(basename $0) -q | head -5   # Get top 5 results without summary"
+    echo "  $(basename $0) /root 50 -s    # Find 50 biggest items in /root with sudo"
     exit 0
 fi
 
 # Default values
 dir="."
 num=20
+use_sudo=""
 excludes=()
 files_only=false
 dirs_only=false
@@ -49,6 +52,10 @@ is_number() {
 # Parse arguments dynamically
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --sudo|-s)
+            use_sudo="sudo"
+            shift
+            ;;
         --exclude|-e)
             if [[ -n "$2" && "$2" != -* ]]; then
                 excludes+=("$2")
@@ -134,24 +141,25 @@ if [[ -n "$exclude_grep" ]]; then
     # With exclusions
     if [[ "$files_only" == true ]]; then
         # Files only mode with exclusions
-        eval "sudo du -ahx \"$dir\" | $exclude_grep" | while read size path; do 
-            if [[ -f "$path" ]]; then 
+        eval "$use_sudo du -ahx \"$dir\" 2>/dev/null | $exclude_grep" | while read size path; do
+            if [[ -f "$path" ]]; then
                 echo -e "$size\t$path"
             fi
         done | sort -rh | head -"$num" > "$temp_results"
+        du_exit_status=${PIPESTATUS[0]}
     else
         # Default or dirs-only mode with exclusions
-        eval "sudo du -$du_flags \"$dir\" | $exclude_grep | sort -rh" | awk '
+        eval "$use_sudo du -$du_flags \"$dir\" 2>/dev/null | $exclude_grep | sort -rh" | awk '
         BEGIN {
             count = 0
             max = '"$num"'
         }
         {
             if (count >= max) exit
-            
+
             current = $2
             skip = 0
-            
+
             # Check if current path is a parent of any already seen path
             for (path in seen) {
                 if (index(path, current "/") == 1) {
@@ -159,7 +167,7 @@ if [[ -n "$exclude_grep" ]]; then
                     break
                 }
             }
-            
+
             # Only print and record if not a parent
             if (!skip) {
                 print
@@ -167,30 +175,32 @@ if [[ -n "$exclude_grep" ]]; then
                 count++
             }
         }' > "$temp_results"
+        du_exit_status=${PIPESTATUS[0]}
     fi
-    display_cmd="sudo du -$du_flags \"$dir\"$exclude_display | sort -rh | head -\"$num\"$type_display"
+    display_cmd="$use_sudo du -$du_flags \"$dir\"$exclude_display | sort -rh | head -\"$num\"$type_display"
 else
     # Without exclusions
     if [[ "$files_only" == true ]]; then
         # Files only mode without exclusions
-        sudo du -ahx "$dir" | while read size path; do 
-            if [[ -f "$path" ]]; then 
+        $use_sudo du -ahx "$dir" 2>/dev/null | while read size path; do
+            if [[ -f "$path" ]]; then
                 echo -e "$size\t$path"
             fi
         done | sort -rh | head -"$num" > "$temp_results"
+        du_exit_status=${PIPESTATUS[0]}
     else
         # Default or dirs-only mode without exclusions
-        sudo du -$du_flags "$dir" | sort -rh | awk '
+        $use_sudo du -$du_flags "$dir" 2>/dev/null | sort -rh | awk '
         BEGIN {
             count = 0
             max = '"$num"'
         }
         {
             if (count >= max) exit
-            
+
             current = $2
             skip = 0
-            
+
             # Check if current path is a parent of any already seen path
             for (path in seen) {
                 if (index(path, current "/") == 1) {
@@ -198,7 +208,7 @@ else
                     break
                 }
             }
-            
+
             # Only print and record if not a parent
             if (!skip) {
                 print
@@ -206,8 +216,9 @@ else
                 count++
             }
         }' > "$temp_results"
+        du_exit_status=${PIPESTATUS[0]}
     fi
-    display_cmd="sudo du -$du_flags \"$dir\" | sort -rh | head -\"$num\"$type_display"
+    display_cmd="$use_sudo du -$du_flags \"$dir\" | sort -rh | head -\"$num\"$type_display"
 fi
 
 # Display the results and count them
@@ -220,6 +231,20 @@ end_time=$(date +%s.%N)
 elapsed=$(echo "$end_time - $start_time" | bc)
 # Format to 2 decimal places
 elapsed_formatted=$(printf "%.2f" $elapsed)
+
+# Check if du encountered issues (only show message if there were actual errors)
+# Note: We've redirected stderr to /dev/null to suppress the error messages themselves
+if [[ $du_exit_status -ne 0 ]]; then
+    if [[ "$quiet_mode" != true ]]; then
+        if [[ $du_exit_status -eq 1 ]]; then
+            # Exit status 1 usually means permission denied errors
+            echo "Note: Some directories were inaccessible (permission denied)." >&2
+            echo "      Use -s/--sudo to search all directories." >&2
+        else
+            echo "Warning: The du command exited with status ${du_exit_status}." >&2
+        fi
+    fi
+fi
 
 # Display execution summary only if not in quiet mode
 if [[ "$quiet_mode" != true ]]; then

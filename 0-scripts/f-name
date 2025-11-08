@@ -12,41 +12,57 @@ BOLD='\033[1m'
 # --- Help Function ---
 show_help() {
 cat << EOF
-Usage: $(basename "$0") [days] [directory] [options]
-  days:            Number of days to look back (default: 1, today).
+Usage: $(basename "$0") <pattern> [pattern...] [directory] [options]
+  pattern:         Search pattern (required). Glob pattern by default (e.g., *.log, test*.txt)
+                   Multiple patterns can be specified (finds files matching ANY pattern)
   directory:       Target directory to search (default: current directory).
 
 Options:
   -f, --files      Show only files, no directories
   -d, --dirs       Show only directories, no files
+  -i, --ignore-case  Case-insensitive search
+  -r, --regex      Treat patterns as regex instead of glob (applies to all patterns)
   -q, --quiet      Suppress summary output (for piping)
   -s, --sudo       Use sudo for find command
   -e, --exclude    Exclude paths matching pattern (can be used multiple times)
                    Example: --exclude .git --exclude node_modules
   -h, --help       Show this help
 
-Note: days/directory can be in any order and will be determined dynamically.
+Note: At least one pattern is required. Directory is optional and can be specified anywhere.
+      When using multiple patterns, all must be the same type (all glob or all regex).
 Examples:
-  $(basename "$0") 7 /var/log        # Find items modified in last 7 days in /var/log
-  $(basename "$0") -f 3              # Find files modified in last 3 days in current dir
-  $(basename "$0") -d /home 14       # Find directories modified in last 14 days in /home
-  $(basename "$0") -q 2 | head -10   # Get top 10 results from last 2 days without summary
-  $(basename "$0") /root 30 -s       # Find items modified in last 30 days in /root with sudo
+  $(basename "$0") "*.log"                    # Find all .log files (glob)
+  $(basename "$0") "*.sh" "*.py" "*.bash"     # Find shell and Python files
+  $(basename "$0") "*.LOG" -i                 # Find .log files case-insensitively
+  $(basename "$0") "test*" /var               # Find files starting with "test" in /var
+  $(basename "$0") "\.txt$" "\.md$" -r        # Find .txt and .md files using regex
+  $(basename "$0") "backup.*" -r -i /home     # Regex search, case-insensitive
+  $(basename "$0") "*.mp4" "*.mkv" -f         # Find only video files, not directories
+  $(basename "$0") "node_modules" -d          # Find directories named node_modules
+  $(basename "$0") "*.tmp" -q | wc -l         # Count tmp files without summary
 EOF
 }
 
+# Show help if no arguments provided
+if [[ $# -eq 0 ]]; then
+    show_help
+    exit 0
+fi
+
 # --- Default values ---
-days=1
+patterns=()
 dir="."
 use_sudo=""
 excludes=()
 files_only=false
 dirs_only=false
 quiet_mode=false
+ignore_case=false
+use_regex=false
 
-# Function to check if a value is a positive integer
-is_number() {
-    [[ "$1" =~ ^[0-9]+$ ]]
+# Function to check if a value looks like a directory
+is_directory() {
+    [[ -d "$1" ]]
 }
 
 # --- Argument Parsing ---
@@ -72,6 +88,14 @@ while [[ $# -gt 0 ]]; do
             quiet_mode=true
             shift
             ;;
+        --ignore-case|-i)
+            ignore_case=true
+            shift
+            ;;
+        --regex|-r)
+            use_regex=true
+            shift
+            ;;
         --exclude|-e)
             if [[ -n "$2" && "$2" != -* ]]; then
                 excludes+=("$2")
@@ -81,15 +105,18 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             ;;
+        -*)
+            echo "Error: Unknown option '$1'" >&2
+            echo "Use $(basename "$0") -h or --help for usage instructions." >&2
+            exit 1
+            ;;
         *)
-            if is_number "$1"; then
-                days="$1"
-            elif [[ -d "$1" ]]; then
+            # Non-flag arguments: could be pattern(s) or directory
+            if is_directory "$1"; then
                 dir="$1"
-            elif [[ "$1" != -* ]]; then
-                # Try to interpret as directory even if it doesn't exist yet
-                # This allows error message to be more specific
-                dir="$1"
+            else
+                # Treat as a pattern
+                patterns+=("$1")
             fi
             shift
             ;;
@@ -103,14 +130,24 @@ if [[ "$files_only" == true && "$dirs_only" == true ]]; then
 fi
 
 # --- Basic Input Validation ---
-if [[ ! -d "$dir" ]]; then
-    echo "Error: Directory '$dir' not found." >&2
+if [[ ${#patterns[@]} -eq 0 ]]; then
+    echo "Error: At least one pattern is required." >&2
     echo "Use $(basename "$0") -h or --help for usage instructions." >&2
     exit 1
 fi
 
-if ! [[ "$days" =~ ^[0-9]+$ && "$days" -gt 0 ]]; then
-    echo "Error: Number of days '$days' must be a positive integer." >&2
+if [[ ! -d "$dir" ]]; then
+    # Check if this looks like a filename (shell-expanded glob)
+    if [[ -f "$dir" || "$dir" == *.* ]]; then
+        echo "Error: It looks like the shell expanded your pattern." >&2
+        echo "       To search for a pattern like *.txt, use quotes:" >&2
+        echo "       $(basename "$0") \"*.txt\"" >&2
+        echo "" >&2
+        echo "       Without quotes, the shell expands *.txt to matching files in the current directory." >&2
+        echo "       With quotes, $(basename "$0") searches recursively for the pattern." >&2
+    else
+        echo "Error: Directory '$dir' not found." >&2
+    fi
     echo "Use $(basename "$0") -h or --help for usage instructions." >&2
     exit 1
 fi
@@ -138,6 +175,78 @@ else
     type_display=""
 fi
 
+# Determine name flag based on case sensitivity and regex vs glob
+name_flag=""
+if [[ "$use_regex" == true ]]; then
+    if [[ "$ignore_case" == true ]]; then
+        name_flag="-iregex"
+        pattern_type="regex (case-insensitive)"
+    else
+        name_flag="-regex"
+        pattern_type="regex (case-sensitive)"
+    fi
+else
+    # Glob pattern
+    if [[ "$ignore_case" == true ]]; then
+        name_flag="-iname"
+        pattern_type="glob (case-insensitive)"
+    else
+        name_flag="-name"
+        pattern_type="glob (case-sensitive)"
+    fi
+fi
+
+# Build the pattern conditions for find with -o (OR) operator
+pattern_conditions=""
+pattern_conditions_display=""
+search_patterns=()
+
+for i in "${!patterns[@]}"; do
+    pattern="${patterns[$i]}"
+    
+    # For regex, prepend .*/ if needed
+    if [[ "$use_regex" == true ]]; then
+        if [[ ! "$pattern" =~ ^\.\*/ && ! "$pattern" =~ ^/ ]]; then
+            search_pattern=".*/$pattern"
+        else
+            search_pattern="$pattern"
+        fi
+    else
+        search_pattern="$pattern"
+    fi
+    
+    search_patterns+=("$search_pattern")
+    
+    # Add pattern condition
+    if [[ $i -eq 0 ]]; then
+        # First pattern: wrap in parentheses if multiple patterns
+        if [[ ${#patterns[@]} -gt 1 ]]; then
+            pattern_conditions="\\( $name_flag \"$search_pattern\""
+            pattern_conditions_display="( $name_flag \"$search_pattern\""
+        else
+            pattern_conditions="$name_flag \"$search_pattern\""
+            pattern_conditions_display="$name_flag \"$search_pattern\""
+        fi
+    else
+        # Additional patterns: add with -o
+        pattern_conditions="$pattern_conditions -o $name_flag \"$search_pattern\""
+        pattern_conditions_display="$pattern_conditions_display -o $name_flag \"$search_pattern\""
+    fi
+    
+    # Close parentheses for last pattern if multiple
+    if [[ $i -eq $((${#patterns[@]} - 1)) && ${#patterns[@]} -gt 1 ]]; then
+        pattern_conditions="$pattern_conditions \\)"
+        pattern_conditions_display="$pattern_conditions_display )"
+    fi
+done
+
+# Create display string for patterns
+if [[ ${#patterns[@]} -eq 1 ]]; then
+    patterns_display="${patterns[0]}"
+else
+    patterns_display=$(IFS=', '; echo "${patterns[*]}")
+fi
+
 # --- Main execution ---
 
 # Start timer (GNU date for %N nanoseconds)
@@ -148,7 +257,7 @@ start_time=$(date +%s.%N)
 find_output_format="%T@ %p\\n"
 
 # Prepare the find command
-find_cmd="$use_sudo find \"$dir\" -xdev $type_flag$exclude_args -mtime -$days -printf '$find_output_format'"
+find_cmd="$use_sudo find \"$dir\" -xdev $type_flag $pattern_conditions$exclude_args -printf '$find_output_format'"
 
 # AWK script to format the timestamp using gawk's built-in 'strftime' function
 awk_formatter_script='
@@ -171,7 +280,7 @@ awk_formatter_script='
 '
 
 # Build full display command for summary (simplified for readability)
-full_cmd="$use_sudo find \"$dir\" -xdev $type_flag$exclude_display -mtime -$days -printf '%T@ %p\\n' | sort -n | gawk '{awk_formatter_script}'"
+full_cmd="$use_sudo find \"$dir\" -xdev $type_flag $pattern_conditions_display$exclude_display -printf '%T@ %p\\n' | sort -rnk1,1 | gawk '{awk_formatter_script}'"
 
 # Execute the command pipeline
 set -o pipefail # Exit immediately if a command in the pipeline fails
@@ -180,7 +289,7 @@ pipeline_exit_status=0
 
 # Execute the full pipeline
 pipeline_output=$(eval "$find_cmd" | \
-    sort -n | \
+    sort -rnk1,1 | \
     gawk "$awk_formatter_script")
 pipeline_exit_status=$?
 
@@ -221,15 +330,12 @@ end_time=$(date +%s.%N)
 elapsed=$(echo "$end_time - $start_time" | bc)
 elapsed_formatted=$(printf "%.2f" $elapsed)
 
-# Calculate start time (midnight X days ago) for display
-cutoff_date=$(date -d "$days days ago" "+%Y-%m-%d 00:00:00")
-
 # Display summary only if not in quiet mode
 if [[ "$quiet_mode" != true ]]; then
     echo  # Always add exactly one blank line before summary
-    echo "Find files by days ($(basename $0) -h for options)"
-    printf "${BOLD}#${NC}${GREEN}%s${NC}\n" "$full_cmd"
-    echo -e "Modified since: ${YELLOW}${cutoff_date}${NC}"
+    echo "Find files by name ($(basename $0) -h for options)"
+    printf "${BOLD}# ${NC}${GREEN}%s${NC}\n" "$full_cmd"
+    echo -e "Pattern(s): ${YELLOW}${patterns_display}${NC} (${pattern_type})"
     echo -e "Execution time: ${YELLOW}${elapsed_formatted}${NC} seconds"
     echo -e "Objects found: ${YELLOW}${object_count}${NC}$type_display"
 fi
