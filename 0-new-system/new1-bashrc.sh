@@ -286,7 +286,6 @@ c() {
     if [[ -z "$1" ]]; then
         cat <<EOF
 'c' quick jump. Usage: c [destination]
-
 -- syskit --
   0, k syskit : \$HOME/syskit
   n, new      : syskit/0-new-system
@@ -296,11 +295,9 @@ c() {
   g, games    : syskit/0-games
   i, install  : syskit/0-install
   w, web      : syskit/0-web-apps
-
 -- custom --
   ms, mdk, mediadk   : syskit/0-docker/0-media-stack
   q, mq, qbit, qconf : ~/.config/media-stack/qbittorrent
-
 -- System --
   h            : \$HOME (same as just 'cd')
   d, down      : \$HOME/Downloads
@@ -313,9 +310,12 @@ c() {
 EOF
         return
     fi
-
-    case "$1" in
-        0|k|syskit)  cd "$HOME/syskit" ;;   # Use '0'/'k' as 's' taken by scripts
+    
+    # Convert to lowercase for case-insensitive matching
+    local dest="${1,,}"
+    
+    case "$dest" in
+        0|k|syskit)  cd "$HOME/syskit" ;;
         n|new)       cd "$HOME/syskit/0-new-system" ;;
         s|scripts)   cd "$HOME/syskit/0-scripts" ;;
         hp|help)     cd "$HOME/syskit/0-help" ;;
@@ -332,8 +332,16 @@ EOF
         c|cf|conf)   cd "$HOME/.config" ;;
         t|tmp|temp)  cd "/tmp" ;;
         l|log)       cd "/var/log" ;;
-        b|bin)         cd "/usr/local/bin" ;;
-        *)           echo "Unknown destination: '$1'" ;;
+        b|bin)       cd "/usr/local/bin" ;;
+        *)           
+            # If not a keyword, try to cd to it as a path
+            if [[ -d "$1" ]]; then
+                cd "$1"
+            else
+                echo "Unknown destination or invalid path: '$1'" >&2
+                return 1
+            fi
+            ;;
     esac
 }
 alias cs='c s'

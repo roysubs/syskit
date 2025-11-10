@@ -1,0 +1,11 @@
+Rank,City,Country,Transport Type,Transport Cost,Accommodation Cost,Total Cost,Hotel Name,Rating,Distance from Center (km)
+1,Budapest,Hungary,flight,€52.47,€108.00,€160.47,Budapest Central Hotel,4.0,0.5
+2,Krakow,Poland,flight,€64.66,€96.00,€160.66,Krakow Central Hotel,4.0,0.5
+3,Prague,Czech Republic,flight,€57.75,€120.00,€177.75,Prague Central Hotel,4.0,0.5
+4,Brussels,Belgium,flight,€44.71,€168.00,€212.71,Brussels Central Hotel,4.0,0.5
+5,Porto,Portugal,flight,€86.56,€132.00,€218.56,Porto Central Hotel,4.0,0.5
+6,Valencia,Spain,flight,€84.40,€144.00,€228.40,Valencia Central Hotel,4.0,0.5
+7,Lisbon,Portugal,flight,€87.39,€144.00,€231.39,Lisbon Central Hotel,4.0,0.5
+8,Berlin,Germany,flight,€77.66,€156.00,€233.66,Berlin Central Hotel,4.0,0.5
+9,Seville,Spain,flight,€87.29,€156.00,€243.29,Seville Central Hotel,4.0,0.5
+10,Brussels,Belgium,train,€80.00,€168.00,€248.00,Brussels Central Hotel,4.0,0.5

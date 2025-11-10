@@ -1,0 +1,320 @@
+[
+  {
+    "city": "Budapest",
+    "country": "Hungary",
+    "transport_type": "flight",
+    "transport_cost": 52.47,
+    "accommodation_cost": 108.0,
+    "total_cost": 160.47,
+    "currency": "EUR",
+    "flight_details": {
+      "origin": "AMS",
+      "destination": "BUD",
+      "outbound_date": "2025-11-14",
+      "return_date": "2025-11-17",
+      "price": 52.47,
+      "currency": "EUR",
+      "carrier": "TP",
+      "departure_time": "2025-11-14T08:30:00",
+      "is_direct": true,
+      "booking_link": "https://www.google.com/flights?q=flights+from+AMS+to+BUD"
+    },
+    "train_details": null,
+    "accommodation_details": {
+      "city": "Budapest",
+      "name": "Budapest Central Hotel",
+      "price_per_night": 36.0,
+      "total_price": 108.0,
+      "currency": "EUR",
+      "rating": 4.0,
+      "distance_from_center_km": 0.5,
+      "booking_link": "https://www.booking.com/city/budapest.html"
+    }
+  },
+  {
+    "city": "Krakow",
+    "country": "Poland",
+    "transport_type": "flight",
+    "transport_cost": 64.66,
+    "accommodation_cost": 96.0,
+    "total_cost": 160.66,
+    "currency": "EUR",
+    "flight_details": {
+      "origin": "AMS",
+      "destination": "KRK",
+      "outbound_date": "2025-11-14",
+      "return_date": "2025-11-17",
+      "price": 64.66,
+      "currency": "EUR",
+      "carrier": "VY",
+      "departure_time": "2025-11-14T08:30:00",
+      "is_direct": true,
+      "booking_link": "https://www.google.com/flights?q=flights+from+AMS+to+KRK"
+    },
+    "train_details": null,
+    "accommodation_details": {
+      "city": "Krakow",
+      "name": "Krakow Central Hotel",
+      "price_per_night": 32.0,
+      "total_price": 96.0,
+      "currency": "EUR",
+      "rating": 4.0,
+      "distance_from_center_km": 0.5,
+      "booking_link": "https://www.booking.com/city/krakow.html"
+    }
+  },
+  {
+    "city": "Prague",
+    "country": "Czech Republic",
+    "transport_type": "flight",
+    "transport_cost": 57.75,
+    "accommodation_cost": 120.0,
+    "total_cost": 177.75,
+    "currency": "EUR",
+    "flight_details": {
+      "origin": "AMS",
+      "destination": "PRG",
+      "outbound_date": "2025-11-14",
+      "return_date": "2025-11-17",
+      "price": 57.75,
+      "currency": "EUR",
+      "carrier": "TP",
+      "departure_time": "2025-11-14T10:15:00",
+      "is_direct": true,
+      "booking_link": "https://www.google.com/flights?q=flights+from+AMS+to+PRG"
+    },
+    "train_details": null,
+    "accommodation_details": {
+      "city": "Prague",
+      "name": "Prague Central Hotel",
+      "price_per_night": 40.0,
+      "total_price": 120.0,
+      "currency": "EUR",
+      "rating": 4.0,
+      "distance_from_center_km": 0.5,
+      "booking_link": "https://www.booking.com/city/prague.html"
+    }
+  },
+  {
+    "city": "Brussels",
+    "country": "Belgium",
+    "transport_type": "flight",
+    "transport_cost": 44.71,
+    "accommodation_cost": 168.0,
+    "total_cost": 212.71,
+    "currency": "EUR",
+    "flight_details": {
+      "origin": "AMS",
+      "destination": "BRU",
+      "outbound_date": "2025-11-14",
+      "return_date": "2025-11-17",
+      "price": 44.71,
+      "currency": "EUR",
+      "carrier": "KL",
+      "departure_time": "2025-11-14T11:45:00",
+      "is_direct": true,
+      "booking_link": "https://www.google.com/flights?q=flights+from+AMS+to+BRU"
+    },
+    "train_details": null,
+    "accommodation_details": {
+      "city": "Brussels",
+      "name": "Brussels Central Hotel",
+      "price_per_night": 56.0,
+      "total_price": 168.0,
+      "currency": "EUR",
+      "rating": 4.0,
+      "distance_from_center_km": 0.5,
+      "booking_link": "https://www.booking.com/city/brussels.html"
+    }
+  },
+  {
+    "city": "Porto",
+    "country": "Portugal",
+    "transport_type": "flight",
+    "transport_cost": 86.56,
+    "accommodation_cost": 132.0,
+    "total_cost": 218.56,
+    "currency": "EUR",
+    "flight_details": {
+      "origin": "AMS",
+      "destination": "OPO",
+      "outbound_date": "2025-11-14",
+      "return_date": "2025-11-17",
+      "price": 86.56,
+      "currency": "EUR",
+      "carrier": "U2",
+      "departure_time": "2025-11-14T11:45:00",
+      "is_direct": true,
+      "booking_link": "https://www.google.com/flights?q=flights+from+AMS+to+OPO"
+    },
+    "train_details": null,
+    "accommodation_details": {
+      "city": "Porto",
+      "name": "Porto Central Hotel",
+      "price_per_night": 44.0,
+      "total_price": 132.0,
+      "currency": "EUR",
+      "rating": 4.0,
+      "distance_from_center_km": 0.5,
+      "booking_link": "https://www.booking.com/city/porto.html"
+    }
+  },
+  {
+    "city": "Valencia",
+    "country": "Spain",
+    "transport_type": "flight",
+    "transport_cost": 84.4,
+    "accommodation_cost": 144.0,
+    "total_cost": 228.4,
+    "currency": "EUR",
+    "flight_details": {
+      "origin": "AMS",
+      "destination": "VLC",
+      "outbound_date": "2025-11-14",
+      "return_date": "2025-11-17",
+      "price": 84.4,
+      "currency": "EUR",
+      "carrier": "IB",
+      "departure_time": "2025-11-14T10:15:00",
+      "is_direct": true,
+      "booking_link": "https://www.google.com/flights?q=flights+from+AMS+to+VLC"
+    },
+    "train_details": null,
+    "accommodation_details": {
+      "city": "Valencia",
+      "name": "Valencia Central Hotel",
+      "price_per_night": 48.0,
+      "total_price": 144.0,
+      "currency": "EUR",
+      "rating": 4.0,
+      "distance_from_center_km": 0.5,
+      "booking_link": "https://www.booking.com/city/valencia.html"
+    }
+  },
+  {
+    "city": "Lisbon",
+    "country": "Portugal",
+    "transport_type": "flight",
+    "transport_cost": 87.39,
+    "accommodation_cost": 144.0,
+    "total_cost": 231.39,
+    "currency": "EUR",
+    "flight_details": {
+      "origin": "AMS",
+      "destination": "LIS",
+      "outbound_date": "2025-11-14",
+      "return_date": "2025-11-17",
+      "price": 87.39,
+      "currency": "EUR",
+      "carrier": "IB",
+      "departure_time": "2025-11-14T16:40:00",
+      "is_direct": true,
+      "booking_link": "https://www.google.com/flights?q=flights+from+AMS+to+LIS"
+    },
+    "train_details": null,
+    "accommodation_details": {
+      "city": "Lisbon",
+      "name": "Lisbon Central Hotel",
+      "price_per_night": 48.0,
+      "total_price": 144.0,
+      "currency": "EUR",
+      "rating": 4.0,
+      "distance_from_center_km": 0.5,
+      "booking_link": "https://www.booking.com/city/lisbon.html"
+    }
+  },
+  {
+    "city": "Berlin",
+    "country": "Germany",
+    "transport_type": "flight",
+    "transport_cost": 77.66,
+    "accommodation_cost": 156.0,
+    "total_cost": 233.66,
+    "currency": "EUR",
+    "flight_details": {
+      "origin": "AMS",
+      "destination": "BER",
+      "outbound_date": "2025-11-14",
+      "return_date": "2025-11-17",
+      "price": 77.66,
+      "currency": "EUR",
+      "carrier": "FR",
+      "departure_time": "2025-11-14T13:20:00",
+      "is_direct": true,
+      "booking_link": "https://www.google.com/flights?q=flights+from+AMS+to+BER"
+    },
+    "train_details": null,
+    "accommodation_details": {
+      "city": "Berlin",
+      "name": "Berlin Central Hotel",
+      "price_per_night": 52.0,
+      "total_price": 156.0,
+      "currency": "EUR",
+      "rating": 4.0,
+      "distance_from_center_km": 0.5,
+      "booking_link": "https://www.booking.com/city/berlin.html"
+    }
+  },
+  {
+    "city": "Seville",
+    "country": "Spain",
+    "transport_type": "flight",
+    "transport_cost": 87.29,
+    "accommodation_cost": 156.0,
+    "total_cost": 243.29000000000002,
+    "currency": "EUR",
+    "flight_details": {
+      "origin": "AMS",
+      "destination": "SVQ",
+      "outbound_date": "2025-11-14",
+      "return_date": "2025-11-17",
+      "price": 87.29,
+      "currency": "EUR",
+      "carrier": "FR",
+      "departure_time": "2025-11-14T11:45:00",
+      "is_direct": true,
+      "booking_link": "https://www.google.com/flights?q=flights+from+AMS+to+SVQ"
+    },
+    "train_details": null,
+    "accommodation_details": {
+      "city": "Seville",
+      "name": "Seville Central Hotel",
+      "price_per_night": 52.0,
+      "total_price": 156.0,
+      "currency": "EUR",
+      "rating": 4.0,
+      "distance_from_center_km": 0.5,
+      "booking_link": "https://www.booking.com/city/seville.html"
+    }
+  },
+  {
+    "city": "Brussels",
+    "country": "Belgium",
+    "transport_type": "train",
+    "transport_cost": 80,
+    "accommodation_cost": 168.0,
+    "total_cost": 248.0,
+    "currency": "EUR",
+    "flight_details": null,
+    "train_details": {
+      "origin": "Amsterdam",
+      "destination": "Brussels",
+      "outbound_date": "",
+      "return_date": "",
+      "price": 80,
+      "currency": "EUR",
+      "duration_hours": 2,
+      "booking_link": "https://www.thetrainline.com"
+    },
+    "accommodation_details": {
+      "city": "Brussels",
+      "name": "Brussels Central Hotel",
+      "price_per_night": 56.0,
+      "total_price": 168.0,
+      "currency": "EUR",
+      "rating": 4.0,
+      "distance_from_center_km": 0.5,
+      "booking_link": "https://www.booking.com/city/brussels.html"
+    }
+  }
+]
