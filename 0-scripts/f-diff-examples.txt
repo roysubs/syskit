@@ -1,0 +1,70 @@
+# f-diff Usage Examples
+
+## Example 1: Summary View
+$ f-diff original.txt modified.txt
+
+File 1: original.txt (2025-11-12 10:30:45)
+File 2: modified.txt (2025-11-12 14:22:13)
+→ File 2 is newer
+
+Line    1 to   12 : no-diff (12 lines, 303 chars)
+Line   13 to   14 : CHANGE (2 lines, ~82 chars, ~8 chars differ)
+Line   15 to   20 : no-diff (6 lines, 192 chars)
+Line   21 to   23 : DELETE (3 lines, 75 chars in file1 only)
+Line   24 to   28 : no-diff (5 lines, 125 chars)
+Line   29 to   31 : ADD (3 lines, 90 chars in file2 only)
+Line   32 to   50 : no-diff (19 lines, 475 chars)
+
+## Example 2: Inspect a Difference
+$ f-diff original.txt modified.txt 13
+
+Block: Lines 13 to 14 (CHANGE)
+======================================================================
+
+*** original.txt ***
+  13 | def calculate_total(items):
+  14 |     return sum(items)
+
+*** modified.txt ***
+  13 | def calculate_total(items, tax=0.0):
+  14 |     return sum(items) * (1 + tax)
+
+## Example 3: Merge Changes from File2 to File1
+$ f-diff original.txt modified.txt 13 '<'
+
+Merging lines 13-14 from modified.txt to original.txt
+Creating backup: original.txt.bak
+
+Lines to copy from modified.txt:
+    13 | def calculate_total(items, tax=0.0):
+    14 |     return sum(items) * (1 + tax)
+
+Will replace in original.txt:
+    13 | def calculate_total(items):
+    14 |     return sum(items)
+
+✓ Successfully merged lines to original.txt
+
+## Example 4: Merge Range from File1 to File2
+$ f-diff config_old.txt config_new.txt 100-150 '>'
+
+Merging lines 100-150 from config_old.txt to config_new.txt
+Creating backup: config_new.txt.bak
+
+Lines to copy from config_old.txt:
+   100 | [database]
+   101 | host = localhost
+   102 | port = 5432
+   ... (51 lines total)
+
+✓ Successfully merged lines to config_new.txt
+
+## Example 5: Identical Files
+$ f-diff file1.txt file1.txt
+
+File 1: file1.txt (2025-11-12 10:30:45)
+File 2: file1.txt (2025-11-12 10:30:45)
+→ Files have same modification time
+
+Line 1 to 150 : no-diff (150 lines, 3847 chars)
+

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Roy Wiseman 2025-11-12
 """
 f-diff: A compact diff tool with block summaries, detailed inspection, and merge capabilities
 
