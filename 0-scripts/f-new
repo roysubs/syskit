@@ -57,7 +57,7 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         --sudo|-s)
-            use_sudo="sudo"
+            use_sudo=" sudo"
             shift
             ;;
         --files|-f)
