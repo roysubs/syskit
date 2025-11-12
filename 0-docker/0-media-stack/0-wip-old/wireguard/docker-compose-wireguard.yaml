@@ -3,6 +3,10 @@
 # are configured to use WireGuard's network stack (`network_mode: service:wireguard`).
 # Ports for accessing the Web UIs of these services from the host (or local network)
 # are mapped *on the WireGuard service itself*.
+#
+# bloop
+# bleep
+1 2 3 4
 
 # WireGuard: VPN client that routes traffic for all of the below.
 # qBittorrent: Torrent client, Web UI 8080
@@ -19,6 +23,9 @@ services:
       - NET_ADMIN
       - SYS_MODULE  # May be needed if host kernel doesn't auto-load wireguard module
     environment:
+# bloop
+# bleep
+1 2 3 4
       - PUID=${PUID}  # Defined in .env by start-media-stack.sh
       - PGID=${PGID}  # Defined in .env by start-media-stack.sh
       - TZ=${TZ}      # Defined in .env by start-media-stack.sh

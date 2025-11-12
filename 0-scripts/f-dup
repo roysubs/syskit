@@ -20,6 +20,8 @@ Usage: $(basename "$0") [directory] [options]
 Options:
   -1, --first-only Show only first instance of each duplicate set
   -m, --min-size   Minimum file size to consider (e.g., 1M, 100K, default: 1 byte)
+  -f, --filter     Filter by file pattern (e.g., "*.jpg", "*.txt")
+                   Only checks files matching the pattern
   --md5            Use MD5 hashing (faster, default)
   --sha256         Use SHA256 hashing (more secure)
   -q, --quiet      Suppress summary output (for piping)
@@ -44,10 +46,16 @@ Methodology:
   This approach is much faster than hashing every file, since most files
   are unique by size and can be eliminated in Stage 1.
 
+Logging:
+  Results are automatically logged to /tmp/$(basename "$0").log
+  The log location is displayed at the end of execution.
+
 Examples:
   $(basename "$0")                    # Find all duplicates in current directory
   $(basename "$0") /media             # Find duplicates in /media
   $(basename "$0") -m 1M              # Only check files >= 1MB
+  $(basename "$0") -f "*.jpg"         # Only check JPG files
+  $(basename "$0") -f "*.mp4" -m 10M  # Only check MP4 files >= 10MB
   $(basename "$0") --sha256           # Use SHA256 instead of MD5
   $(basename "$0") -1                 # Show only first of each duplicate set
   $(basename "$0") -s /root           # Search /root with sudo
@@ -70,6 +78,8 @@ first_only=false
 min_size="1c"  # 1 byte in find's size format
 hash_algo="md5sum"
 hash_name="MD5"
+filter_pattern=""
+log_file="/tmp/$(basename "$0").log"
 
 # --- Argument Parsing ---
 while [[ $# -gt 0 ]]; do
@@ -100,6 +110,15 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             ;;
+        --filter|-f)
+            if [[ -n "$2" && "$2" != -* ]]; then
+                filter_pattern="$2"
+                shift 2
+            else
+                echo "Error: --filter requires a pattern argument (e.g., \"*.jpg\")"
+                exit 1
+            fi
+            ;;
         --md5)
             hash_algo="md5sum"
             hash_name="MD5"
@@ -125,10 +144,15 @@ while [[ $# -gt 0 ]]; do
             exit 1
             ;;
         *)
-            if [[ -d "$1" ]]; then
+            # Check if this looks like a pattern (contains wildcards)
+            if [[ "$1" == *"*"* || "$1" == *"?"* || "$1" == *"["* ]]; then
+                # This is likely a filter pattern, not a directory
+                filter_pattern="$1"
+            elif [[ -d "$1" ]]; then
                 dir="$1"
             else
                 echo "Error: Directory '$1' not found." >&2
+                echo "Hint: If this is a filter pattern, use -f/--filter: $(basename "$0") -f \"$1\"" >&2
                 exit 1
             fi
             shift
@@ -151,6 +175,16 @@ done
 
 # --- Main execution ---
 
+# Initialize log file
+echo "=== f-dup run started at $(date) ===" > "$log_file"
+echo "Directory: $dir" >> "$log_file"
+echo "Hash algorithm: $hash_name" >> "$log_file"
+echo "Minimum size: $min_size" >> "$log_file"
+if [[ -n "$filter_pattern" ]]; then
+    echo "Filter pattern: $filter_pattern" >> "$log_file"
+fi
+echo "" >> "$log_file"
+
 # Start timer (GNU date for %N nanoseconds)
 start_time=$(date +%s.%N)
 
@@ -164,8 +198,14 @@ temp_all_files=$(mktemp)
 temp_size_groups=$(mktemp)
 temp_duplicates=$(mktemp)
 
+# Build filter for find command
+filter_args=""
+if [[ -n "$filter_pattern" ]]; then
+    filter_args="-name \"$filter_pattern\""
+fi
+
 # Find all files with their sizes
-find_cmd="$use_sudo find \"$dir\" -xdev -type f -size +${min_size}${exclude_args} -printf '%s %p\n'"
+find_cmd="$use_sudo find \"$dir\" -xdev -type f $filter_args -size +${min_size}${exclude_args} -printf '%s %p\n'"
 eval "$find_cmd" 2>/dev/null > "$temp_all_files"
 find_exit_status=$?
 
@@ -221,6 +261,22 @@ if [[ $files_to_hash -eq 0 ]]; then
     exit 0
 fi
 
+# Function to format seconds into human-readable time
+format_time() {
+    local total_seconds=$1
+    local hours=$((total_seconds / 3600))
+    local minutes=$(((total_seconds % 3600) / 60))
+    local seconds=$((total_seconds % 60))
+    
+    if [[ $hours -gt 0 ]]; then
+        printf "%dh %dm %ds" $hours $minutes $seconds
+    elif [[ $minutes -gt 0 ]]; then
+        printf "%dm %ds" $minutes $seconds
+    else
+        printf "%.2fs" $total_seconds
+    fi
+}
+
 # Stage 2: Hash files with matching sizes
 if [[ "$quiet_mode" != true ]]; then
     echo >&2
@@ -264,8 +320,10 @@ for hash in "${!hash_to_files[@]}"; do
         size_bytes=$(echo "$first_line" | cut -d'|' -f1)
         size_human=$(numfmt --to=iec-i --suffix=B "$size_bytes" 2>/dev/null || echo "${size_bytes}B")
         
-        # Display duplicate set header
-        echo -e "\n${CYAN}# Duplicate set ${duplicate_set_count} (${file_count} files, ${size_human} each):${NC}"
+        # Display duplicate set header (to both stdout and log)
+        header="\n# Duplicate set ${duplicate_set_count} (${file_count} files, ${size_human} each):"
+        echo -e "${CYAN}${header}${NC}"
+        echo -e "${header}" >> "$log_file"
         
         # Sort by modification time (newest first) and display
         display_count=0
@@ -279,7 +337,9 @@ for hash in "${!hash_to_files[@]}"; do
                 continue
             fi
             
-            echo "$timestamp  $size_display  $filepath"
+            output_line="$timestamp  $size_display  $filepath"
+            echo "$output_line"
+            echo "$output_line" >> "$log_file"
             display_count=$((display_count + 1))
         done
         
@@ -327,16 +387,46 @@ end_time=$(date +%s.%N)
 elapsed=$(echo "$end_time - $start_time" | bc)
 elapsed_formatted=$(printf "%.2f" $elapsed)
 
+# Format time as hr:min:sec for display (if > 60 seconds)
+elapsed_int=$(printf "%.0f" $elapsed)
+if [[ $elapsed_int -ge 60 ]]; then
+    elapsed_display=$(format_time $elapsed_int)
+else
+    elapsed_display="${elapsed_formatted}s"
+fi
+
+# Write summary to log
+{
+    echo ""
+    echo "=== Summary ==="
+    echo "Hash algorithm: $hash_name"
+    echo "Minimum size: $min_size"
+    if [[ -n "$filter_pattern" ]]; then
+        echo "Filter pattern: $filter_pattern"
+    fi
+    echo "Execution time: $elapsed_display ($elapsed_formatted seconds)"
+    echo "Duplicate sets found: $total_duplicate_sets"
+    if [[ $total_duplicate_sets -gt 0 ]]; then
+        echo "Wasted space: $wasted_human"
+    fi
+    echo ""
+    echo "=== Run completed at $(date) ==="
+} >> "$log_file"
+
 # Display summary only if not in quiet mode
 if [[ "$quiet_mode" != true ]]; then
     echo
     echo "Find duplicate files ($(basename $0) -h for options)"
     echo -e "Hash algorithm: ${YELLOW}${hash_name}${NC}"
+    if [[ -n "$filter_pattern" ]]; then
+        echo -e "Filter pattern: ${YELLOW}${filter_pattern}${NC}"
+    fi
     echo -e "Minimum size: ${YELLOW}${min_size}${NC}"
-    echo -e "Execution time: ${YELLOW}${elapsed_formatted}${NC} seconds"
+    echo -e "Execution time: ${YELLOW}${elapsed_display}${NC} (${elapsed_formatted} seconds)"
     echo -e "Duplicate sets found: ${YELLOW}${total_duplicate_sets}${NC}"
     if [[ $total_duplicate_sets -gt 0 ]]; then
         echo -e "Wasted space: ${RED}${wasted_human}${NC}"
     fi
+    echo -e "Log saved to: ${GREEN}${log_file}${NC}"
 fi
 

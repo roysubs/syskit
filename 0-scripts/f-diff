@@ -1,0 +1,534 @@
+#!/usr/bin/env python3
+"""
+f-diff: A compact diff tool with block summaries, detailed inspection, and merge capabilities
+
+Usage:
+    f-diff file1 file2                    # Show compact block summary
+    f-diff file1 file2 LINE               # Show detailed diff for block at LINE
+    f-diff file1 file2 START-END >        # Copy lines START-END from file1 to file2
+    f-diff file1 file2 START-END <        # Copy lines START-END from file2 to file1
+    f-diff file1 file2 LINE >             # Copy block at LINE from file1 to file2
+    f-diff file1 file2 LINE <             # Copy block at LINE from file2 to file1
+
+Change types:
+    - CHANGE (yellow):  Lines exist in both files but differ
+    - ADD (green):      Lines exist in file2 but not file1
+    - DELETE (red):     Lines exist in file1 but not file2
+"""
+
+import sys
+import subprocess
+import re
+import os
+from datetime import datetime
+from typing import List, Tuple, Optional
+
+
+# ANSI color codes
+class Colors:
+    RED = '\033[91m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    BLUE = '\033[94m'
+    CYAN = '\033[96m'
+    GRAY = '\033[90m'
+    BOLD = '\033[1m'
+    RESET = '\033[0m'
+    
+    @staticmethod
+    def disable():
+        """Disable colors (for piping/redirection)"""
+        Colors.RED = ''
+        Colors.GREEN = ''
+        Colors.YELLOW = ''
+        Colors.BLUE = ''
+        Colors.CYAN = ''
+        Colors.GRAY = ''
+        Colors.BOLD = ''
+        Colors.RESET = ''
+
+
+def get_file_mtime(filepath: str) -> str:
+    """Get file modification time as formatted string."""
+    try:
+        mtime = os.path.getmtime(filepath)
+        dt = datetime.fromtimestamp(mtime)
+        return dt.strftime('%Y-%m-%d %H:%M:%S')
+    except Exception:
+        return "unknown"
+
+
+def get_file_lines(filepath: str) -> List[str]:
+    """Read file and return lines."""
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+            return f.readlines()
+    except Exception as e:
+        print(f"Error reading {filepath}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def parse_unified_diff(diff_output: str, file1_lines: List[str], file2_lines: List[str]) -> List[Tuple[int, int, str]]:
+    """
+    Parse unified diff output and return list of (start_line, num_lines, type)
+    where type is 'change', 'add', or 'delete'
+    """
+    changes = []
+    lines = diff_output.split('\n')
+    i = 0
+    
+    while i < len(lines):
+        line = lines[i]
+        # Look for hunk headers like @@ -1,4 +1,5 @@
+        match = re.match(r'^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@', line)
+        if match:
+            old_start = int(match.group(1))
+            new_start = int(match.group(3))
+            
+            # Parse the hunk to find actual changed lines
+            i += 1
+            old_line_num = old_start
+            new_line_num = new_start
+            
+            # Track changes in this hunk
+            hunk_changes = []
+            change_start_old = None
+            change_start_new = None
+            removed_lines = 0
+            added_lines = 0
+            
+            while i < len(lines) and not lines[i].startswith('@@'):
+                hunk_line = lines[i]
+                
+                if hunk_line.startswith('-') and not hunk_line.startswith('---'):
+                    # Line removed
+                    if change_start_old is None:
+                        change_start_old = old_line_num
+                        change_start_new = new_line_num
+                    removed_lines += 1
+                    old_line_num += 1
+                    
+                elif hunk_line.startswith('+') and not hunk_line.startswith('+++'):
+                    # Line added
+                    if change_start_old is None:
+                        change_start_old = old_line_num
+                        change_start_new = new_line_num
+                    added_lines += 1
+                    new_line_num += 1
+                    
+                else:
+                    # Context line - record any pending change
+                    if change_start_old is not None:
+                        # Determine change type
+                        if removed_lines > 0 and added_lines > 0:
+                            change_type = 'change'
+                            num_lines = max(removed_lines, added_lines)
+                            start = change_start_old
+                        elif removed_lines > 0:
+                            change_type = 'delete'
+                            num_lines = removed_lines
+                            start = change_start_old
+                        else:  # added_lines > 0
+                            change_type = 'add'
+                            num_lines = added_lines
+                            start = change_start_old if change_start_old <= len(file1_lines) else change_start_new
+                        
+                        changes.append((start, num_lines, change_type))
+                        
+                        # Reset
+                        change_start_old = None
+                        change_start_new = None
+                        removed_lines = 0
+                        added_lines = 0
+                    
+                    old_line_num += 1
+                    new_line_num += 1
+                
+                i += 1
+            
+            # Don't forget the last change in the hunk
+            if change_start_old is not None:
+                if removed_lines > 0 and added_lines > 0:
+                    change_type = 'change'
+                    num_lines = max(removed_lines, added_lines)
+                    start = change_start_old
+                elif removed_lines > 0:
+                    change_type = 'delete'
+                    num_lines = removed_lines
+                    start = change_start_old
+                else:  # added_lines > 0
+                    change_type = 'add'
+                    num_lines = added_lines
+                    start = change_start_old if change_start_old <= len(file1_lines) else change_start_new
+                
+                changes.append((start, num_lines, change_type))
+            
+            continue
+        i += 1
+    
+    return changes
+
+
+def create_blocks(file1_lines: List[str], changes: List[Tuple[int, int, str]]) -> List[dict]:
+    """Create blocks of diff/no-diff regions."""
+    if not changes:
+        # Files are identical
+        return [{
+            'type': 'no-diff',
+            'start': 1,
+            'end': len(file1_lines),
+            'lines': len(file1_lines)
+        }]
+    
+    blocks = []
+    current_line = 1
+    total_lines = max(len(file1_lines), 1)
+    
+    for change_start, change_count, change_type in sorted(changes):
+        # Add no-diff block before this change
+        if current_line < change_start:
+            blocks.append({
+                'type': 'no-diff',
+                'start': current_line,
+                'end': change_start - 1,
+                'lines': change_start - current_line
+            })
+        
+        # Add diff block
+        change_end = change_start + change_count - 1
+        blocks.append({
+            'type': change_type,
+            'start': change_start,
+            'end': change_end,
+            'lines': change_count
+        })
+        
+        current_line = change_end + 1
+    
+    # Add final no-diff block if needed
+    if current_line <= total_lines:
+        blocks.append({
+            'type': 'no-diff',
+            'start': current_line,
+            'end': total_lines,
+            'lines': total_lines - current_line + 1
+        })
+    
+    return blocks
+
+
+def count_chars(lines: List[str]) -> int:
+    """Count total characters in lines."""
+    return sum(len(line) for line in lines)
+
+
+def get_color_for_type(change_type: str) -> str:
+    """Get color for change type."""
+    if change_type == 'change':
+        return Colors.YELLOW
+    elif change_type == 'add':
+        return Colors.GREEN
+    elif change_type == 'delete':
+        return Colors.RED
+    return ''
+
+
+def show_summary(file1: str, file2: str):
+    """Show compact block summary."""
+    file1_lines = get_file_lines(file1)
+    file2_lines = get_file_lines(file2)
+    
+    # Show file info with timestamps
+    mtime1 = get_file_mtime(file1)
+    mtime2 = get_file_mtime(file2)
+    
+    print(f"{Colors.BOLD}{Colors.CYAN}File 1:{Colors.RESET} {file1} {Colors.GRAY}({mtime1}){Colors.RESET}")
+    print(f"{Colors.BOLD}{Colors.CYAN}File 2:{Colors.RESET} {file2} {Colors.GRAY}({mtime2}){Colors.RESET}")
+    
+    # Indicate which is newer
+    try:
+        if os.path.getmtime(file1) > os.path.getmtime(file2):
+            print(f"{Colors.GRAY}→ File 1 is newer{Colors.RESET}")
+        elif os.path.getmtime(file2) > os.path.getmtime(file1):
+            print(f"{Colors.GRAY}→ File 2 is newer{Colors.RESET}")
+        else:
+            print(f"{Colors.GRAY}→ Files have same modification time{Colors.RESET}")
+    except Exception:
+        pass
+    
+    print()
+    
+    # Run diff
+    result = subprocess.run(
+        ['diff', '-u', file1, file2],
+        capture_output=True,
+        text=True
+    )
+    
+    if result.returncode == 0:
+        # Files are identical
+        print(f"Line 1 to {len(file1_lines)} : {Colors.GRAY}no-diff{Colors.RESET} ({len(file1_lines)} lines, {count_chars(file1_lines)} chars)")
+        return
+    
+    # Parse diff output
+    changes = parse_unified_diff(result.stdout, file1_lines, file2_lines)
+    blocks = create_blocks(file1_lines, changes)
+    
+    # Display blocks
+    for block in blocks:
+        start = block['start']
+        end = block['end']
+        lines = block['lines']
+        block_type = block['type']
+        
+        if block_type == 'no-diff':
+            chars = count_chars(file1_lines[start-1:end])
+            print(f"Line {start:4d} to {end:4d} : {Colors.GRAY}no-diff{Colors.RESET} ({lines} lines, {chars} chars)")
+        else:
+            # For diff blocks, show char counts and type
+            color = get_color_for_type(block_type)
+            type_label = block_type.upper()
+            
+            if block_type == 'change':
+                f1_chars = count_chars(file1_lines[start-1:min(end, len(file1_lines))])
+                f2_chars = count_chars(file2_lines[start-1:min(end, len(file2_lines))])
+                diff_chars = abs(f1_chars - f2_chars)
+                print(f"Line {start:4d} to {end:4d} : {color}{type_label}{Colors.RESET} ({lines} lines, ~{max(f1_chars, f2_chars)} chars, ~{diff_chars} chars differ)")
+            elif block_type == 'add':
+                f2_chars = count_chars(file2_lines[start-1:min(end, len(file2_lines))])
+                print(f"Line {start:4d} to {end:4d} : {color}{type_label}{Colors.RESET} ({lines} lines, {f2_chars} chars in file2 only)")
+            elif block_type == 'delete':
+                f1_chars = count_chars(file1_lines[start-1:min(end, len(file1_lines))])
+                print(f"Line {start:4d} to {end:4d} : {color}{type_label}{Colors.RESET} ({lines} lines, {f1_chars} chars in file1 only)")
+
+
+def show_detail(file1: str, file2: str, target_line: int):
+    """Show detailed diff for block containing target_line."""
+    file1_lines = get_file_lines(file1)
+    file2_lines = get_file_lines(file2)
+    
+    # Run diff
+    result = subprocess.run(
+        ['diff', '-u', file1, file2],
+        capture_output=True,
+        text=True
+    )
+    
+    if result.returncode == 0:
+        print("Files are identical - no differences to show")
+        return
+    
+    # Parse diff output
+    changes = parse_unified_diff(result.stdout, file1_lines, file2_lines)
+    blocks = create_blocks(file1_lines, changes)
+    
+    # Find block containing target line
+    target_block = None
+    for block in blocks:
+        if block['start'] <= target_line <= block['end']:
+            target_block = block
+            break
+    
+    if not target_block:
+        print(f"Line {target_line} not found in file")
+        return
+    
+    block_type = target_block['type']
+    start = target_block['start']
+    end = target_block['end']
+    
+    if block_type == 'no-diff':
+        print(f"Block at line {target_line} has {Colors.GRAY}no differences{Colors.RESET}")
+        print(f"\nLines {start} to {end}:")
+        print("=" * 70)
+        for i in range(start - 1, end):
+            print(f"{i+1:4d} | {file1_lines[i]}", end='')
+        return
+    
+    # Show diff block with color
+    color = get_color_for_type(block_type)
+    type_label = block_type.upper()
+    
+    print(f"Block: Lines {start} to {end} ({color}{type_label}{Colors.RESET})")
+    print("=" * 70)
+    
+    print(f"\n{Colors.BOLD}{Colors.CYAN}*** {file1} ***{Colors.RESET}")
+    for i in range(start - 1, min(end, len(file1_lines))):
+        if i < len(file1_lines):
+            print(f"{i+1:4d} | {file1_lines[i]}", end='')
+    
+    print(f"\n\n{Colors.BOLD}{Colors.CYAN}*** {file2} ***{Colors.RESET}")
+    for i in range(start - 1, min(end, len(file2_lines))):
+        if i < len(file2_lines):
+            print(f"{i+1:4d} | {file2_lines[i]}", end='')
+    
+    print()
+
+
+def merge_lines(file1: str, file2: str, start: int, end: int, direction: str):
+    """
+    Merge lines from one file to another.
+    direction: '>' means copy from file1 to file2
+               '<' means copy from file2 to file1
+    """
+    file1_lines = get_file_lines(file1)
+    file2_lines = get_file_lines(file2)
+    
+    if direction == '>':
+        source = file1
+        target = file2
+        source_lines = file1_lines
+        target_lines = file2_lines
+    else:  # '<'
+        source = file2
+        target = file1
+        source_lines = file2_lines
+        target_lines = file1_lines
+    
+    # Validate range
+    if start < 1 or start > len(source_lines):
+        print(f"Error: Start line {start} out of range for {source} (1-{len(source_lines)})", file=sys.stderr)
+        sys.exit(1)
+    
+    if end < start:
+        print(f"Error: End line {end} is before start line {start}", file=sys.stderr)
+        sys.exit(1)
+    
+    # Adjust end if it's beyond the file
+    end = min(end, len(source_lines))
+    
+    print(f"{Colors.BOLD}Merging lines {start}-{end} from {source} to {target}{Colors.RESET}")
+    print(f"{Colors.GRAY}Creating backup: {target}.bak{Colors.RESET}\n")
+    
+    # Create backup
+    try:
+        with open(target + '.bak', 'w', encoding='utf-8') as f:
+            f.writelines(target_lines)
+    except Exception as e:
+        print(f"Error creating backup: {e}", file=sys.stderr)
+        sys.exit(1)
+    
+    # Show what will be replaced
+    print(f"{Colors.CYAN}Lines to copy from {source}:{Colors.RESET}")
+    for i in range(start - 1, end):
+        print(f"  {i+1:4d} | {source_lines[i]}", end='')
+    
+    print(f"\n{Colors.YELLOW}Will replace in {target}:{Colors.RESET}")
+    for i in range(start - 1, min(end, len(target_lines))):
+        if i < len(target_lines):
+            print(f"  {i+1:4d} | {target_lines[i]}", end='')
+    
+    # Perform the merge
+    new_lines = target_lines[:start-1] + source_lines[start-1:end] + target_lines[end:]
+    
+    try:
+        with open(target, 'w', encoding='utf-8') as f:
+            f.writelines(new_lines)
+        print(f"\n{Colors.GREEN}✓ Successfully merged lines to {target}{Colors.RESET}")
+    except Exception as e:
+        print(f"\n{Colors.RED}Error writing to {target}: {e}{Colors.RESET}", file=sys.stderr)
+        sys.exit(1)
+
+
+def main():
+    # Disable colors if output is redirected
+    if not sys.stdout.isatty():
+        Colors.disable()
+    
+    if len(sys.argv) < 3:
+        print(__doc__)
+        sys.exit(1)
+    
+    file1 = sys.argv[1]
+    file2 = sys.argv[2]
+    
+    if len(sys.argv) == 3:
+        # Summary mode
+        show_summary(file1, file2)
+    
+    elif len(sys.argv) == 4:
+        # Detail mode or single-line merge
+        arg = sys.argv[3]
+        
+        if arg in ['>', '<']:
+            print("Error: Must specify line number or range before direction", file=sys.stderr)
+            sys.exit(1)
+        
+        try:
+            target_line = int(arg)
+            show_detail(file1, file2, target_line)
+        except ValueError:
+            print(f"Error: '{arg}' is not a valid line number", file=sys.stderr)
+            sys.exit(1)
+    
+    elif len(sys.argv) == 5:
+        # Merge mode
+        range_arg = sys.argv[3]
+        direction = sys.argv[4]
+        
+        if direction not in ['>', '<']:
+            print(f"Error: Direction must be '>' or '<', not '{direction}'", file=sys.stderr)
+            sys.exit(1)
+        
+        # Parse range (e.g., "13-15" or "13")
+        if '-' in range_arg:
+            try:
+                start, end = map(int, range_arg.split('-'))
+            except ValueError:
+                print(f"Error: Invalid range '{range_arg}'. Use format: START-END", file=sys.stderr)
+                sys.exit(1)
+        else:
+            # Single line or block - need to find the block
+            try:
+                line_num = int(range_arg)
+                
+                # Find the block containing this line
+                file1_lines = get_file_lines(file1)
+                file2_lines = get_file_lines(file2)
+                
+                result = subprocess.run(
+                    ['diff', '-u', file1, file2],
+                    capture_output=True,
+                    text=True
+                )
+                
+                if result.returncode == 0:
+                    print("Files are identical - nothing to merge")
+                    sys.exit(0)
+                
+                changes = parse_unified_diff(result.stdout, file1_lines, file2_lines)
+                blocks = create_blocks(file1_lines, changes)
+                
+                # Find block containing this line
+                target_block = None
+                for block in blocks:
+                    if block['start'] <= line_num <= block['end']:
+                        target_block = block
+                        break
+                
+                if not target_block:
+                    print(f"Line {line_num} not found")
+                    sys.exit(1)
+                
+                if target_block['type'] == 'no-diff':
+                    print(f"Line {line_num} is in a no-diff block - nothing to merge")
+                    sys.exit(0)
+                
+                start = target_block['start']
+                end = target_block['end']
+                
+            except ValueError:
+                print(f"Error: Invalid line number '{range_arg}'", file=sys.stderr)
+                sys.exit(1)
+        
+        merge_lines(file1, file2, start, end, direction)
+    
+    else:
+        print("Error: Too many arguments", file=sys.stderr)
+        print(__doc__)
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()
+
