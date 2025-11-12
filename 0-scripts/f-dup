@@ -55,8 +55,8 @@ Examples:
 EOF
 }
 
-# Show help if no arguments or -h/--help
-if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+# Show help if -h/--help
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     show_help
     exit 0
 fi
