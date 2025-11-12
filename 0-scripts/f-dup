@@ -1,0 +1,342 @@
+#!/usr/bin/env bash
+# Author: Roy Wiseman 2025-01
+# Updated: 2025-11-06 - Find duplicate files using size and hash comparison
+
+# ANSI color codes
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+CYAN='\033[0;36m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+WHITE='\033[1;37m'
+BOLD='\033[1m'
+
+# --- Help Function ---
+show_help() {
+cat << EOF
+Usage: $(basename "$0") [directory] [options]
+  directory:       Target directory to search (default: current directory).
+
+Options:
+  -1, --first-only Show only first instance of each duplicate set
+  -m, --min-size   Minimum file size to consider (e.g., 1M, 100K, default: 1 byte)
+  --md5            Use MD5 hashing (faster, default)
+  --sha256         Use SHA256 hashing (more secure)
+  -q, --quiet      Suppress summary output (for piping)
+  -s, --sudo       Use sudo for find command
+  -e, --exclude    Exclude paths matching pattern (can be used multiple times)
+                   Example: --exclude .git --exclude node_modules
+  -h, --help       Show this help
+
+Methodology:
+  This tool uses a two-stage approach for efficient duplicate detection:
+  
+  Stage 1: Group by Size (Fast)
+    - Finds all files and groups them by size
+    - Skips files that are unique by size (cannot be duplicates)
+    - Only files with matching sizes proceed to Stage 2
+  
+  Stage 2: Hash Comparison (Accurate)
+    - Calculates hash (MD5 or SHA256) for files with matching sizes
+    - Groups files by hash value
+    - Reports files with identical hashes as true duplicates
+  
+  This approach is much faster than hashing every file, since most files
+  are unique by size and can be eliminated in Stage 1.
+
+Examples:
+  $(basename "$0")                    # Find all duplicates in current directory
+  $(basename "$0") /media             # Find duplicates in /media
+  $(basename "$0") -m 1M              # Only check files >= 1MB
+  $(basename "$0") --sha256           # Use SHA256 instead of MD5
+  $(basename "$0") -1                 # Show only first of each duplicate set
+  $(basename "$0") -s /root           # Search /root with sudo
+  $(basename "$0") --exclude .git     # Exclude .git directories
+EOF
+}
+
+# Show help if no arguments or -h/--help
+if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+    show_help
+    exit 0
+fi
+
+# --- Default values ---
+dir="."
+use_sudo=""
+excludes=()
+quiet_mode=false
+first_only=false
+min_size="1c"  # 1 byte in find's size format
+hash_algo="md5sum"
+hash_name="MD5"
+
+# --- Argument Parsing ---
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        --sudo|-s)
+            use_sudo="sudo"
+            shift
+            ;;
+        --quiet|-q)
+            quiet_mode=true
+            shift
+            ;;
+        --first-only|-1)
+            first_only=true
+            shift
+            ;;
+        --min-size|-m)
+            if [[ -n "$2" && "$2" != -* ]]; then
+                # Convert human-readable size to find's format
+                min_size="$2"
+                shift 2
+            else
+                echo "Error: --min-size requires a size argument (e.g., 1M, 100K)"
+                exit 1
+            fi
+            ;;
+        --md5)
+            hash_algo="md5sum"
+            hash_name="MD5"
+            shift
+            ;;
+        --sha256)
+            hash_algo="sha256sum"
+            hash_name="SHA256"
+            shift
+            ;;
+        --exclude|-e)
+            if [[ -n "$2" && "$2" != -* ]]; then
+                excludes+=("$2")
+                shift 2
+            else
+                echo "Error: --exclude requires a pattern argument"
+                exit 1
+            fi
+            ;;
+        -*)
+            echo "Error: Unknown option '$1'" >&2
+            echo "Use $(basename "$0") -h or --help for usage instructions." >&2
+            exit 1
+            ;;
+        *)
+            if [[ -d "$1" ]]; then
+                dir="$1"
+            else
+                echo "Error: Directory '$1' not found." >&2
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+# --- Basic Input Validation ---
+if [[ ! -d "$dir" ]]; then
+    echo "Error: Directory '$dir' not found." >&2
+    echo "Use $(basename "$0") -h or --help for usage instructions." >&2
+    exit 1
+fi
+
+# Build exclude conditions for find
+exclude_args=""
+for exclude in "${excludes[@]}"; do
+    exclude_args="$exclude_args -not -path '*/$exclude/*' -not -path '*/$exclude'"
+done
+
+# --- Main execution ---
+
+# Start timer (GNU date for %N nanoseconds)
+start_time=$(date +%s.%N)
+
+# Stage 1: Find all files and group by size
+if [[ "$quiet_mode" != true ]]; then
+    echo "Stage 1: Grouping files by size..." >&2
+fi
+
+# Create temp files
+temp_all_files=$(mktemp)
+temp_size_groups=$(mktemp)
+temp_duplicates=$(mktemp)
+
+# Find all files with their sizes
+find_cmd="$use_sudo find \"$dir\" -xdev -type f -size +${min_size}${exclude_args} -printf '%s %p\n'"
+eval "$find_cmd" 2>/dev/null > "$temp_all_files"
+find_exit_status=$?
+
+# Count total files
+total_files=$(wc -l < "$temp_all_files")
+
+if [[ "$quiet_mode" != true ]]; then
+    echo "  Found $total_files files" >&2
+fi
+
+# Group by size and find sizes that have multiple files
+awk '{
+    size = $1
+    $1 = ""
+    filepath = substr($0, 2)
+    sizes[size] = sizes[size] filepath "\n"
+    count[size]++
+}
+END {
+    for (size in count) {
+        if (count[size] > 1) {
+            printf "%s\n", sizes[size]
+        }
+    }
+}' "$temp_all_files" > "$temp_size_groups"
+
+# Count files that need hashing
+files_to_hash=$(wc -l < "$temp_size_groups")
+
+if [[ "$quiet_mode" != true ]]; then
+    echo "  ${files_to_hash} files have matching sizes and need hash comparison" >&2
+fi
+
+if [[ $files_to_hash -eq 0 ]]; then
+    if [[ "$quiet_mode" != true ]]; then
+        echo >&2
+        echo "No duplicate files found (all files are unique by size)." >&2
+    fi
+    rm -f "$temp_all_files" "$temp_size_groups" "$temp_duplicates"
+    
+    # End timer
+    end_time=$(date +%s.%N)
+    elapsed=$(echo "$end_time - $start_time" | bc)
+    elapsed_formatted=$(printf "%.2f" $elapsed)
+    
+    if [[ "$quiet_mode" != true ]]; then
+        echo >&2
+        echo "Find duplicate files ($(basename $0) -h for options)" >&2
+        echo -e "Hash algorithm: ${YELLOW}${hash_name}${NC}" >&2
+        echo -e "Execution time: ${YELLOW}${elapsed_formatted}${NC} seconds" >&2
+        echo -e "Duplicate sets found: ${YELLOW}0${NC}" >&2
+    fi
+    exit 0
+fi
+
+# Stage 2: Hash files with matching sizes
+if [[ "$quiet_mode" != true ]]; then
+    echo >&2
+    echo "Stage 2: Computing ${hash_name} hashes for files with matching sizes..." >&2
+fi
+
+# Hash each file and group by hash
+declare -A hash_to_files
+duplicate_set_count=0
+
+while IFS= read -r filepath; do
+    if [[ -f "$filepath" ]]; then
+        # Calculate hash
+        hash_output=$($hash_algo "$filepath" 2>/dev/null)
+        if [[ $? -eq 0 ]]; then
+            hash=$(echo "$hash_output" | awk '{print $1}')
+            # Get file size and modification time
+            size=$(stat -c '%s' "$filepath" 2>/dev/null)
+            mtime=$(stat -c '%Y' "$filepath" 2>/dev/null)
+            
+            # Store: hash -> size|mtime|filepath
+            if [[ -n "${hash_to_files[$hash]}" ]]; then
+                hash_to_files[$hash]+=$'\n'"$size|$mtime|$filepath"
+            else
+                hash_to_files[$hash]="$size|$mtime|$filepath"
+            fi
+        fi
+    fi
+done < "$temp_size_groups"
+
+# Find and display duplicate sets
+for hash in "${!hash_to_files[@]}"; do
+    file_list="${hash_to_files[$hash]}"
+    file_count=$(echo "$file_list" | wc -l)
+    
+    if [[ $file_count -gt 1 ]]; then
+        duplicate_set_count=$((duplicate_set_count + 1))
+        
+        # Get size from first file for display
+        first_line=$(echo "$file_list" | head -1)
+        size_bytes=$(echo "$first_line" | cut -d'|' -f1)
+        size_human=$(numfmt --to=iec-i --suffix=B "$size_bytes" 2>/dev/null || echo "${size_bytes}B")
+        
+        # Display duplicate set header
+        echo -e "\n${CYAN}# Duplicate set ${duplicate_set_count} (${file_count} files, ${size_human} each):${NC}"
+        
+        # Sort by modification time (newest first) and display
+        display_count=0
+        echo "$file_list" | sort -t'|' -k2 -rn | while IFS='|' read -r size mtime filepath; do
+            # Format timestamp
+            timestamp=$(date -d "@$mtime" "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "unknown")
+            size_display=$(numfmt --to=iec-i --suffix=B "$size" 2>/dev/null || echo "${size}B")
+            
+            # Only show first file if --first-only flag is set
+            if [[ "$first_only" == true && $display_count -gt 0 ]]; then
+                continue
+            fi
+            
+            echo "$timestamp  $size_display  $filepath"
+            display_count=$((display_count + 1))
+        done
+        
+        # Store summary info
+        echo "$file_count|$size_human" >> "$temp_duplicates"
+    fi
+done
+
+# Count total duplicates
+total_duplicate_sets=$(wc -l < "$temp_duplicates" 2>/dev/null || echo "0")
+
+# Calculate wasted space
+wasted_space=0
+while IFS='|' read -r count size_str; do
+    # Each duplicate set wastes (count - 1) * size
+    # Extract numeric part from size string (e.g., "2.5MiB" -> "2.5M")
+    size_for_calc=$(echo "$size_str" | sed 's/iB$//')
+    
+    # Convert to bytes for calculation
+    size_bytes=$(numfmt --from=iec "$size_for_calc" 2>/dev/null || echo "0")
+    wasted=$((size_bytes * (count - 1)))
+    wasted_space=$((wasted_space + wasted))
+done < "$temp_duplicates"
+
+wasted_human=$(numfmt --to=iec-i --suffix=B "$wasted_space" 2>/dev/null || echo "${wasted_space}B")
+
+# Clean up temp files
+rm -f "$temp_all_files" "$temp_size_groups" "$temp_duplicates"
+
+# Check for permission errors
+if [[ $find_exit_status -ne 0 ]]; then
+    if [[ "$quiet_mode" != true ]]; then
+        if [[ $find_exit_status -eq 1 ]]; then
+            echo >&2
+            echo "Note: Some directories were inaccessible (permission denied)." >&2
+            echo "      Use -s/--sudo to search all directories." >&2
+        else
+            echo "Warning: The find command exited with status ${find_exit_status}." >&2
+        fi
+    fi
+fi
+
+# End timer and calculate duration with decimal precision
+end_time=$(date +%s.%N)
+elapsed=$(echo "$end_time - $start_time" | bc)
+elapsed_formatted=$(printf "%.2f" $elapsed)
+
+# Display summary only if not in quiet mode
+if [[ "$quiet_mode" != true ]]; then
+    echo
+    echo "Find duplicate files ($(basename $0) -h for options)"
+    echo -e "Hash algorithm: ${YELLOW}${hash_name}${NC}"
+    echo -e "Minimum size: ${YELLOW}${min_size}${NC}"
+    echo -e "Execution time: ${YELLOW}${elapsed_formatted}${NC} seconds"
+    echo -e "Duplicate sets found: ${YELLOW}${total_duplicate_sets}${NC}"
+    if [[ $total_duplicate_sets -gt 0 ]]; then
+        echo -e "Wasted space: ${RED}${wasted_human}${NC}"
+    fi
+fi
+
