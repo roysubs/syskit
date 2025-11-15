@@ -1,0 +1,497 @@
+#!/bin/bash
+#
+# start-share.sh (v1)
+# Dynamically create Samba shares for directories
+#
+# Usage: start-share [path]
+#        start-share --list
+#        start-share --remove <share_name>
+#
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Configuration
+SMB_CONF="/etc/samba/smb.conf"
+SHARE_PREFIX="auto_"
+VERSION="1.0"
+
+# Execute command with sudo only if not root
+as_root() {
+    if [ "$EUID" -eq 0 ]; then
+        # Already root, just execute
+        "$@"
+    else
+        # Not root, use sudo
+        sudo "$@"
+    fi
+}
+
+# Show help
+show_help() {
+    echo "start-share v${VERSION}"
+    echo ""
+    echo "Dynamically create and manage Samba shares for directories"
+    echo ""
+    echo "Usage:"
+    echo "  start-share [path]              Create a share for the specified path (or current directory)"
+    echo "  start-share --list, -l          List all auto-created shares"
+    echo "  start-share --remove, -r <name> Remove an auto-created share"
+    echo "  start-share --help, -h          Show this help message"
+    echo "  start-share --version, -v       Show version information"
+    echo ""
+    echo "Examples:"
+    echo "  start-share                     Share current directory (interactive)"
+    echo "  start-share /home/user/project  Share a specific directory"
+    echo "  start-share --list              View all auto-created shares"
+    echo "  start-share --remove auto_name  Remove a share"
+    echo ""
+    echo "Note: Operations that modify the Samba configuration require sudo privileges."
+}
+
+# Show version
+show_version() {
+    echo "start-share v${VERSION}"
+}
+
+# Check if running with sufficient privileges (no longer used as upfront check)
+# Kept for reference but functionality moved inline
+check_privileges() {
+    return 0
+}
+
+# List all auto-created shares
+list_shares() {
+    if [ ! -r "$SMB_CONF" ]; then
+        echo -e "${RED}Error: Cannot read $SMB_CONF${NC}"
+        echo "You may need elevated privileges to read the Samba configuration."
+        return 1
+    fi
+    
+    echo -e "${CYAN}=== Auto-created Samba Shares ===${NC}"
+    echo ""
+    
+    local found=false
+    local current_share=""
+    local current_path=""
+    
+    while IFS= read -r line; do
+        # Skip comments and empty lines
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+        
+        # Detect share section
+        if [[ "$line" =~ ^\[([^]]+)\] ]]; then
+            # Print previous share if it was auto-created
+            if [ -n "$current_share" ] && [[ "$current_share" == ${SHARE_PREFIX}* ]]; then
+                echo -e "${GREEN}[$current_share]${NC}"
+                echo -e "  Path: ${BLUE}$current_path${NC}"
+                echo ""
+                found=true
+            fi
+            
+            current_share="${BASH_REMATCH[1]}"
+            current_path=""
+            continue
+        fi
+        
+        # Extract path
+        if [[ "$line" =~ ^[[:space:]]*[Pp][Aa][Tt][Hh][[:space:]]*=[[:space:]]*(.+)$ ]]; then
+            current_path="${BASH_REMATCH[1]}"
+            current_path="${current_path%%[[:space:]#]*}"
+        fi
+    done < <(grep -vE '^[[:space:]]*;' "$SMB_CONF")
+    
+    # Check last share
+    if [ -n "$current_share" ] && [[ "$current_share" == ${SHARE_PREFIX}* ]]; then
+        echo -e "${GREEN}[$current_share]${NC}"
+        echo -e "  Path: ${BLUE}$current_path${NC}"
+        echo ""
+        found=true
+    fi
+    
+    if [ "$found" = false ]; then
+        echo "No auto-created shares found."
+    fi
+}
+
+# Remove a share
+remove_share() {
+    local share_name="$1"
+    
+    if [[ ! "$share_name" == ${SHARE_PREFIX}* ]]; then
+        echo -e "${RED}Error: Can only remove auto-created shares (starting with '${SHARE_PREFIX}').${NC}"
+        exit 1
+    fi
+    
+    echo -e "${YELLOW}Removing share: $share_name${NC}"
+    
+    # Create temporary file
+    local temp_file=$(mktemp)
+    
+    local in_target_section=false
+    local removed=false
+    
+    while IFS= read -r line; do
+        # Check if we're entering the target section
+        if [[ "$line" =~ ^\[([^]]+)\] ]]; then
+            if [ "${BASH_REMATCH[1]}" = "$share_name" ]; then
+                in_target_section=true
+                removed=true
+                continue  # Skip this line
+            else
+                in_target_section=false
+            fi
+        fi
+        
+        # Skip lines if we're in the target section
+        if [ "$in_target_section" = false ]; then
+            echo "$line" >> "$temp_file"
+        fi
+    done < "$SMB_CONF"
+    
+    if [ "$removed" = true ]; then
+        # Backup original (requires sudo)
+        echo "Backing up configuration..."
+        as_root cp "$SMB_CONF" "${SMB_CONF}.backup.$(date +%Y%m%d_%H%M%S)" || {
+            echo -e "${RED}Error: Failed to backup configuration file.${NC}"
+            rm "$temp_file"
+            exit 1
+        }
+        
+        # Replace with new config (requires sudo)
+        echo "Updating configuration file..."
+        as_root mv "$temp_file" "$SMB_CONF" || {
+            echo -e "${RED}Error: Failed to update configuration file.${NC}"
+            rm "$temp_file"
+            exit 1
+        }
+        
+        # Reload Samba (requires sudo)
+        echo "Reloading Samba configuration..."
+        as_root smbcontrol smbd reload-config 2>/dev/null || as_root systemctl reload smbd 2>/dev/null || as_root service smbd reload || {
+            echo -e "${YELLOW}Warning: Could not reload Samba. You may need to restart manually.${NC}"
+        }
+        
+        echo -e "${GREEN}✓ Share removed successfully.${NC}"
+    else
+        rm "$temp_file"
+        echo -e "${RED}Error: Share '$share_name' not found.${NC}"
+        exit 1
+    fi
+}
+
+# Generate a unique share name
+generate_share_name() {
+    local base_path="$1"
+    local base_name=$(basename "$base_path")
+    
+    # Sanitize name: lowercase, replace spaces/special chars with underscores
+    base_name=$(echo "$base_name" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]' '_')
+    
+    local share_name="${SHARE_PREFIX}${base_name}"
+    local counter=1
+    
+    # Check if share name already exists
+    while grep -q "^\[${share_name}\]" "$SMB_CONF" 2>/dev/null; do
+        share_name="${SHARE_PREFIX}${base_name}_${counter}"
+        ((counter++))
+    done
+    
+    echo "$share_name"
+}
+
+# Check if path is already in a share
+check_existing_share() {
+    local target_path="$1"
+    
+    # Check if we can read the config file
+    if [ ! -r "$SMB_CONF" ]; then
+        # Can't read config, skip check
+        return 1
+    fi
+    
+    local current_share=""
+    local current_path=""
+    
+    while IFS= read -r line; do
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+        
+        if [[ "$line" =~ ^\[([^]]+)\] ]]; then
+            if [ -n "$current_share" ] && [ -n "$current_path" ]; then
+                # Check if target path is within this share
+                if [[ "$target_path" == "$current_path"* ]]; then
+                    echo "$current_share|$current_path"
+                    return 0
+                fi
+            fi
+            
+            current_share="${BASH_REMATCH[1]}"
+            current_path=""
+            continue
+        fi
+        
+        if [[ "$line" =~ ^[[:space:]]*[Pp][Aa][Tt][Hh][[:space:]]*=[[:space:]]*(.+)$ ]]; then
+            current_path="${BASH_REMATCH[1]}"
+            current_path="${current_path%%[[:space:]#]*}"
+            current_path="${current_path%/}"  # Remove trailing slash
+        fi
+    done < <(grep -vE '^[[:space:]]*;' "$SMB_CONF")
+    
+    # Check last share
+    if [ -n "$current_share" ] && [ -n "$current_path" ]; then
+        if [[ "$target_path" == "$current_path"* ]]; then
+            echo "$current_share|$current_path"
+            return 0
+        fi
+    fi
+    
+    return 1
+}
+
+# Find potential parent directories
+get_parent_candidates() {
+    local target_path="$1"
+    local candidates=()
+    
+    # Start with the target path itself
+    candidates+=("$target_path")
+    
+    # Walk up the directory tree
+    local current="$target_path"
+    while [ "$current" != "/" ] && [ "$current" != "$HOME" ]; do
+        current=$(dirname "$current")
+        
+        # Stop at home directory
+        if [ "$current" = "$HOME" ]; then
+            candidates+=("$current")
+            break
+        fi
+        
+        candidates+=("$current")
+        
+        # Limit to reasonable depth (e.g., 5 levels up)
+        if [ ${#candidates[@]} -ge 6 ]; then
+            break
+        fi
+    done
+    
+    printf '%s\n' "${candidates[@]}"
+}
+
+# Interactive parent selection
+select_parent_directory() {
+    local target_path="$1"
+    
+    # All prompts go to stderr so they don't get captured
+    echo "" >&2
+    echo -e "${CYAN}=== Select Directory to Share ===${NC}" >&2
+    echo "" >&2
+    echo "Sharing a parent directory allows multiple subdirectories to be accessed" >&2
+    echo "through a single share, reducing clutter and improving organization." >&2
+    echo "" >&2
+    
+    local candidates=($(get_parent_candidates "$target_path"))
+    
+    if [ ${#candidates[@]} -eq 1 ]; then
+        echo "Only option: ${candidates[0]}" >&2
+        echo "${candidates[0]}"  # Only this goes to stdout
+        return
+    fi
+    
+    local i=1
+    for candidate in "${candidates[@]}"; do
+        local annotation=""
+        
+        # Add helpful annotations
+        if [ "$candidate" = "$target_path" ]; then
+            annotation=" ${YELLOW}(requested path)${NC}"
+        elif [ "$candidate" = "$HOME" ]; then
+            annotation=" ${GREEN}(home directory)${NC}"
+        elif [ -d "$candidate/.git" ]; then
+            annotation=" ${BLUE}(git repository root)${NC}"
+        fi
+        
+        echo -e "  ${GREEN}$i${NC}. $candidate$annotation" >&2
+        ((i++))
+    done
+    
+    echo "" >&2
+    read -p "Select directory to share [1]: " choice <&2
+    
+    # Default to 1 if empty
+    choice=${choice:-1}
+    
+    # Validate choice
+    if ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt ${#candidates[@]} ]; then
+        echo -e "${RED}Invalid choice. Using requested path.${NC}" >&2
+        echo "${candidates[0]}"  # Only this goes to stdout
+        return
+    fi
+    
+    local selected_index=$((choice - 1))
+    echo "${candidates[$selected_index]}"  # Only this goes to stdout
+}
+
+# Create a new Samba share
+create_share() {
+    local target_path="$1"
+    
+    # Check if already in a share
+    if existing=$(check_existing_share "$target_path"); then
+        local existing_share=$(echo "$existing" | cut -d'|' -f1)
+        local existing_path=$(echo "$existing" | cut -d'|' -f2)
+        
+        echo -e "${YELLOW}Path is already accessible via existing share:${NC}"
+        echo -e "  Share: ${GREEN}[$existing_share]${NC}"
+        echo -e "  Path:  ${BLUE}$existing_path${NC}"
+        echo ""
+        echo "No action needed."
+        exit 0
+    fi
+    
+    # Interactive parent selection
+    local share_path=$(select_parent_directory "$target_path")
+    
+    echo ""
+    echo -e "Creating share for: ${BLUE}$share_path${NC}"
+    
+    # Generate share name
+    local share_name=$(generate_share_name "$share_path")
+    echo -e "Share name: ${GREEN}[$share_name]${NC}"
+    
+    # Confirm with user
+    echo ""
+    read -p "Proceed with share creation? [Y/n]: " confirm
+    confirm=${confirm:-Y}
+    
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo "Cancelled."
+        exit 0
+    fi
+    
+    # Backup original config
+    echo ""
+    echo "Backing up configuration..."
+    as_root cp "$SMB_CONF" "${SMB_CONF}.backup.$(date +%Y%m%d_%H%M%S)" || {
+        echo -e "${RED}Error: Failed to backup configuration file.${NC}"
+        exit 1
+    }
+    
+    # Create temporary file with new share configuration
+    local temp_file=$(mktemp)
+    cat >> "$temp_file" << EOF
+
+[$share_name]
+    path = $share_path
+    browseable = yes
+    read only = no
+    guest ok = no
+    create mask = 0644
+    directory mask = 0755
+    valid users = $USER
+    # Auto-created by start-share on $(date)
+EOF
+    
+    # Append new share to config
+    echo "Adding share to configuration..."
+    as_root tee -a "$SMB_CONF" < "$temp_file" > /dev/null || {
+        echo -e "${RED}Error: Failed to update configuration file.${NC}"
+        rm "$temp_file"
+        exit 1
+    }
+    rm "$temp_file"
+    
+    # Reload Samba configuration
+    echo ""
+    echo "Reloading Samba configuration..."
+    if as_root smbcontrol smbd reload-config 2>/dev/null; then
+        echo -e "${GREEN}✓ Configuration reloaded successfully (no restart needed).${NC}"
+    elif as_root systemctl reload smbd 2>/dev/null; then
+        echo -e "${GREEN}✓ Configuration reloaded successfully (systemctl).${NC}"
+    elif as_root service smbd reload 2>/dev/null; then
+        echo -e "${GREEN}✓ Configuration reloaded successfully (service).${NC}"
+    else
+        echo -e "${YELLOW}Warning: Could not reload Samba. You may need to restart manually:${NC}"
+        echo "  sudo systemctl restart smbd"
+    fi
+    
+    echo ""
+    echo -e "${GREEN}✓ Share created successfully!${NC}"
+    echo ""
+    echo -e "Share details:"
+    echo -e "  Name: ${GREEN}[$share_name]${NC}"
+    echo -e "  Path: ${BLUE}$share_path${NC}"
+    echo -e "  UNC:  ${CYAN}\\\\\\\\$(hostname)\\\\${share_name}${NC}"
+}
+
+# Main script logic
+main() {
+    # Handle help flags
+    if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+        show_help
+        exit 0
+    fi
+    
+    # Handle version flags
+    if [ "$1" = "--version" ] || [ "$1" = "-v" ]; then
+        show_version
+        exit 0
+    fi
+    
+    # Handle --list flag
+    if [ "$1" = "--list" ] || [ "$1" = "-l" ]; then
+        list_shares
+        exit 0
+    fi
+    
+    # Handle --remove flag
+    if [ "$1" = "--remove" ] || [ "$1" = "-r" ]; then
+        if [ -z "$2" ]; then
+            echo -e "${RED}Error: Share name required.${NC}"
+            echo "Usage: start-share --remove <share_name>"
+            exit 1
+        fi
+        remove_share "$2"
+        exit 0
+    fi
+    
+    # Handle path argument
+    if [ -z "$1" ]; then
+        # No argument provided - use current directory
+        TARGET_PATH=$(pwd)
+    else
+        # Argument provided - resolve it
+        if [ ! -e "$1" ]; then
+            echo -e "${RED}Error: Path does not exist: $1${NC}"
+            exit 1
+        fi
+        TARGET_PATH=$(realpath "$1")
+    fi
+    
+    # Ensure it's a directory
+    if [ ! -d "$TARGET_PATH" ]; then
+        echo -e "${YELLOW}Note: Target is a file, sharing parent directory instead.${NC}"
+        TARGET_PATH=$(dirname "$TARGET_PATH")
+    fi
+    
+    # Check if we need privileges and inform user
+    if [ "$EUID" -ne 0 ]; then
+        echo -e "${YELLOW}Note: Creating Samba shares requires administrative privileges.${NC}"
+        echo "You will be prompted for your password when needed."
+        echo ""
+    fi
+    
+    create_share "$TARGET_PATH"
+}
+
+# Run main function
+main "$@"
