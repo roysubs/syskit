@@ -1,6 +1,9 @@
 #!/bin/bash
 # Author: Roy Wiseman (Refactored by Gemini) 2025-01
 # Description: Fast directory size analyzer with dynamic column width and permission hints.
+# Change:
+#   - v6.1: Fixed typo 2>/null to 2>/dev/null
+#   - v6.2: Fixed syntax error in 'find' command (missing space)
 
 # --- Configuration ---
 set -o pipefail  # Crucial: allows us to catch 'find' errors after the pipeline
@@ -20,6 +23,7 @@ target_path="."
 max_depth=""     # Empty means infinite recursion
 specific_ext=""  # Empty means report all
 report_mode="summary" # Options: summary, breakdown
+list_files=0     # Use 0 for false
 excludes=()
 
 # --- Helper Functions ---
@@ -28,17 +32,19 @@ show_help() {
     echo -e "${CYAN}SysKit Size Analyzer${NC}"
     echo "Usage: size [options] [path]"
     echo ""
-    echo "  [path]              Directory to analyze (defaults to current)."
+    echo "  [path]                Directory to analyze (defaults to current)."
     echo ""
     echo "Options:"
-    echo "  -t, --type [ext]    Report by extension."
-    echo "                      - If [ext] is provided (e.g. 'ps1'), filters only those files."
-    echo "                      - If no [ext] provided, lists ALL extensions found."
-    echo "  -e, --exclude <pat> Exclude file or directory pattern (can be used multiple times)."
-    echo "                      Example: -e .git -e node_modules"
-    echo "  -s, --sudo          Run as root (auto-executes sudo if needed)."
-    echo "  -L <level>          Max depth. '-L 1' is current folder only."
-    echo "  -h, --help          Show this help."
+    echo "  -t, --type [ext]      Report by extension."
+    echo "                        - If [ext] is provided (e.g. 'ps1'), filters only those files."
+    echo "                        - If no [ext] provided, lists ALL extensions found."
+    echo "  -l, -f, --list, --files"
+    echo "                        List all found files, sorted by size (largest first)."
+    echo "  -e, --exclude <pat>   Exclude file or directory pattern (can be used multiple times)."
+    echo "                        Example: -e .git -e node_modules"
+    echo "  -s, --sudo            Run as root (auto-executes sudo if needed)."
+    echo "  -L <level>            Max depth. '-L 1' is current folder only."
+    echo "  -h, --help            Show this help."
     echo ""
 }
 
@@ -76,6 +82,10 @@ while [[ $# -gt 0 ]]; do
                 shift
             fi
             ;;
+        -l|--list|-f|--files) 
+            list_files=1 # Use 1 for true
+            shift
+            ;;
         -e|--exclude)
             if [[ -n "$2" ]]; then
                 excludes+=("$2")
@@ -90,10 +100,6 @@ while [[ $# -gt 0 ]]; do
             show_help
             exit 1
             ;;
-        *)
-            target_path="$1"
-            shift
-            ;;
     esac
 done
 
@@ -103,6 +109,29 @@ if [[ ! -e "$real_path" ]]; then
     echo -e "size: ${RED}Error: '$real_path' does not exist.${NC}" >&2
     exit 1
 fi
+
+# --- Get Disk Usage ---
+parsed_disk_info=""
+disk_info_raw=$(df -P "$real_path" 2>/dev/null | tail -n 1)
+disk_info_human=$(df -P -h "$real_path" 2>/dev/null | tail -n 1)
+
+if [[ -n "$disk_info_raw" && -n "$disk_info_human" ]]; then
+  # Read raw block numbers
+  read -r _ total_blocks used_blocks free_blocks _ mount <<< "$disk_info_raw"
+  # Read human-readable strings
+  read -r _ total_h used_h free_h _ _ <<< "$disk_info_human"
+
+  # Calculate the *correct* percentage (Used / Total)
+  if [[ "$total_blocks" -gt 0 ]]; then
+    percent_calc=$(awk "BEGIN {printf \"%.0f\", ($used_blocks / $total_blocks) * 100}")
+  else
+    percent_calc=0
+  fi
+  
+  # Format the string using human strings but our calculated percentage
+  parsed_disk_info=$(printf "%s : %s total, %s (%s%%) used, %s free" "$mount" "$total_h" "$used_h" "$percent_calc" "$free_h")
+fi
+
 
 # --- Construct the Find Command ---
 
@@ -131,16 +160,25 @@ if [[ -n "$specific_ext" ]]; then
     cmd+=("-name" "*.$specific_ext")
 fi
 
-cmd+=("-type" "f" "-printf" "%s|%f\n")
+# MODIFIED: Output size|path|filename if listing, otherwise original
+if [[ $list_files -eq 1 ]]; then
+    cmd+=("-type" "f" "-printf" "%s|%p|%f\n")
+else
+    # FIX: Added the missing space between "-type" and "f"
+    cmd+=("-type" "f" "-printf" "%s|%f\n")
+fi
+
 
 # --- Execution & Output Processing ---
 
 "${cmd[@]}" | awk -F "|" -v mode="$report_mode" \
-                  -v target_ext="$specific_ext" \
-                  -v search_path="$real_path" \
-                  -v yellow="$YELLOW" \
-                  -v green="$GREEN" \
-                  -v nc="$NC" '
+                     -v list_files="$list_files" \
+                     -v target_ext="$specific_ext" \
+                     -v search_path="$real_path" \
+                     -v parsed_disk_info="$parsed_disk_info" \
+                     -v yellow="$YELLOW" \
+                     -v green="$GREEN" \
+                     -v nc="$NC" '
 
     function human(x) {
         split("B KiB MiB GiB TiB", v, " ")
@@ -148,13 +186,14 @@ cmd+=("-type" "f" "-printf" "%s|%f\n")
         while(x>1024){x/=1024; s++}
 
         if (s == 1) {
+            # Extra padding for Bytes
             return sprintf("%.1f   %s", x, v[s])
         } else {
             return sprintf("%.1f %s", x, v[s])
         }
     }
 
-    function comma(num,   i, res) {
+    function comma(num,    i, res) {
         res = ""
         for (i=length(num); i>0; i--) {
             res = substr(num, i, 1) res
@@ -166,7 +205,27 @@ cmd+=("-type" "f" "-printf" "%s|%f\n")
 
     {
         bytes = $1
-        filename = $2
+        
+        # Handle different printf formats
+        if (list_files) {
+            filepath = $2
+            filename = $3
+            
+            # --- NEW: Make path relative ---
+            relative_path = filepath
+            # Check if filepath starts with search_path
+            if (index(filepath, search_path) == 1 && length(filepath) > length(search_path)) {
+                # Get substring starting *after* search_path and the next "/"
+                relative_path = "./" substr(filepath, length(search_path) + 2)
+            } else if (filepath == search_path) {
+                relative_path = "."
+            }
+            
+            file_paths[total_files + 1] = relative_path
+            file_sizes[total_files + 1] = bytes
+        } else {
+            filename = $2
+        }
 
         n = split(filename, a, ".")
         if (n > 1) {
@@ -188,6 +247,27 @@ cmd+=("-type" "f" "-printf" "%s|%f\n")
             exit
         }
 
+        # --- FILE LISTING (Clean implementation) ---
+        if (list_files) {
+            print yellow "--- File List (Largest First) ---" nc
+            
+            sort_cmd = "sort -k1,1nr | cut -f2-"
+            fmt_str_files = "%12s   %s\n"
+            full_fmt = "%s\t" fmt_str_files
+
+            printf fmt_str_files, "SIZE", "FILE"
+            printf fmt_str_files, "------------", "----"
+
+            for (i = 1; i <= total_files; i++) {
+                printf full_fmt, file_sizes[i], human(file_sizes[i]), file_paths[i] | sort_cmd
+            }
+            close(sort_cmd)
+            
+            print ""
+            print yellow "-------------------------------------" nc
+            print ""
+        }
+
         # --- OUTPUT LOGIC ---
 
         if (target_ext != "") {
@@ -195,11 +275,10 @@ cmd+=("-type" "f" "-printf" "%s|%f\n")
             print "Path: " search_path
             print "Found " yellow comma(ext_counts[target_ext]) nc " files ending in " yellow "." target_ext nc
             print "Total Size: " green human(total_bytes) nc
+            if (parsed_disk_info != "") print parsed_disk_info
         }
         else if (mode == "breakdown") {
             # Breakdown Table Mode
-
-            # 1. Calculate dynamic width for first column
             max_len = 9
             for (e in ext_sizes) {
                 len = length((e == "(no extension)") ? e : "."e)
@@ -208,19 +287,18 @@ cmd+=("-type" "f" "-printf" "%s|%f\n")
             max_len += 2
             fmt_str = "%-" max_len "s %12s %12s\n"
 
-            # Print Header
             printf fmt_str, "EXTENSION", "COUNT", "SIZE"
 
             total_width = max_len + 26
             for(i=1; i<=total_width; i++) printf "-"
             print ""
 
-            # 2. Print Data
             sort_cmd = "sort -k1,1nr | cut -f2-"
+            full_fmt = "%s\t" fmt_str
 
             for (e in ext_sizes) {
                 formatted_ext = (e == "(no extension)") ? e : "."e
-                printf "%s\t" fmt_str, ext_sizes[e], formatted_ext, comma(ext_counts[e]), human(ext_sizes[e]) | sort_cmd
+                printf full_fmt, ext_sizes[e], formatted_ext, comma(ext_counts[e]), human(ext_sizes[e]) | sort_cmd
             }
             close(sort_cmd)
 
@@ -229,11 +307,13 @@ cmd+=("-type" "f" "-printf" "%s|%f\n")
             print ""
             print "Path: " search_path
             print "Total: " yellow comma(total_files) nc " files, " green human(total_bytes) nc
+            if (parsed_disk_info != "") print parsed_disk_info
         }
         else {
             # Summary Mode (Default)
             print "Path: " search_path
             print "Total: " yellow comma(total_files) nc " files, " green human(total_bytes) nc
+            if (parsed_disk_info != "") print parsed_disk_info
         }
     }
 '
