@@ -4,6 +4,7 @@
 # Change:
 #   - v6.1: Fixed typo 2>/null to 2>/dev/null
 #   - v6.2: Fixed syntax error in 'find' command (missing space)
+#   - v7.0: Separated -t (show all types) from -x (filter by extension) for PowerShell symmetry
 
 # --- Configuration ---
 set -o pipefail  # Crucial: allows us to catch 'find' errors after the pipeline
@@ -35,11 +36,11 @@ show_help() {
     echo "  [path]                Directory to analyze (defaults to current)."
     echo ""
     echo "Options:"
-    echo "  -t, --type [ext]      Report by extension."
-    echo "                        - If [ext] is provided (e.g. 'ps1'), filters only those files."
-    echo "                        - If no [ext] provided, lists ALL extensions found."
+    echo "  -t, --type            Report by extension (lists ALL extensions found)."
+    echo "  -x, --ext <ext>       Filter by specific extension (e.g. 'mkv', 'ps1')."
+    echo "                        Use with or without -t flag."
     echo "  -f, --files           List all found files, sorted by size (largest first)."
-    echo "                        e.g.:  size -t mkv -f  (show all sorted files, then summary)."
+    echo "                        e.g.:  size -x mkv -f  (show all sorted files, then summary)."
     echo "  -e, --exclude <pat>   Exclude file or directory pattern (can be used multiple times)."
     echo "                        e.g.:  -e .git -e node_modules"
     echo "  -s, --sudo            Run as root (auto-executes sudo if needed)."
@@ -75,14 +76,18 @@ while [[ $# -gt 0 ]]; do
             ;;
         -t|--type)
             report_mode="breakdown"
+            shift
+            ;;
+        -x|--ext)
             if [[ -n "$2" && ! "$2" =~ ^- ]]; then
                 specific_ext="${2#.}"
                 shift 2
             else
-                shift
+                echo -e "${RED}Error: -x/--ext requires an extension.${NC}" >&2
+                exit 1
             fi
             ;;
-        -l|--list|-f|--files) 
+        -l|--list|-f|--files)
             list_files=1 # Use 1 for true
             shift
             ;;
@@ -99,6 +104,10 @@ while [[ $# -gt 0 ]]; do
             echo -e "${RED}Unknown option: $1${NC}" >&2
             show_help
             exit 1
+            ;;
+        *)
+            target_path="$1"
+            shift
             ;;
     esac
 done
@@ -127,7 +136,7 @@ if [[ -n "$disk_info_raw" && -n "$disk_info_human" ]]; then
   else
     percent_calc=0
   fi
-  
+
   # Format the string using human strings but our calculated percentage
   parsed_disk_info=$(printf "%s : %s total, %s (%s%%) used, %s free" "$mount" "$total_h" "$used_h" "$percent_calc" "$free_h")
 fi
@@ -160,11 +169,10 @@ if [[ -n "$specific_ext" ]]; then
     cmd+=("-name" "*.$specific_ext")
 fi
 
-# MODIFIED: Output size|path|filename if listing, otherwise original
+# Output size|path|filename if listing, otherwise original
 if [[ $list_files -eq 1 ]]; then
     cmd+=("-type" "f" "-printf" "%s|%p|%f\n")
 else
-    # FIX: Added the missing space between "-type" and "f"
     cmd+=("-type" "f" "-printf" "%s|%f\n")
 fi
 
@@ -205,13 +213,13 @@ fi
 
     {
         bytes = $1
-        
+
         # Handle different printf formats
         if (list_files) {
             filepath = $2
             filename = $3
-            
-            # --- NEW: Make path relative ---
+
+            # --- Make path relative ---
             relative_path = filepath
             # Check if filepath starts with search_path
             if (index(filepath, search_path) == 1 && length(filepath) > length(search_path)) {
@@ -220,7 +228,7 @@ fi
             } else if (filepath == search_path) {
                 relative_path = "."
             }
-            
+
             file_paths[total_files + 1] = relative_path
             file_sizes[total_files + 1] = bytes
         } else {
@@ -250,7 +258,7 @@ fi
         # --- FILE LISTING (Clean implementation) ---
         if (list_files) {
             print yellow "--- File List (Largest First) ---" nc
-            
+
             sort_cmd = "sort -k1,1nr | cut -f2-"
             fmt_str_files = "%12s   %s\n"
             full_fmt = "%s\t" fmt_str_files
@@ -262,7 +270,7 @@ fi
                 printf full_fmt, file_sizes[i], human(file_sizes[i]), file_paths[i] | sort_cmd
             }
             close(sort_cmd)
-            
+
             print ""
             print yellow "-------------------------------------" nc
             print ""
@@ -326,3 +334,4 @@ if [[ $pipeline_status -ne 0 ]]; then
     echo -e "${RED}[!] Some directories could not be entered due to permissions.${NC}"
     echo -e "${RED}    Rerun with -s | --sudo to include them.${NC}"
 fi
+

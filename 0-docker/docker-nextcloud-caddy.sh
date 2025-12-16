@@ -1,5 +1,6 @@
 #!/bin/bash
-# Author: Roy Wiseman (template style), Claude (Nextcloud+Caddy implementation) 2025-10
+# Author: Roy Wiseman (template style), (Nextcloud+Caddy implementations)
+# Date: 2025-03
 #
 # Nextcloud + Caddy Docker automated deployment script.
 # Creates a complete, secure personal cloud with automatic HTTPS.

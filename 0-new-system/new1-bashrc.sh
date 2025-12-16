@@ -193,10 +193,10 @@ def() {
 }
 
 # Helpers for various configuration scripts:
-alias bashload='source ~/.bashrc'  # Reload / dotsource .bashrc
-alias bashrc='vi ~/.bashrc'          # Edit .bashrc (user)
-alias inputrc='vi ~/.inputrc'        # Edit .inputrc (user)
-alias vimrc='vi ~/.vimrc'            # Edit .vimrc (user)
+alias bashrcsource='source ~/.bashrc' # Reload / dotsource .bashrc
+alias bashrc='vi ~/.bashrc'           # Edit .bashrc (user)
+alias inputrc='vi ~/.inputrc'         # Edit .inputrc (user)
+alias vimrc='vi ~/.vimrc'             # Edit .vimrc (user)
 alias vimrcroot='sudo vi /etc/vim/vimrc'     # Edit vimrc (system)
 alias vimrcsudo='sudo vi /etc/vim/vimrc'     # Edit vimrc (system)
 config() { cd $HOME/.config || return; ls; } # Jump to ~/.config
@@ -248,7 +248,7 @@ alias venvh='source $HOME/syskit/0-scripts/venv-helper.sh'   # Uses 0-scripts/ve
 alias tt='tmux'
 alias td='tmux detach'   # ta detach current session, ta attach last *or* named session
 ta() { if [ -n "$2" ]; then tmux attach-session -t "$2"; else tmux attach; fi; }
-alias th='t nh'; alias tv='t nv'
+alias thh='t nh'; alias tvv='t nv'
 alias tf='tmux select-pane -t :.+' # Jump to next pane
 alias tb='tmux select-pane -t :.-' # Jump to previous pane
 # tl+, tr+, tu+, td+ resize pane left, right, up, down
@@ -296,8 +296,8 @@ c() {
   i, install  : syskit/0-install
   w, web      : syskit/0-web-apps
 -- custom --
-  ms, mdk, mediadk   : syskit/0-docker/0-media-stack
-  q, mq, qbit, qconf : ~/.config/media-stack/qbittorrent
+  ms          : syskit/0-docker/0-media-stack
+  q, qbit, qc : ~/.config/media-stack/qbittorrent
 -- System --
   h            : \$HOME (same as just 'cd')
   d, down      : \$HOME/Downloads
@@ -323,8 +323,8 @@ EOF
         g|games)     cd "$HOME/syskit/0-games" ;;
         i|install)   cd "$HOME/syskit/0-install" ;;
         w|web)       cd "$HOME/syskit/0-web-apps" ;;
-        ms|mdk|mediadk)   cd "$HOME/syskit/0-docker/0-media-stack" ;;
-        q|mq|qbit|qconf)  cd "$HOME/.config/media-stack/qbittorrent" ;;
+        ms)          cd "$HOME/syskit/0-docker/0-media-stack" ;;
+        q|qbit|qc)   cd "$HOME/.config/media-stack/qbittorrent" ;;
         d|down|downloads) cd "$HOME/Downloads" ;;
         docs)        cd "$HOME/Documents" ;;
         h|home)      cd "$HOME" ;;
