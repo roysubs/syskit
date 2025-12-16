@@ -23,7 +23,6 @@ The `syskit` repo can rapidly bootstrap any Linux system:
 
   • Deploying clean, powerful, and easy to use helper scripts: `a`, `b`, `def`, `dk`, `g`, `h`, `z`, etc
 
-  • 
 
 Bootstrap Process
 =========================
