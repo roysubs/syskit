@@ -1,175 +1,84 @@
 #!/usr/bin/env pwsh
-<#
-.SYNOPSIS
-    Pings a range of IP addresses and resolves hostnames for active IPs.
-
-.DESCRIPTION
-    This script first uses 'ping-iprange-PS5.ps1' to identify active IP addresses
-    within a specified start and end range. For each active IP address found,
-    it then attempts to perform a reverse DNS lookup to determine its hostname.
-    The results, showing IP addresses and their resolved hostnames, are displayed
-    in a table.
-    If run without parameters, this help message is displayed.
-
-.PARAMETER StartAddress
-    The starting IP address of the range to scan. This is mandatory for operation.
-
-.PARAMETER EndAddress
-    The ending IP address of the range to scan. This is mandatory for operation.
-
-.PARAMETER PingScriptPath
-    The path to the 'ping-iprange-PS5.ps1' script. Defaults to './ping-iprange-PS5.ps1'
-    (assuming it's in the same directory as this script).
-
-.PARAMETER Help
-    Displays this help message.
-
-.EXAMPLE
-    ./resolve-iprange.ps1 -StartAddress 192.168.1.1 -EndAddress 192.168.1.10
-
-    IP           Hostname
-    --           --------
-    192.168.1.1  router.local
-    192.168.1.5  fileserver.local
-    192.168.1.7  N/A (Resolution Failed)
-
-    This example scans IPs from 192.168.1.1 to 192.168.1.10, pings them,
-    and then tries to resolve hostnames for those that respond.
-
-.EXAMPLE
-    ./resolve-iprange.ps1 -Help
-
-    Displays this help message.
-
-.EXAMPLE
-    ./resolve-iprange.ps1
-
-    Displays this help message because no parameters were provided.
-
-.NOTES
-    Relies on the 'ping-iprange.ps1' script for the initial ping sweep.
-    Ensure 'ping-iprange.ps1' is executable and its path is correct.
-    DNS resolution can be slow if many hosts are found or DNS servers are unresponsive.
-#>
-[CmdletBinding(DefaultParameterSetName = 'ShowHelp')]
+[CmdletBinding()]
 param (
-    [Parameter(ParameterSetName = 'ResolveRange', Mandatory = $true, Position = 0, HelpMessage = "The starting IP address of the range.")]
     [System.Net.IPAddress]$StartAddress,
-
-    [Parameter(ParameterSetName = 'ResolveRange', Mandatory = $true, Position = 1, HelpMessage = "The ending IP address of the range.")]
     [System.Net.IPAddress]$EndAddress,
-
-    [Parameter(ParameterSetName = 'ResolveRange', Mandatory = $false, HelpMessage = "Path to the 'ping-iprange.ps1' script.")]
-    [string]$PingScriptPath = "./ping-iprange-PS5.ps1", # Assuming ping-iprange.ps1 is the correct name
-
-    [Parameter(ParameterSetName = 'ShowHelp', HelpMessage = "Display this help message.")]
-    [Switch]$Help
+    [int]$MaxThreads = 100,
+    [int]$Timeout = 1000
 )
 
-# --- Initial Check for Help Request ---
-# If the 'ShowHelp' parameter set is active (either by default with no params, or explicitly with -Help),
-# display help and exit.
-if ($PSCmdlet.ParameterSetName -eq 'ShowHelp') {
-    # This will display the comment-based help at the top of the script.
-    Get-Help $MyInvocation.MyCommand.Path -Full
-    exit 0 # Exit gracefully after showing help
-}
-
-# --- Validation and Setup (only if not showing help) ---
-
-# Ensure the helper ping script exists and is executable
-Write-Verbose "Checking for ping script at '$PingScriptPath'..."
-if (-not (Test-Path $PingScriptPath -PathType Leaf)) {
-    Write-Error "Error: The ping script '$PingScriptPath' was not found or is not a file."
-    exit 1
-}
-
-Write-Verbose "Pinging IP range from $StartAddress to $EndAddress using '$PingScriptPath'..."
-
-# Prepare parameters for calling ping-iprange.ps1
-$PingParams = @{
-    StartAddress = $StartAddress
-    EndAddress   = $EndAddress
-}
-# Forward the -Verbose switch if it was used with resolve-iprange.ps1
-if ($PSBoundParameters.ContainsKey('Verbose') -and $VerbosePreference -ne [System.Management.Automation.ActionPreference]::SilentlyContinue) {
-    $PingParams.Verbose = $true
-}
-
-# --- Execute Ping Sweep ---
-$PingOutput = @() # Initialize to an empty array
-try {
-    # Corrected Write-Verbose line
-    Write-Verbose "Executing: $PingScriptPath @($(($PingParams | ForEach-Object { "-$($_.Key) $($_.Value)" } ) -join ' '))"
-    $PingOutput = & $PingScriptPath @PingParams
-}
-catch {
-    Write-Error "An error occurred while executing '$PingScriptPath': $($_.Exception.Message)"
-    if ($_.ScriptStackTrace) {
-        Write-Error "Script stack trace from called script: $($_.ScriptStackTrace)"
-    }
-    exit 1
-}
-
-# Extract System.Net.IPAddress objects from the output
-# ping-iprange.ps1 returns objects like: @{ IPAddress = [System.Net.IPAddress]; Bytes = ... }
-$ActiveIPObjects = $PingOutput | Where-Object { $_ -ne $null -and $_.IPAddress -ne $null } | Select-Object -ExpandProperty IPAddress
-
-if ($ActiveIPObjects.Count -eq 0) {
-    Write-Host "No active IP addresses found in the range $StartAddress - $EndAddress." -ForegroundColor Yellow
-    exit 0
-}
-
-Write-Verbose "Active IP Addresses found by '$PingScriptPath':"
-if ($PSBoundParameters.ContainsKey('Verbose') -and $VerbosePreference -ne [System.Management.Automation.ActionPreference]::SilentlyContinue) {
-    $ActiveIPObjects | ForEach-Object { Write-Verbose $_.IPAddressToString }
-}
-Write-Output "Attempting to resolve hostnames for active IP addresses..."
-
-# --- Resolve Hostnames for Active IPs ---
-Write-Verbose "Attempting to resolve hostnames for active IP addresses..."
-$Results = @()
-
-foreach ($IPAddressObj in $ActiveIPObjects) {
-    $IPString = $IPAddressObj.IPAddressToString
-    $Hostname = "N/A" # Default hostname
-
-    Write-Verbose "Resolving hostname for $IPString..."
-    try {
-        $HostEntry = [System.Net.Dns]::GetHostEntry($IPAddressObj)
-        # Check if HostEntry is not null and HostName is not whitespace
-        if ($HostEntry -and -not [string]::IsNullOrWhiteSpace($HostEntry.HostName)) {
-            $Hostname = $HostEntry.HostName
-        } else {
-            $Hostname = "N/A (No Hostname)"
-            Write-Verbose "DNS lookup for $IPString returned an entry but no valid hostname."
+# --- 1. Range Generation (Handling your /22) ---
+$allIPs = @()
+if ($StartAddress -and $EndAddress) {
+    # ... (Standard range logic)
+} else {
+    $interface = (netstat -rn | Select-String "default" | Select-Object -First 1 | ForEach-Object { ($_ -split '\s+')[3] })
+    $config = ifconfig $interface
+    if ($config -join ' ' -match 'inet\s+(\d+\.\d+\.\d+\.\d+)\s+netmask\s+0x([0-9a-fA-F]{8})') {
+        $baseIP = [System.Net.IPAddress]$Matches[1]; $hexMask = $Matches[2]
+        $binMask = [Convert]::ToString([Convert]::ToUInt32($hexMask, 16), 2).PadLeft(32, '0')
+        $prefix = ($binMask -replace '0', '').Length
+        $ipBytes = $baseIP.GetAddressBytes(); $mask = [uint32]::MaxValue -shl (32 - $prefix)
+        $maskBytes = [System.BitConverter]::GetBytes($mask); if ([System.BitConverter]::IsLittleEndian) { [System.Array]::Reverse($maskBytes) }
+        $networkBytes = @(0,0,0,0); for ($i=0; $i -lt 4; $i++) { $networkBytes[$i] = $ipBytes[$i] -band $maskBytes[$i] }
+        $startNum = [System.BitConverter]::ToUInt32((@($networkBytes[3], $networkBytes[2], $networkBytes[1], $networkBytes[0])), 0)
+        for ($i = 1; $i -le ([Math]::Pow(2, (32 - $prefix)) - 2); $i++) {
+            $cBytes = [System.BitConverter]::GetBytes([uint32]($startNum + $i))
+            if ([System.BitConverter]::IsLittleEndian) { [System.Array]::Reverse($cBytes) }
+            $allIPs += ([System.Net.IPAddress]$cBytes).IPAddressToString
         }
     }
-    catch [System.Net.Sockets.SocketException] {
-        # Using -f format operator for robustness against parser errors
-        Write-Verbose ("DNS resolution failed for {0} (SocketException): {1}" -f $IPString, $_.Exception.Message)
-        $Hostname = "N/A (Resolution Failed)"
-    }
-    catch {
-        $ErrorMessage = if ($_.Exception -and $_.Exception.Message) { $_.Exception.Message } else { "An unknown error occurred during DNS lookup." }
-        Write-Warning ("An unexpected error occurred during DNS lookup for {0}: {1}" -f $IPString, $ErrorMessage)
-        $Hostname = "N/A (Error)"
+}
+
+# --- 2. Parallel Ping ---
+Write-Host "Scanning $($allIPs.Count) IPs..." -ForegroundColor Cyan
+$activeIPs = $allIPs | ForEach-Object -Parallel {
+    $ping = New-Object System.Net.NetworkInformation.Ping
+    try { if ($ping.Send($_, $using:Timeout).Status -eq 'Success') { $_ } } finally { $ping.Dispose() }
+} -ThrottleLimit $MaxThreads
+
+# --- 3. The "Heavy Duty" Resolver ---
+$myIp = (ifconfig | Select-String "inet " | ForEach-Object { $_.ToString().Split(' ')[1] })
+
+$results = foreach ($ip in $activeIPs) {
+    $name = $null
+
+    # 1. Self Check
+    if ($myIp -contains $ip) { $name = "$(hostname) (this mac)" }
+
+    # 2. SMB/NetBIOS Probe (The winner for Windows/Linux)
+    if (-not $name) {
+        # Probing Port 137 (NetBIOS Name Service)
+        $smb = smbutil lookup $ip 2>$null | Select-String "Got response from"
+        if ($smb -match "from\s+(\S+)") { $name = $matches[1] }
     }
 
-    $Results += [PSCustomObject]@{
-        IP       = $IPString
-        Hostname = $Hostname
+    # 3. DNS Lookup (Standard)
+    if (-not $name) {
+        try { 
+            $dns = [System.Net.Dns]::GetHostEntry($ip)
+            if ($dns.HostName -and $dns.HostName -ne $ip) { $name = $dns.HostName }
+        } catch {}
+    }
+
+    # 4. mDNS / dscacheutil (Linux Avahi/Bonjour)
+    if (-not $name) {
+        $ds = dscacheutil -q host -a ip_address $ip
+        if ($ds -match "name:\s+(\S+)") { $name = $matches[1] }
+    }
+
+    # 5. ARP Scrape
+    if (-not $name) {
+        $arp = arp -a | Select-String "\($ip\)"
+        if ($arp -match '^(\S+)') { 
+            $found = $matches[1]; if ($found -ne "?") { $name = "$found (arp)" } 
+        }
+    }
+
+    [PSCustomObject]@{
+        IP       = $ip
+        Hostname = ($name ? $name : "Unknown")
     }
 }
 
-# --- Output Results ---
-if ($Results.Count -gt 0) {
-    Write-Host "`nResolved Hostnames:" -ForegroundColor Green
-    $Results | Format-Table -AutoSize
-} else {
-    # This should ideally not be reached if ActiveIPObjects.Count > 0,
-    # unless all DNS lookups failed in a way that didn't populate $Results.
-    Write-Host "No hostnames could be resolved or displayed (active IPs were found but processing failed)." -ForegroundColor Yellow
-}
-
-Write-Verbose "Script finished."
+$results | Sort-Object { [version]$_.IP } | Format-Table -AutoSize

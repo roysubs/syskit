@@ -119,6 +119,9 @@ fi
 
 # --- Vim settings and key mappings to apply ---
 vimrc_block="
+set nocompatible       \" Use Vim defaults instead of Vi compatibility
+let mapleader = \"\\\\\"   \" Set Leader key to backslash explicitly
+
 syntax on              \" Syntax highlighting
 colorscheme desert     \" Syntax highlighting scheme
 \" Available themes: blue, darkblue, default, delek, desert, elflord, evening, habamax, industry, koehler
@@ -321,6 +324,14 @@ endfunction
 nnoremap <F4> :call ToggleHiddenAndStatusBar()<CR>
 inoremap <F4> <Esc>:call ToggleHiddenAndStatusBar()<CR>a
 
+" --- macOS / Layout Friendly Fallbacks (Leader is backslash by default) ---
+" Toggle line numbers (\n)
+nnoremap <Leader>n :set invnumber<CR>
+" Toggle wrap (\w)
+nnoremap <Leader>w :set wrap!<CR>
+" Toggle hidden chars (\h)
+nnoremap <Leader>h :call ToggleHiddenAndStatusBar()<CR>
+
 "
 
 # \" \" Enable 'list' and 'laststatus' via F4 in normal or insert mode
@@ -384,13 +395,9 @@ update_config_file() {
     echo "-------------------------------------------------"
     # --- End Debug ---
 
-    # Remove trailing blank lines using corrected logic
-    # This will remove *all* blank lines from the end of the file.
-    # Ensure the temporary file is not empty before processing
-    if [ -s "$temp_file" ]; then # Check if temp_file is not empty
-        tac "$temp_file" | sed '/^[[:space:]]*$/d' | tac > "${temp_file}.cleaned" # Corrected: Removed 'q'
-        command mv "${temp_file}.cleaned" "$temp_file" # Move cleaned back to temp_file
-    fi
+    # Remove trailing blank lines
+    # This sed command works on both GNU and BSD sed to remove trailing newlines
+    sed -i '' -e :a -e '/^\n*$/{$d;N;};/\n$/ba' "$temp_file" 2>/dev/null || sed -i -e :a -e '/^\n*$/{$d;N;};/\n$/ba' "$temp_file"
 
 
     # Replace the original file with the updated content from the temporary file
@@ -415,24 +422,24 @@ echo "Processing $vimrc_file..."
 # --- Call to update_config_file ---
 update_config_file "$vimrc_file" "$vimrc_block"
 
-# Ensure Neovim config directory and init.vim file exist
-echo "Ensuring Neovim configuration directory exists..."
-mkdir -p "$HOME/.config/nvim"
-nvim_init_file="$HOME/.config/nvim/init.vim"
-if [ ! -f "$nvim_init_file" ]; then
-    touch "$nvim_init_file"
-    echo "Created new $nvim_init_file."
+# Fallback verification: explicitly check for mapleader and keys
+if ! grep -q "let mapleader" "$vimrc_file"; then
+     echo "Retrying critical configuration patch..."
+     {
+        echo 'set nocompatible       " Use Vim defaults instead of Vi compatibility'
+        echo 'let mapleader = "\\"   " Set Leader key to backslash explicitly'
+        cat "$vimrc_file"
+     } > "${vimrc_file}.tmp" && mv "${vimrc_file}.tmp" "$vimrc_file"
 fi
-
-# Update the user's nvim init.vim - Apply vimrc_block first, then nvim_block
-echo "Processing $nvim_init_file..."
-# First pass: Add common vimrc_block settings
-# --- Call to update_config_file ---
-update_config_file "$nvim_init_file" "$vimrc_block"
-# Second pass: Add Neovim-specific settings
-# --- Call to update_config_file ---
-update_config_file "$nvim_init_file" "$nvim_block"
-
+if ! grep -q "<Leader>n" "$vimrc_file"; then
+     echo "Appending missing Leader mappings..."
+     cat <<EOF >> "$vimrc_file"
+" --- macOS / Layout Friendly Fallbacks ---
+nnoremap <Leader>n :set invnumber<CR>
+nnoremap <Leader>w :set wrap!<CR>
+nnoremap <Leader>h :call ToggleHiddenAndStatusBar()<CR>
+EOF
+fi
 
 echo -e "\nConfiguration update complete! Reopen vi/vim/nvim to see the updates."
 
