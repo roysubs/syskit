@@ -306,6 +306,7 @@ c() {
 -- custom --
   ms          : syskit/0-docker/0-media-stack
   q, qbit, qc : ~/.config/media-stack/qbittorrent
+  o           : ~/OneDrive
 -- System --
   h            : \$HOME
   d, down      : \$HOME/Downloads
@@ -330,6 +331,7 @@ EOF
         g|games)     cd "$HOME/syskit/0-games" ;;
         i|install)   cd "$HOME/syskit/0-install" ;;
         w|web)       cd "$HOME/syskit/0-web-apps" ;;
+        o)           cd "$HOME/OneDrive" ;;
         ms)          cd "$HOME/syskit/0-docker/0-media-stack" ;;
         q|qbit|qc)   cd "$HOME/.config/media-stack/qbittorrent" ;;
         d|down|downloads) cd "$HOME/Downloads" ;;

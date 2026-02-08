@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Author: Roy Wiseman 2025-01
 # Enhanced with PowerShell improvements 2025-11-03 (v17)
+# macOS compatibility fix 2026-01
 
 # This script is a universal video processing tool for YouTube, X, TikTok, Instagram, Facebook, NPO, and local files.
 # It includes presets for quality/size-based encoding, optional trimming, and robust error handling.
@@ -11,7 +12,7 @@ set -e
 set -o pipefail
 
 # ---------------[ CONFIG ]---------------
-DEFAULT_OUTDIR="$HOME"
+DEFAULT_OUTDIR="$HOME/Desktop/chop-video"   # DEFAULT_OUTDIR="$HOME"
 DEFAULT_QUALITY_PROFILE="sd" # Options: phone_small, phone_fast, sd, hd, source_mp4, half, quarter, 10mb
 YTDLP_CMD=""                 # Global variable to hold the yt-dlp command path
 fetched_title=""             # Global variable to store fetched title for later rename
@@ -97,15 +98,33 @@ command_exists() {
 
 # Function to check for common signs of a VPN connection
 check_for_vpn() {
-    # Check for common VPN interface names (e.g., tun0, ppp0)
-    if ip addr 2>/dev/null | grep -q -E 'tun[0-9]+|ppp[0-9]+'; then
-        return 0 # VPN likely detected
-    fi
-    # Check if the default route's interface name suggests a VPN
-    local default_interface
-    default_interface=$(ip route 2>/dev/null | grep '^default' | awk '{print $5}')
-    if [[ -n "$default_interface" ]] && echo "$default_interface" | grep -q -i 'vpn'; then
-        return 0 # VPN likely detected
+    # Detect OS type
+    local os_type=$(uname -s)
+    
+    if [[ "$os_type" == "Darwin" ]]; then
+        # macOS-specific VPN detection
+        # Check for common VPN interface names (utun, ppp, ipsec)
+        if ifconfig 2>/dev/null | grep -q -E '^(utun|ppp|ipsec)[0-9]+:'; then
+            return 0 # VPN likely detected
+        fi
+        # Check for VPN services in network setup
+        if scutil --nc list 2>/dev/null | grep -q "Connected"; then
+            return 0 # VPN likely detected
+        fi
+    else
+        # Linux-specific VPN detection
+        if command_exists ip; then
+            # Check for common VPN interface names (e.g., tun0, ppp0)
+            if ip addr 2>/dev/null | grep -q -E 'tun[0-9]+|ppp[0-9]+'; then
+                return 0 # VPN likely detected
+            fi
+            # Check if the default route's interface name suggests a VPN
+            local default_interface
+            default_interface=$(ip route 2>/dev/null | grep '^default' | awk '{print $5}')
+            if [[ -n "$default_interface" ]] && echo "$default_interface" | grep -q -i 'vpn'; then
+                return 0 # VPN likely detected
+            fi
+        fi
     fi
     return 1 # No obvious VPN signs detected
 }
@@ -251,14 +270,17 @@ get_file_summary() {
         bitrate_kbps=$(printf "%.0f" "$(echo "$bitrate / 1000" | bc -l)")
     fi
     format=$(echo "$format" | cut -d ',' -f 1)
-    echo "${format^^}: ${width}x${height} @ ${framerate_clean}fps, ${duration_fmt}s, ${size_mb}MB, ${bitrate_kbps}kbps (${codec})"
+    # echo "${format^^}: ${width}x${height} @ ${framerate_clean}fps, ${duration_fmt}s, ${size_mb}MB, ${bitrate_kbps}kbps (${codec})"
+    echo "$(echo "$format" | tr '[:lower:]' '[:upper:]'): ${width}x${height} @ ${framerate_clean}fps, ${duration_fmt}s, ${size_mb}MB, ${bitrate_kbps}kbps (${codec})"
 }
 
 # Function to handle dependency checking and installation
 main_dep_install() {
     local EXE_NAME="yt-dlp"
     local TARGET_EXE_PATH="$HOME/.local/bin/$EXE_NAME"
-    for cmd in bc date stat curl awk grep ffmpeg ffprobe realpath ip; do
+    
+    # Check essential dependencies (excluding 'ip' which is Linux-only)
+    for cmd in bc date stat curl awk grep ffmpeg ffprobe realpath; do
         if ! command_exists "$cmd"; then
             msg_warn "Dependency '$cmd' is not found."
             if [[ ("$cmd" == "ffmpeg" || "$cmd" == "ffprobe") && $(command -v apt-get 2>/dev/null) && $(command -v sudo 2>/dev/null) ]]; then
@@ -275,6 +297,7 @@ main_dep_install() {
             fi
         fi
     done
+    
     if ! command_exists "$EXE_NAME" && [ ! -x "$TARGET_EXE_PATH" ]; then
         msg_warn "yt-dlp not found."
         read -r -p "Attempt to download the latest version to $HOME/.local/bin? (y/N): " confirm
@@ -471,7 +494,7 @@ ffmpeg_vf=""
 if [[ "$effective_quality" != "stream_copy" ]]; then
     video_width=$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=s=x:p=0 "$input_file")
     video_height=$(ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=s=x:p=0 "$input_file")
-    source_size_bytes=$(stat -c%s "$input_file")
+    source_size_bytes=$(stat -c%s "$input_file" 2>/dev/null || stat -f%z "$input_file")
 
     # Get the FULL duration of the input file for bitrate calculation
     full_source_duration_sec=$(ffprobe -v error -i "$input_file" -show_entries format=duration -of default=noprint_wrappers=1:nokey=1)
@@ -603,7 +626,7 @@ fi
 rm -f ffmpeg2pass-0.log ffmpeg2pass-0.log.mbtree
 
 if [[ "$process_success" == true && -s "$output_final_mp4" ]]; then
-    final_size_mb=$(printf "%.2f" "$(echo "$(stat -c%s "$output_final_mp4") / 1024 / 1024" | bc -l)")
+    final_size_mb=$(printf "%.2f" "$(echo "$(stat -c%s "$output_final_mp4" 2>/dev/null || stat -f%z "$output_final_mp4") / 1024 / 1024" | bc -l)")
     msg_ok "Successfully processed video (Size: ${final_size_mb} MB)"
 else
     msg_error "ffmpeg processing failed or output file is empty."
@@ -643,7 +666,7 @@ echo
 echo "-------------------------------------"
 echo "           Processing Timers"
 echo "-------------------------------------"
-if [[ -v start_download_timer ]]; then
+if [[ -n "${start_download_timer:-}" ]]; then
     printf "Download Time:     %.2f seconds\n" "$(echo "$end_download_timer - $start_download_timer" | bc -l)"
 fi
 printf "Processing Time:   %.2f seconds\n" "$(echo "$end_processing_timer - $start_processing_timer" | bc -l)"

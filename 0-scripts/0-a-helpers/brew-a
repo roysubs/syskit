@@ -1,0 +1,95 @@
+#!/bin/bash
+# Homebrew Tool Script (homebrew-a)
+# Author: Roy Wiseman 2026-01
+
+GREEN='\e[32m'
+RED='\e[31m'
+YELLOW='\e[33m'
+NC='\e[0m'
+
+show_help() {
+    echo -e "${YELLOW}Homebrew Wrapper${NC}. Usage: a [option] <formula/cask>"
+    echo "Standard Options:"
+    echo -e "  ${GREEN}i${NC} <pkg>      Install a formula (or cask if matched)"
+    echo -e "  ${GREEN}r${NC} <pkg>      Remove/Uninstall a package"
+    echo -e "  ${GREEN}s${NC} <term>     Search formulas and casks"
+    echo -e "  ${GREEN}u${NC}           Update Brew, Upgrade all, and Cleanup"
+    echo -e "  ${GREEN}v${NC} <pkg>      View info for a package"
+    echo ""
+    echo "Homebrew Specific:"
+    echo -e "  ${GREEN}c${NC} <pkg>      Install as a CASK (GUI App)"
+    echo -e "  ${GREEN}clean${NC}       Remove old lock files and outdated downloads"
+    echo -e "  ${GREEN}dr${NC}          Run 'brew doctor' to check system health"
+    echo -e "  ${GREEN}ls${NC}          List all installed formulas and casks"
+    echo -e "  ${GREEN}svc${NC}         List/Manage background services"
+    echo -e "  ${GREEN}deps${NC} <pkg>    Show dependency tree for a package"
+    echo -e "  ${GREEN}leaves${NC}      List installed pkgs not depended on by others"
+    echo ""
+}
+
+run_command() {
+    echo -e "# ${GREEN}brew $1${NC}"
+    shift
+    brew "$@"
+}
+
+if [ $# -eq 0 ]; then show_help; exit 0; fi
+
+option=$1
+shift
+
+case "$option" in
+    i) # Install (Smart detection for casks)
+        if [ $# -eq 0 ]; then echo "Specify package"; exit 1; fi
+        brew install "$@" ;;
+    
+    c) # Cask Install (Specific for GUI apps)
+        brew install --cask "$@" ;;
+        
+    r) # Remove
+        brew uninstall "$@" ;;
+        
+    s) # Search
+        brew search "$@" ;;
+        
+    u) # Update & Upgrade
+        echo -e "${YELLOW}Updating Homebrew...${NC}"
+        brew update
+        echo -e "${YELLOW}Upgrading packages...${NC}"
+        brew upgrade
+        echo -e "${YELLOW}Cleaning up...${NC}"
+        brew cleanup ;;
+        
+    v) # Info
+        brew info "$@" ;;
+
+    ls) # List
+        echo -e "${YELLOW}Installed Formulas:${NC}"
+        brew list --formula
+        echo -e "\n${YELLOW}Installed Casks:${NC}"
+        brew list --cask ;;
+
+    svc) # Services
+        if [ $# -eq 0 ]; then
+            brew services list
+        else
+            brew services "$@"
+        fi ;;
+
+    deps) # Dependencies
+        brew deps --tree "$@" ;;
+
+    leaves) # Show top-level installed packages
+        brew leaves ;;
+
+    dr|doctor)
+        brew doctor ;;
+
+    clean)
+        brew cleanup -s ;;
+
+    *)
+        echo -e "${RED}Unknown option: $option${NC}\n"
+        show_help
+        exit 1 ;;
+esac

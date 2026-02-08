@@ -4,3 +4,32 @@
    This will automate collecting every game you own into ~/steam-game.csv
 
 2. You can now search this using filters with steam-csv-search.py
+
+To get your Steam Web API Key and SteamID64, you'll need to be logged into your Steam account via a web browser. Here is the quickest way to find both.
+
+1. How to get your SteamID64
+Your SteamID64 is a unique 17-digit number linked to your account.
+
+Option A (Profile URL):
+- Open your Steam Profile.
+- Look at the URL in your browser. It will likely look like: https://steamcommunity.com/profiles/76561198XXXXXXXXX/
+- That long number at the end is your SteamID64.
+
+Option B (Custom URL):
+- If you have a custom URL (e.g., .../id/yourname), go to a third-party tool like SteamID.io.
+- Paste your profile link there, and it will give you the "SteamID64" version.
+
+2. How to get your Steam Web API Key
+Note: You must have a non-limited Steam account (meaning you have spent at least $5.00 USD on Steam) to generate a key.
+
+- Go to the official Steam Web API Key page.
+- Log in with your Steam credentials.
+- You will see a field labeled Domain Name.
+- If you don't have a website, you can just enter localhost or none.
+- Check the box to agree to the Terms of Service and click Register.
+- Your key (a string of 32 characters) will appear on the screen.
+
+⚠️ Security Warning
+Never share your Web API Key with anyone. If a person or a suspicious website asks for it, they may be trying to gain access to your trade offers or account data. If you think your key has been compromised, go back to the API page and click Revoke My Steam Web API Key to generate a new one.
+
+Would you like me to explain how to use these keys for a specific application or script you're working on?
