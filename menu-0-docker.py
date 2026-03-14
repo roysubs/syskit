@@ -201,7 +201,9 @@ def main():
 
     signal.signal(signal.SIGINT, signal_handler)
 
-    script_dir = os.path.expanduser("~/syskit/0-docker")
+    # Get the directory where this script is located
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    script_dir = os.path.join(base_dir, "0-docker")
     scripts = list_scripts(script_dir)
 
     if not scripts:

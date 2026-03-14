@@ -1,17 +1,18 @@
 #!/bin/bash
 # Author: Roy Wiseman 2025-02
-# Fixed script to update h-* help files in /usr/local/bin
-# 1. Remove all h-* files from /usr/local/bin
-# 2. Copy h-* files containing "mdcat" from ~/syskit/0-help to /usr/local/bin
+# Refactored script to manage h-* help files
+# 1. Cleaner: Removes all stale h-* files from /usr/local/bin (legacy approach)
+# 2. Permissions: Ensures all h-* files in ~/syskit/0-help are executable
 
 # Exit on any error
 set -e
 
 # Directories
-SOURCE_DIR="$HOME/syskit/0-help"
-DEST_DIR="/usr/local/bin"
+# Use dynamic path detection relative to this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+SOURCE_DIR="$(cd "$SCRIPT_DIR/../0-help" && pwd)"
 
-echo "Starting h-* script update process..."
+echo "Optimizing h-* help system..."
 
 # Check if source directory exists
 if [ ! -d "$SOURCE_DIR" ]; then
@@ -19,50 +20,29 @@ if [ ! -d "$SOURCE_DIR" ]; then
     exit 1
 fi
 
-# Verify with the user before proceeding
-total_files=$(find "$SOURCE_DIR" -maxdepth 1 -type f -name "h-*" | wc -l)
-echo "Found $total_files h-* files in $SOURCE_DIR"
-
-# Remove existing h-* files from /usr/local/bin
-echo "Removing existing h-* files from $DEST_DIR..."
-sudo rm -f "$DEST_DIR"/h-*
-
-# Create a temporary file to store the names of copied files
-temp_file=$(mktemp)
-
-# Try multiple grep methods to find "mdcat" in files
-echo "Finding and copying h-* files containing 'mdcat' from $SOURCE_DIR to $DEST_DIR..."
-
-# Method 1: Standard grep with binary files treated as text
-find "$SOURCE_DIR" -maxdepth 1 -type f \( -name "h-*" -o -name "mdcat-get.sh" \) | while read -r file; do
-    if grep -q "mdcat" "$file" 2>/dev/null || strings "$file" | grep -q "mdcat"; then
-        # Make file executable
-        chmod +x "$file"
-        
-        # Copy to destination with sudo
-        if sudo cp -f "$file" "$DEST_DIR/"; then
-            basename_file=$(basename "$file")
-            echo "Copied: $basename_file"
-            echo "$basename_file" >> "$temp_file"
-        else
-            echo "Failed to copy: $(basename "$file")"
-        fi
+# 1. Clean up stale copies from legacy approach (one-time cleanup)
+if [ -d "/usr/local/bin" ]; then
+    STALE_FILES=$(ls /usr/local/bin/h-* 2>/dev/null | wc -l)
+    if [ "$STALE_FILES" -gt 0 ]; then
+        echo "Removing $STALE_FILES stale h-* files from /usr/local/bin (legacy cleanup)..."
+        sudo rm -f /usr/local/bin/h-*
     fi
-done
-
-# Count and display copied files
-copied_count=$(wc -l < "$temp_file")
-copied_files=$(cat "$temp_file")
-
-echo
-echo "--- Summary ---"
-echo "Copied $copied_count h-* files to $DEST_DIR"
-if [ "$copied_count" -gt 0 ]; then
-    echo "Files copied:"
-    cat "$temp_file" | sed 's/^/  /'
 fi
 
-# Clean up
-rm -f "$temp_file"
+# 2. Ensure all h-* files in source are executable
+echo "Ensuring help scripts in $SOURCE_DIR are executable..."
+find "$SOURCE_DIR" -maxdepth 1 -type f -name "h-*" -exec chmod +x {} +
+chmod +x "$SOURCE_DIR/mdcat-get.sh" 2>/dev/null || true
+
+# 3. List available help commands
+echo
+echo "--- Help System Ready ---"
+echo "All h-* scripts are now executable in $SOURCE_DIR."
+echo "Since this directory is in your PATH, you can use them directly."
+echo "Try typing 'h-' and hitting <TAB> to see available help topics."
+echo
+
+total_files=$(find "$SOURCE_DIR" -maxdepth 1 -type f -name "h-*" | wc -l)
+echo "Total help topics available: $total_files"
 
 echo "Done!"

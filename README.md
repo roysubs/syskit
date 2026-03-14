@@ -133,7 +133,7 @@ See also:
 # New Linux System Setup Scripts
 
 Essential tools to add to any Debian/Mint/Ubuntu system to cleanly add functionality, and particularly useful for new environments to get up and running quickly. There is no need to run every script; just pick and choose as required from each section.
-The main menu script `setup-new-system-by-menu.py` (if available in the project root) can help automate the installation of multiple scripts. Some phases also contain their own menu-driven Python scripts.
+The main menu script `menu-0-new-system.py` (if available in the project root) can help automate the installation of multiple scripts. Some phases also contain their own menu-driven Python scripts.
 
 The `0-new-system/0-wip` directory may contain work-in-progress scripts that are not yet finalized for general use.
 

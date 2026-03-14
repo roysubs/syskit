@@ -82,9 +82,10 @@ bash -x          # Debug non-login shell startup scripts
 # Clean PATH before adding new directories
 clean_path
 
-# Apply function to both directories
+# Apply function to all relevant directories
 add_to_path "syskit"
 add_to_path "syskit/0-scripts"
+add_to_path "syskit/0-help"
 
 # Check if script was sourced
 if ! (return 0 2>/dev/null); then

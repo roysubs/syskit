@@ -118,208 +118,208 @@ fi
 
 
 # --- Vim settings and key mappings to apply ---
-vimrc_block="
-set nocompatible       \" Use Vim defaults instead of Vi compatibility
-let mapleader = \"\\\\\"   \" Set Leader key to backslash explicitly
+vimrc_block=$(cat <<'EOF'
+set nocompatible       " Use Vim defaults instead of Vi compatibility
+let mapleader = "\\"   " Set Leader key to backslash explicitly
 
-syntax on              \" Syntax highlighting
-colorscheme desert     \" Syntax highlighting scheme
-\" Available themes: blue, darkblue, default, delek, desert, elflord, evening, habamax, industry, koehler
-\" lunapeche lunaperche, morning, murphy, pablo, peachpuff, quiet, ron, shine, slate, torte, zellner
-\" Disable tabs (to get a tab, Ctrl-V<Tab>), tab stops are 4 chars, indents are 4 chars
-\" Set tab behavior to use spaces instead of tabs
+syntax on              " Syntax highlighting
+colorscheme desert     " Syntax highlighting scheme
+" Available themes: blue, darkblue, default, delek, desert, elflord, evening, habamax, industry, koehler
+" lunapeche lunaperche, morning, murphy, pablo, peachpuff, quiet, ron, shine, slate, torte, zellner
+" Disable tabs (to get a tab, Ctrl-V<Tab>), tab stops are 4 chars, indents are 4 chars
+" Set tab behavior to use spaces instead of tabs
 
-set expandtab          \" Use spaces instead of tab characters
-set tabstop=4          \" Set tab width to 4 spaces
-set shiftwidth=4       \" Set indent width to 4 spaces
-set softtabstop=4      \" Set the number of spaces a tab character represents in insert mode
-set smarttab           \" Tab and Delete respect tab width stops throughout document
-filetype plugin indent on   \" Enable built-in filetype detection, plugins, and indent rules
-set autoindent         \" Auto and smart indent settings
+set expandtab          " Use spaces instead of tab characters
+set tabstop=4          " Set tab width to 4 spaces
+set shiftwidth=4       " Set indent width to 4 spaces
+set softtabstop=4      " Set the number of spaces a tab character represents in insert mode
+set smarttab           " Tab and Delete respect tab width stops throughout document
+filetype plugin indent on   " Enable built-in filetype detection, plugins, and indent rules
+set autoindent         " Auto and smart indent settings
 
-inoremap <C-s> <Esc>:w<CR>            \" Save file while in insert mode
-\" Perform :w write on a protected file even when not as sudo
+inoremap <C-s> <Esc>:w<CR>            " Save file while in insert mode
+" Perform :w write on a protected file even when not as sudo
 cnoremap w!! execute 'silent! write !sudo tee % >/dev/null' <bar> edit
 
-set background=dark  \" Dark background
-set noerrorbells     \" Disable error bells
-set novisualbell     \" Disable error screen flash
-set t_vb=            \" Disable all bells
-if has('termguicolors')     \" Check if 24-bit colors are available
-    set termguicolors       \" Enable 24-bit RGB colors if available
-    let &t_SI = \"\\e[6 q\" \" Set cursor to a steady underline in Insert mode
-    let &t_SR = \"\\e[4 q\" \" Set cursor to a steady underline in Replace mode
-    let &t_EI = \"\\e[2 q\" \" Set cursor to a steady block in Normal mode (often default)
+set background=dark  " Dark background
+set noerrorbells     " Disable error bells
+set novisualbell     " Disable error screen flash
+set t_vb=            " Disable all bells
+if has('termguicolors')     " Check if 24-bit colors are available
+    set termguicolors       " Enable 24-bit RGB colors if available
+    let &t_SI = "\e[6 q" " Set cursor to a steady underline in Insert mode
+    let &t_SR = "\e[4 q" " Set cursor to a steady underline in Replace mode
+    let &t_EI = "\e[2 q" " Set cursor to a steady block in Normal mode (often default)
 endif
 
-\" --- Visual Mode Enhancements ---
-\" <C-v> is generally unavailable when connected by a terminal emulator so <C-q> was
-\" also added as a core vim default due to common terminals using <C-v> but neither
-\" are ideal to use. To provide options similar to Notepad++ and VS Code can make it
-\" easier / more intuitive when switching between editors, but multi-key selections
-\" in Vim are complex (require plugins), so we will map as follows:
-\"
-\" Shift+Right/Left => Visual character-wise, select the word under the cursor
-\"       Replaces word jump function, but this is redundant as Ctrl+Right/Left already does
-\" Shift+Up/Down     => Visual line-wise, select current and one more line
-\"       Replaces half-page-up/down function, but redundant as just use PgUp/PgDn
-\" Alt+Up/Down/Left/Right  => Visual block-wise, select rectangle as move around.
-\" Avoiding Ctrl+Left/Right, leaving those as default navigate word actions.
-\"
-\" This setup works well with tmux (but not byobu, so avoid byobu).
-\" Note: The default keys 'v' (Visual Character-wise) and 'V' (Visual Line-wise)
-\" still work as usual and are not affected by these mappings.
-\" Also add 'vb' as a key entry to go with 'v' and 'V'
-nnoremap vb <C-q>  \" vb -> Enter block-wise visual mode (equivalent to 'Ctrl-v' / 'Ctrl-q')
-\" So, v (VISUAL), V (VISUAL LINE), vb (VISUAL BLOCK)
+" --- Visual Mode Enhancements ---
+" <C-v> is generally unavailable when connected by a terminal emulator so <C-q> was
+" also added as a core vim default due to common terminals using <C-v> but neither
+" are ideal to use. To provide options similar to Notepad++ and VS Code can make it
+" easier / more intuitive when switching between editors, but multi-key selections
+" in Vim are complex (require plugins), so we will map as follows:
+"
+" Shift+Right/Left => Visual character-wise, select the word under the cursor
+"       Replaces word jump function, but this is redundant as Ctrl+Right/Left already does
+" Shift+Up/Down     => Visual line-wise, select current and one more line
+"       Replaces half-page-up/down function, but redundant as just use PgUp/PgDn
+" Alt+Up/Down/Left/Right  => Visual block-wise, select rectangle as move around.
+" Avoiding Ctrl+Left/Right, leaving those as default navigate word actions.
+"
+" This setup works well with tmux (but not byobu, so avoid byobu).
+" Note: The default keys 'v' (Visual Character-wise) and 'V' (Visual Line-wise)
+" still work as usual and are not affected by these mappings.
+" Also add 'vb' as a key entry to go with 'v' and 'V'
+nnoremap vb <C-q>  " vb -> Enter block-wise visual mode (equivalent to 'Ctrl-v' / 'Ctrl-q')
+" So, v (VISUAL), V (VISUAL LINE), vb (VISUAL BLOCK)
 
-\" --- Map Shift+Right and Shift+Left for Visual Word Selection ---
-\" These mappings will override the default word-jumping behaviour (W and B for Normal mode) as that already
-\" exists with Ctrl+Right/Left.
-\" The original W and B jumps are still available directly in Normal mode.
-\" Shift+Right: Select word under/after cursor
-\" In Normal mode: Enter visual mode (v), move one word forward (w). Selects from cursor to start of next word.
+" --- Map Shift+Right and Shift+Left for Visual Word Selection ---
+" These mappings will override the default word-jumping behaviour (W and B for Normal mode) as that already
+" exists with Ctrl+Right/Left.
+" The original W and B jumps are still available directly in Normal mode.
+" Shift+Right: Select word under/after cursor
+" In Normal mode: Enter visual mode (v), move one word forward (w). Selects from cursor to start of next word.
 nmap <S-Right> vw
-\" In Insert mode: Exit Insert mode (<Esc>), then do the Normal mode action (vw).
+" In Insert mode: Exit Insert mode (<Esc>), then do the Normal mode action (vw).
 imap <S-Right> <Esc>vw
-\" Shift+Left: Select word under/before cursor
-\" In Normal mode: Jump back one word (b), enter visual mode (v), select inner word (iw).
-\" Selects the word you just jumped back into/past.
+" Shift+Left: Select word under/before cursor
+" In Normal mode: Jump back one word (b), enter visual mode (v), select inner word (iw).
+" Selects the word you just jumped back into/past.
 nmap <S-Left> bviw
-\" In Insert mode: Exit Insert mode (<Esc>), then do the Normal mode action (bviw).
+" In Insert mode: Exit Insert mode (<Esc>), then do the Normal mode action (bviw).
 imap <S-Left> <Esc>bviw
-\" In Visual mode (vmap): Do NOT remap <S-Right> and <S-Left>.
-\" Their default behaviour (extending selection by WORD forwards/backwards) is useful
-\" and aligns with extending a word-based selection.
+" In Visual mode (vmap): Do NOT remap <S-Right> and <S-Left>.
+" Their default behaviour (extending selection by WORD forwards/backwards) is useful
+" and aligns with extending a word-based selection.
 
-\" --- Map Shift+Home and Shift+End for Visual Line Start/End Selection ---
-\" Shift+Home: Visual select from cursor to beginning of line
-\" In Normal mode: Enter visual mode (v), move to start of line (0).
+" --- Map Shift+Home and Shift+End for Visual Line Start/End Selection ---
+" Shift+Home: Visual select from cursor to beginning of line
+" In Normal mode: Enter visual mode (v), move to start of line (0).
 nmap <S-Home> v0
-\" In Insert mode: Exit Insert mode (<Esc>), then do the Normal mode action (v0).
+" In Insert mode: Exit Insert mode (<Esc>), then do the Normal mode action (v0).
 imap <S-Home> <Esc>v0
-\" In Visual mode (vmap): Move to start of line (0). Selection extends automatically.
+" In Visual mode (vmap): Move to start of line (0). Selection extends automatically.
 vmap <S-Home> 0
 
-\" Shift+End: Visual select from cursor to end of line
-\" In Normal mode: Enter visual mode (v), move to end of line ($).
+" Shift+End: Visual select from cursor to end of line
+" In Normal mode: Enter visual mode (v), move to end of line ($).
 nmap <S-End> v$
-\" In Insert mode: Exit Insert mode (<Esc>), then do the Normal mode action (v$).
+" In Insert mode: Exit Insert mode (<Esc>), then do the Normal mode action (v$).
 imap <S-End> <Esc>v$
-\" In Visual mode (vmap): Move to end of line ($). Selection extends automatically.
+" In Visual mode (vmap): Move to end of line ($). Selection extends automatically.
 vmap <S-End> $
 
-\" --- Map Alt+Up and Alt+Down for Visual Block-wise Selection ---
-\" <C-o> drops back to Insert mode after each step, cancelling selection, so use <Esc> to
-\" leave Insert mode permanently when starting selection, and vmap for continuous selection.
-\" Alt+Up in Insert mode: Exit Insert, Enter Block Visual, Move Up.
-\" <Esc>: Exit Insert mode permanently. <C-v>: Enter block-wise Visual mode.
-\" k: Move cursor up (extends selection in Visual mode).
+" --- Map Alt+Up and Alt+Down for Visual Block-wise Selection ---
+" <C-o> drops back to Insert mode after each step, cancelling selection, so use <Esc> to
+" leave Insert mode permanently when starting selection, and vmap for continuous selection.
+" Alt+Up in Insert mode: Exit Insert, Enter Block Visual, Move Up.
+" <Esc>: Exit Insert mode permanently. <C-v>: Enter block-wise Visual mode.
+" k: Move cursor up (extends selection in Visual mode).
 inoremap <M-Up> <Esc><C-v>k
-\" Alt+Down in Insert mode: Exit Insert, Enter Block Visual, Move Down.
-\" <Esc>: Exit Insert mode permanently. <C-v>: Enter block-wise Visual mode.
-\" j: Move cursor down (extends selection in Visual mode).
+" Alt+Down in Insert mode: Exit Insert, Enter Block Visual, Move Down.
+" <Esc>: Exit Insert mode permanently. <C-v>: Enter block-wise Visual mode.
+" j: Move cursor down (extends selection in Visual mode).
 inoremap <M-Down> <Esc><C-v>j
-\" Now, handle Alt+Up/Down when already in Normal or Visual mode.
-\" If you're already in Normal mode, just go straight to Visual Block and move.
-\" If you're already in ANY Visual mode (char, line, or block), just perform the move,
-\" which will extend the current selection.
-\" Alt+Up in Normal mode: Enter Block Visual, Move Up.
+" Now, handle Alt+Up/Down when already in Normal or Visual mode.
+" If you're already in Normal mode, just go straight to Visual Block and move.
+" If you're already in ANY Visual mode (char, line, or block), just perform the move,
+" which will extend the current selection.
+" Alt+Up in Normal mode: Enter Block Visual, Move Up.
 nmap <M-Up> <C-v>k
-\" Alt+Down in Normal mode: Enter Block Visual, Move Down.
+" Alt+Down in Normal mode: Enter Block Visual, Move Down.
 nmap <M-Down> <C-v>j
-\" Alt+Up in Visual mode (any type): Just move Up. Selection extends automatically.
+" Alt+Up in Visual mode (any type): Just move Up. Selection extends automatically.
 vmap <M-Up> k
-\" Alt+Down in Visual mode (any type): Just move Down. Selection extends automatically.
+" Alt+Down in Visual mode (any type): Just move Down. Selection extends automatically.
 vmap <M-Down> j
 
-\" --- Map Shift+Up and Shift+Down for Visual Line-wise Selection ---
-\" Overrides default half-page scrolling behavior for <S-Up>/<S-Down>
-\" Shift+Up in Insert mode: Exit Insert, Enter Line Visual, Select Line Above
-\" <Esc>: Exit Insert mode permanently.
-\" V: Enter Line-wise Visual mode.
-\" k: Move cursor up. When in Line Visual mode, this extends the selection to the line above.
+" --- Map Shift+Up and Shift+Down for Visual Line-wise Selection ---
+" Overrides default half-page scrolling behavior for <S-Up>/<S-Down>
+" Shift+Up in Insert mode: Exit Insert, Enter Line Visual, Select Line Above
+" <Esc>: Exit Insert mode permanently.
+" V: Enter Line-wise Visual mode.
+" k: Move cursor up. When in Line Visual mode, this extends the selection to the line above.
 inoremap <S-Up> <Esc>Vk
-\" Shift+Down in Insert mode: Exit Insert, Enter Line Visual, Select Line Below
-\" <Esc>: Exit Insert mode permanently.
-\" V: Enter Line-wise Visual mode.
-\" j: Move cursor down. When in Line Visual mode, this extends the selection to the line below.
+" Shift+Down in Insert mode: Exit Insert, Enter Line Visual, Select Line Below
+" <Esc>: Exit Insert mode permanently.
+" V: Enter Line-wise Visual mode.
+" j: Move cursor down. When in Line Visual mode, this extends the selection to the line below.
 inoremap <S-Down> <Esc>Vj
-\" Shift+Up in Normal mode: Enter Line Visual, Select Line Above
-\" V: Enter Line-wise Visual mode.
-\" k: Move cursor up.
+" Shift+Up in Normal mode: Enter Line Visual, Select Line Above
+" V: Enter Line-wise Visual mode.
+" k: Move cursor up.
 nmap <S-Up> Vk
-\" Shift+Down in Normal mode: Enter Line Visual, Select Line Below
-\" V: Enter Line-wise Visual mode.
-\" j: Move cursor down.
+" Shift+Down in Normal mode: Enter Line Visual, Select Line Below
+" V: Enter Line-wise Visual mode.
+" j: Move cursor down.
 nmap <S-Down> Vj
-\" Shift+Up in Visual mode (any type): Move Selection Up by a Line
-\" When you are already in Visual mode and press S-Up, just move up.
-\" In line-wise visual, this reduces the bottom boundary or extends the top boundary.
+" Shift+Up in Visual mode (any type): Move Selection Up by a Line
+" When you are already in Visual mode and press S-Up, just move up.
+" In line-wise visual, this reduces the bottom boundary or extends the top boundary.
 vmap <S-Up> k
-\" Shift+Down in Visual mode (any type): Move Selection Down by a Line
-\" When you are already in Visual mode and press S-Down, just move down.
-\" In line-wise visual, this extends the bottom boundary or reduces the top boundary.
+" Shift+Down in Visual mode (any type): Move Selection Down by a Line
+" When you are already in Visual mode and press S-Down, just move down.
+" In line-wise visual, this extends the bottom boundary or reduces the top boundary.
 vmap <S-Down> j
 
-\" --- Map Shift+PgUp and Shift+PgDown for Visual Line-wise Selection ---
-\" Shift + PgUp: Enter visual line select and scroll up a page
-\" In Normal mode: Enter Visual Line mode (V), then scroll page up (<C-B>)
+" --- Map Shift+PgUp and Shift+PgDown for Visual Line-wise Selection ---
+" Shift + PgUp: Enter visual line select and scroll up a page
+" In Normal mode: Enter Visual Line mode (V), then scroll page up (<C-B>)
 nnoremap <S-PageUp> V<C-B>
-\" In Insert mode: Exit Insert mode (<Esc>), then do the Normal mode action (V<C-B>)
+" In Insert mode: Exit Insert mode (<Esc>), then do the Normal mode action (V<C-B>)
 inoremap <S-PageUp> <Esc>V<C-B>
-\" In Visual mode: Just scroll page up (<C-B>), selection extends automatically
+" In Visual mode: Just scroll page up (<C-B>), selection extends automatically
 vmap <S-PageUp> <C-B>
-\" Shift + PgDn: Enter visual line select and scroll down a page
-\" In Normal mode: Enter Visual Line mode (V), then scroll page down (<C-F>)
+" Shift + PgDn: Enter visual line select and scroll down a page
+" In Normal mode: Enter Visual Line mode (V), then scroll page down (<C-F>)
 nnoremap <S-PageDown> V<C-F>
-\" In Insert mode: Exit Insert mode (<Esc>), then do the Normal mode action (V<C-F>)
+" In Insert mode: Exit Insert mode (<Esc>), then do the Normal mode action (V<C-F>)
 inoremap <S-PageDown> <Esc>V<C-F>
-\" In Visual mode: Just scroll page down (<C-F>), selection extends automatically
+" In Visual mode: Just scroll page down (<C-F>), selection extends automatically
 vmap <S-PageDown> <C-F>
 
-\" --- TAB Key Enhancements ---
-\" In normal mode, a TAB should go into insert mode, insert a tab, then go back to normal mode.
-\" This provides a quick way to insert a tab without staying in insert mode.
+" --- TAB Key Enhancements ---
+" In normal mode, a TAB should go into insert mode, insert a tab, then go back to normal mode.
+" This provides a quick way to insert a tab without staying in insert mode.
 nnoremap <Tab> i<Tab><Esc>
 
-\" In visual mode, a TAB should indent the selected block using the standard '>' command,
-\" and then re-select the same area using 'gv'.
+" In visual mode, a TAB should indent the selected block using the standard '>' command,
+" and then re-select the same area using 'gv'.
 vmap <Tab> >gv
 
-\" Shift + Tab: Dedent selected lines/block ONLY in Visual mode
-\" Applies to Visual Character, Visual Line, and Visual Block modes.
-\" Uses the '<' command for dedent, then 'gv' to re-select the block.
+" Shift + Tab: Dedent selected lines/block ONLY in Visual mode
+" Applies to Visual Character, Visual Line, and Visual Block modes.
+" Uses the '<' command for dedent, then 'gv' to re-select the block.
 vmap <S-Tab> <gv
 
-\" Toggle line numbers with F2 or Ctrl+L
-set nonumber    \" Start with no line numbers when starting Vim
+" Toggle line numbers with F2 or Ctrl+L
+set nonumber    " Start with no line numbers when starting Vim
 nnoremap <C-L> :set invnumber<CR>
 inoremap <C-L> <Esc>:set invnumber<CR>a
 nnoremap <F2> :set invnumber<CR>
 inoremap <F2> <Esc>:set invnumber<CR>a
-\" Toggle line wrap with F3
+" Toggle line wrap with F3
 nnoremap <F3> :set wrap!<CR>
 inoremap <F3> <Esc>:set wrap!<CR>a
-\" Toggle 'list' (invisible characters) AND 'laststatus' (statusline) with F4
-set laststatus=0        \" Start vim sessions with statusline hidden
-set statusline=         \" Set up a custom statusline (used to be only when laststatus is activated)
-set statusline+=%F      \" Add Full file path
-set statusline+=%m      \" Add Modified flag [+]
-set statusline+=%r      \" Add Readonly flag
-set statusline+=%h      \" Add Help file flag
-set statusline+=%w      \" Add Preview window flag
-set statusline+=\\ [FORMAT=%{&ff}]   \" Add File format: unix/dos/mac
-set statusline+=\\ [ENC=%{&enc}]     \" Add Encoding (e.g., utf-8)
-set statusline+=\\ [TYPE=%Y]         \" Add File type (e.g., sh, conf)
-set statusline+=\\ %l/%L             \" Add Current line / total lines
-set statusline+=\\ %P                \" Add Percentage through file
+" Toggle 'list' (invisible characters) AND 'laststatus' (statusline) with F4
+set laststatus=0        " Start vim sessions with statusline hidden
+set statusline=         " Set up a custom statusline (used to be only when laststatus is activated)
+set statusline+=%F      " Add Full file path
+set statusline+=%m      " Add Modified flag [+]
+set statusline+=%r      " Add Readonly flag
+set statusline+=%h      " Add Help file flag
+set statusline+=%w      " Add Preview window flag
+set statusline+=\ [FORMAT=%{&ff}]   " Add File format: unix/dos/mac
+set statusline+=\ [ENC=%{&enc}]     " Add Encoding (e.g., utf-8)
+set statusline+=\ [TYPE=%Y]         " Add File type (e.g., sh, conf)
+set statusline+=\ %l/%L             " Add Current line / total lines
+set statusline+=\ %P                " Add Percentage through file
 function! ToggleHiddenAndStatusBar()
-    set list!   \" Toggle the 'list' setting to show/hide hidden characters
-    set listchars=tab:→\ ,trail:·,eol:¶   \" Set chars to use for tabs, trailing spaces, end-of-line
-    let &laststatus = (&laststatus == 0 ? 2 : 0)   \" Toggle the statusline. 0=default, 1=never, 2=always.
-    \" Echo the current state to the command line
-    echo \"Hidden chars \" . (&list ? \"ON\" : \"OFF\") . \", Statusline \" . (&laststatus == 2 ? \"ON\" : \"OFF\")
+    set list!   " Toggle the 'list' setting to show/hide hidden characters
+    set listchars=tab:→\ ,trail:·,eol:¶   " Set chars to use for tabs, trailing spaces, end-of-line
+    let &laststatus = (&laststatus == 0 ? 2 : 0)   " Toggle the statusline. 0=default, 1=never, 2=always.
+    " Echo the current state to the command line
+    echo "Hidden chars " . (&list ? "ON" : "OFF") . ", Statusline " . (&laststatus == 2 ? "ON" : "OFF")
 endfunction
 nnoremap <F4> :call ToggleHiddenAndStatusBar()<CR>
 inoremap <F4> <Esc>:call ToggleHiddenAndStatusBar()<CR>a
@@ -331,40 +331,18 @@ nnoremap <Leader>n :set invnumber<CR>
 nnoremap <Leader>w :set wrap!<CR>
 " Toggle hidden chars (\h)
 nnoremap <Leader>h :call ToggleHiddenAndStatusBar()<CR>
-
-"
-
-# \" \" Enable 'list' and 'laststatus' via F4 in normal or insert mode
-# \" nnoremap <F4> :set list! listchars=tab:→\\ ,trail:·,eol:¶<CR>
-# \"         \\ :let &laststatus = (&laststatus == 0 ? 2 : 0)<CR>
-# \"         \\ :echo \"Hidden chars \" . (&list ? \"ON\" : \"OFF\") . \", Statusline \" . (&laststatus == 2 ? \"ON\" : \"OFF\")<CR>
-# \" inoremap <F4> <Esc>:set list! listchars=tab:→\ ,trail:·,eol:¶<CR> \
-# \"         \\ :let &laststatus = (&laststatus == 0 ? 2 : 0)<CR> \
-# \"         \\ :echo \"Hidden chars \" . (&list ? \"ON\" : \"OFF\") . \", Statusline \" . (&laststatus == 2 ? \"ON\" : \"OFF\")<CR>a
-
-# \" Alternatively, to just do 'list' on F4:
-# nnoremap <F4> :set list! listchars=tab:→\\ ,trail:·,eol:¶<CR>
-
-# Having problems with persistent undo (global undo history between sessions), so leaving off for now
-# \" Enable persistent undo, so that undo will operate between different edit sessions of files
-# set undofile
-# \" Set the directory where undo files will be stored
-# \" Create this directory if it doesn't exist
-# \" Use a path within your home directory
-# set undodir=\$HOME/.vim/undodir,\$HOME/.config/nvim/undodir,/tmp/undodir
-# \" Optional: Set undolevels to -1 for potentially unlimited undo history (disk space permitting)
-# \" set undolevels=-1
-# \" There is no way to cycle old undos, so be cautious with very large files and histories, as this can consume disk space.
-# \" Periodically clean, e.g. remove anything older than 90 days:   find /home/boss/.vim/undodir -type f -mtime +90 -delete
+EOF
+)
 
 # Neovim-specific settings block
-nvim_block="
-\" Neovim-specific settings
-\" Disable mouse support if it's causing issues in your terminal/container
+nvim_block=$(cat <<'EOF'
+" Neovim-specific settings
+" Disable mouse support if it's causing issues in your terminal/container
 set mouse=
-"
+EOF
+)
 
-# Function to update a target configuration file by adding missing lines (Revised & Corrected Blank Removal)
+# Function to update a target configuration file by adding missing lines
 # This version reads existing content, combines with new block, filters for unique lines, and writes.
 update_config_file() {
     local target_file="$1"

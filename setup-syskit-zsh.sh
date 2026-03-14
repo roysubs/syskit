@@ -15,7 +15,7 @@ This will setup the following:
 - ./0-new-system/new1-vimrc.sh      : Add essential definitions for vim and neovim
 - ./0-new-system/new1-update-h-scripts.sh : Markdown help files, use h-<tab> to view
 - ./0-new-system/new1-zshrc.sh      : Add essential definitions to ~/.zshrc
-- (Built-in)                        : Add path for 0-scripts to PATH
+- (Built-in)                        : Add /0-scripts and /0-help to PATH
 "
     exit 1
 fi
@@ -88,5 +88,6 @@ typeset -U path
 # Add syskit paths
 add_to_path "$SCRIPT_DIR"
 add_to_path "$SCRIPT_DIR/0-scripts"
+add_to_path "$SCRIPT_DIR/0-help"
 
 echo -e "\n\033[1;32mSuccess!\033[0m Syskit Zsh setup complete."
