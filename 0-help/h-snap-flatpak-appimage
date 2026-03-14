@@ -2,7 +2,7 @@
 command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
 command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
 WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
-mdcat --columns="$WIDTH" <(cat <<'EOF'
+mdcat --columns="$WIDTH" <<'EOF' | less -R
 
 
 Remove Flatpak Completely: If you don’t plan to use it at all, you can uninstall Flatpak:
@@ -19,4 +19,3 @@ APT: Native Debian package management is the most efficient and lightweight.
 AppImage: Portable, self-contained application bundles that don’t require daemons or services (as Snap and Flatpak do). They don’t integrate with the system as smoothly as Flatpak but avoid background resource usage entirely.
 
 EOF
-) | less -R

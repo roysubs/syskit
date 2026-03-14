@@ -2,7 +2,7 @@
 command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
 command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
 WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
-mdcat --columns="$WIDTH" <(cat <<'EOF'
+mdcat --columns="$WIDTH" <<'EOF' | less -R
 
 # Using UUIDs in /etc/fstab: Best Practices and How-Tos
 
@@ -141,4 +141,3 @@ sudo reboot
 Using UUIDs in `/etc/fstab` provides consistency, reliability, and future-proofing for your Linux systems. While `/dev/sdX` notation may work in some scenarios, switching to UUIDs is highly recommended, especially for critical system drives and regularly mounted data devices.
 
 EOF
-) | less -R

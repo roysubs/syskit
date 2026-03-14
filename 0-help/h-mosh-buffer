@@ -2,7 +2,7 @@
 command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
 command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
 WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
-mdcat --columns="$WIDTH" <(cat <<'EOF'
+mdcat --columns="$WIDTH" <<'EOF' | less -R
 
 The difference in behavior you're noticing between SSH and Mosh is due to how each handles terminal input/output and the scroll buffer:
 
@@ -33,4 +33,3 @@ some_command | less
 These approaches will give you a more familiar way to navigate through previous output while using Mosh.
 
 EOF
-) | less -R

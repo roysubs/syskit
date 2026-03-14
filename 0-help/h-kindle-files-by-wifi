@@ -2,7 +2,7 @@
 command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
 command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
 WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
-mdcat --columns="$WIDTH" <(cat <<'EOF'
+mdcat --columns="$WIDTH" <<'EOF' | less -R
 
 # Kindle File Management via WiFi
 
@@ -79,4 +79,3 @@ If you cannot access your Kindle over USB, use these methods to delete files:
 Using the "Send to Kindle" feature via email is a reliable alternative to USB file transfer. For file deletions, the Kindle interface or Amazon’s management tools provide viable solutions.
 
 EOF
-) | less -R

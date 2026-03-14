@@ -1,28 +1,8 @@
 #!/bin/bash
-# Ensure mdcat is available, try to fetch it if not.
-# The mdcat-get.sh script would need to be in the same directory or accessible.
-# For this example, we'll assume it's a placeholder or you have a mechanism for it.
-if ! command -v mdcat &>/dev/null; then
-    echo "mdcat not found. Please install mdcat to view this help file correctly." >&2
-    # Attempt to run a local getter script if it exists
-    if [ -f "${0%/*}/mdcat-get.sh" ]; then
-        echo "Attempting to run mdcat-get.sh..." >&2
-        "${0%/*}/mdcat-get.sh"
-        hash -r # Rehash to find mdcat if it was just installed
-    fi
-fi
-
-# Final check for mdcat
-command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available, and mdcat-get.sh failed or was not found." >&2; exit 1; }
-
-# Calculate column width for mdcat
-WIDTH=$(if [ "$(tput cols)" -ge 105 ]; then echo 100; else echo "$(( $(tput cols) - 5 ))"; fi)
-# Ensure WIDTH has a sane default if tput cols fails (e.g., in a non-interactive script)
-WIDTH=${WIDTH:-80}
-
-
-# Use mdcat to render the Markdown content from the here document, then pipe to less
-mdcat --columns="$WIDTH" <(cat <<'EOF_MARKDOWN'
+command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
+command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
+WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
+mdcat --columns="$WIDTH" <<'EOF' | less -R
 Bash Parameter Expansions: Advanced Guide
 ==========================================
 

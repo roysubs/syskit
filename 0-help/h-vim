@@ -2,7 +2,7 @@
 command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
 command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
 WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
-mdcat --columns="$WIDTH" <(cat <<'EOF'
+mdcat --columns="$WIDTH" <<'EOF' | less -R
 
 Vim Notes
 ===============
@@ -74,7 +74,7 @@ So, the default keys you'll find in any standard Vim installation are `v`, `V`, 
         - Use `↓` or `j` to select lines downwards that you want to modify.
         - Now press `:` to enter command mode: `:'<,'>` will appear automatically.
         - Add the substitution required, so: `:'<,'>s/"$//`.
-            - `'<,'>` is "apply to all visual selected text", and `/"$//` is "replace `"` at end of line with nothing".
+        - `'<,'>` is "apply to all visual selected text", and `/"$//` is "replace `"` at end of line with nothing".
     - **Example: Globally remove " at the end of *every* line in the file: `:%s/"$//`**
         - `%` apply to all lines, `s/` substitution, `"$` matches a double quote at the end of the line
         - `//` replace with nothing (i.e., delete).
@@ -167,4 +167,3 @@ call plug#end()
     - Example: `:!ls` to list files in the current directory.
 
 EOF
-) | less -R

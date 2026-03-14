@@ -2,7 +2,7 @@
 command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
 command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
 WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
-mdcat --columns="$WIDTH" <(cat <<'EOF'
+mdcat --columns="$WIDTH" <<'EOF' | less -R
 
 
 # YouCompleteMe for Vim
@@ -127,4 +127,3 @@ sudo apt remove build-essential cmake python3-dev
 You've now successfully set up, used, and learned how to uninstall the YouCompleteMe plugin in Vim. If you need to re-enable it, simply follow the steps to add it back into your `.vimrc` and run `:PlugInstall` again.
 
 EOF
-) | less -R

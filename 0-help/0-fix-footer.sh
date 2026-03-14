@@ -45,7 +45,6 @@ for file in "${FILES[@]}"; do
   # Append new footer
   {
       echo "EOF"
-      echo ") | less -R"
   } >> "${file}.tmp"
 
   mv "${file}.tmp" "$file"

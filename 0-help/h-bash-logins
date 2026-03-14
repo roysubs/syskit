@@ -2,7 +2,7 @@
 command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
 command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
 WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
-mdcat --columns="$WIDTH" <(cat <<'EOF'
+mdcat --columns="$WIDTH" <<'EOF' | less -R
 
 ## Bash Login Shells and Startup Files
 
@@ -97,4 +97,3 @@ To understand which files are being sourced and what is happening during shell s
 Remember: The behavior of startup files can be complex and influenced by shell options and how Bash is invoked. Always refer to the official Bash manual (`man bash`) for the most comprehensive and authoritative information, especially the section on 'INVOCATION'.
 
 EOF
-) | less -R

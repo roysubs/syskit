@@ -2,7 +2,7 @@
 command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
 command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
 WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
-mdcat --columns="$WIDTH" <(cat <<'EOF'
+mdcat --columns="$WIDTH" <<'EOF' | less -R
 
 
 # H-Repo Helper: Managing Repositories and Fixing Issues
@@ -92,4 +92,3 @@ Managing repositories involves adding, modifying, or removing repository URLs fr
 By following the steps above, you should be able to handle most common repository-related issues on your system.
 
 EOF
-) | less -R

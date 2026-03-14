@@ -1,9 +1,8 @@
 #!/bin/bash
-# Author: Roy Wiseman 2025-01
 command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
 command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
 WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
-mdcat --columns="$WIDTH" <(cat <<'EOF'
+mdcat --columns="$WIDTH" <<'EOF' | less -R
 
 ## Finding Specific Filenames: Web Search Engines vs. Scripting
 
@@ -143,4 +142,3 @@ Don't forget search engines built for specific types of content, which can be ve
 For "deep internet search" with "forensic detail" for specific filenames, standard web search engines are a good starting point but are limited by what's publicly indexed. **Python scripting offers a significantly more powerful and customizable approach** to delve deeper, search specific locations more thoroughly, and apply exact matching criteria, especially when files are not easily found through conventional search engines. However, this power comes with greater responsibility regarding ethical considerations and technical complexity. Shell scripts play a supporting role, mainly for local processing of already retrieved data.
 
 EOF
-) | less -R

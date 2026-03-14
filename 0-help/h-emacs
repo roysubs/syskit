@@ -2,7 +2,7 @@
 command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
 command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
 WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
-mdcat --columns="$WIDTH" <(cat <<'EOF'
+mdcat --columns="$WIDTH" <<'EOF' | less -R
 
 # Emacs Cheatsheet
 
@@ -61,4 +61,3 @@ mdcat --columns="$WIDTH" <(cat <<'EOF'
 - Set font: `M-x set-frame-font`
 - Open Emacs tutorial: `C-h t`
 EOF
-) | less -R

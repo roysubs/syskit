@@ -2,7 +2,7 @@
 command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
 command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
 WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
-mdcat --columns="$WIDTH" <(cat <<'EOF'
+mdcat --columns="$WIDTH" <<'EOF' | less -R
 
 # Searching GitHub and GitLab
 
@@ -97,4 +97,3 @@ While you want to go beyond basic Google search, there are some third-party tool
 By combining these techniques, you can move beyond basic keyword searches and effectively navigate the vast landscapes of GitHub and GitLab to uncover projects that perfectly match your interests and needs. Remember that the best approach often involves starting broad and then using filters and advanced operators to narrow down your results.
 
 EOF
-) | less -R

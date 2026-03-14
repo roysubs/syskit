@@ -2,7 +2,7 @@
 command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
 command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
 WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
-mdcat --columns="$WIDTH" <(cat <<'EOF'
+mdcat --columns="$WIDTH" <<'EOF' | less -R
 
 # Linux `find` Command Cheatsheet
 
@@ -79,4 +79,3 @@ Use -exec \; when you need to perform different actions per file, when you need 
 `find ~ -path ~/backup-home -prune -o \( -name "*.png" -o -name "*.jpg" \) -printf "%s %p\n" | awk '{printf "%.2f MB %s\n", $1/1048576, $2}'`
 
 EOF
-) | less -R

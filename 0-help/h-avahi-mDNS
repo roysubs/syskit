@@ -2,7 +2,7 @@
 command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
 command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
 WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
-mdcat --columns="$WIDTH" <(cat <<'EOF'
+mdcat --columns="$WIDTH" <<'EOF' | less -R
 
 Avahi, mDNS, and Network Name Resolution
 ========================================
@@ -62,4 +62,3 @@ Troubleshooting and Solutions
     4.  Save the file. The `ping hp2` command will now be instant.
 
 EOF
-) | less -R

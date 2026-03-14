@@ -2,7 +2,7 @@
 command -v mdcat &>/dev/null || "${0%/*}/mdcat-get.sh"; hash -r
 command -v mdcat &>/dev/null || { echo "Error: mdcat required but not available." >&2; exit 1; }
 WIDTH=$(if [ $(tput cols) -ge 105 ]; then echo 100; else echo $(( $(tput cols) - 5 )); fi)
-mdcat --columns="$WIDTH" <(cat <<'EOF'
+mdcat --columns="$WIDTH" <<'EOF' | less -R
 
 Vimrc Quick Notes
 =================
@@ -68,4 +68,3 @@ Vimrc Quick Notes
 30. **Window Navigation**: Move to the next window: `Ctrl+w w`, move to the previous window: `Ctrl+w W`, close window: `Ctrl+w q`
 
 EOF
-) | less -R
