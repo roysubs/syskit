@@ -1,6 +1,6 @@
 #!/bin/bash
 # -------------------------------------------------------------------------
-# Disk Spin-Down Policy & Health Monitor
+# PRESERVE-DISKS-POLICY: Disk Health & Power Manager
 # -------------------------------------------------------------------------
 
 # ANSI color codes

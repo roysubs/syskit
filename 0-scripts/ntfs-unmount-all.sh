@@ -6,9 +6,19 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+function show_usage() {
+    echo -e "\n── Current Disk Usage ──"
+    if command -v duf &>/dev/null; then
+        duf -only-fs ntfs,ntfs3,fuseblk,ext4 2>/dev/null || duf
+    else
+        df -h -t ntfs -t ntfs3 -t fuseblk -t ext4 2>/dev/null || df -h
+    fi
+}
+
 echo "========================================"
 echo " NTFS Cleanup Script"
 echo "========================================"
+show_usage
 echo ""
 
 # ── Step 1: Unmount all NTFS/fuseblk partitions ──────────────────────────────
@@ -28,7 +38,7 @@ while IFS= read -r line; do
     else
         echo "FAILED (busy? try: sudo lsof $MOUNT_POINT)"
     fi
-done < <(grep -E '\s(ntfs|fuseblk)\s' /proc/mounts)
+done < <(grep -E '\s(ntfs|fuseblk|ntfs3)\s' /proc/mounts)
 
 if [[ $COUNT -eq 0 ]]; then
     echo "[ INFO ] No active NTFS mounts found to unmount."
@@ -52,4 +62,5 @@ done
 
 echo ""
 echo "── Step 3: Current state ──"
-duf 2>/dev/null || df -h
+show_usage
+echo ""

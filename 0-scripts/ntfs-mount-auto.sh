@@ -66,13 +66,12 @@ print_smart_summary() {
     smart_out=$(smartctl -A -H "$disk" 2>/dev/null)
     local smart_health
     smart_health=$(echo "$smart_out" | grep -i "overall-health\|test result" | awk -F: '{print $2}' | tr -d ' ')
-    local temp
+
+    local temp hours realloc pending
     temp=$(echo "$smart_out" | awk '/Temperature_Celsius|Airflow_Temperature/{print $10; exit}')
-    local hours
-    hours=$(echo "$smart_out" | awk '/Power_On_Hours/{print $10; exit}')
-    local reallocated
-    reallocated=$(echo "$smart_out" | awk '/Reallocated_Sector/{print $10; exit}')
-    local pending
+    # Improved Power_On_Hours parsing from preserve-disks-policy.sh
+    hours=$(echo "$smart_out" | awk '/Power_On_Hours/{print $10; exit}' | sed 's/h+.*$//' | sed 's/[^0-9]//g')
+    realloc=$(echo "$smart_out" | awk '/Reallocated_Sector/{print $10; exit}')
     pending=$(echo "$smart_out" | awk '/Current_Pending_Sector/{print $10; exit}')
 
     # Format hours into days
@@ -81,30 +80,25 @@ print_smart_summary() {
         hours_display="${hours}h ($(( hours / 24 ))d)"
     fi
 
-    [[ -z "$smart_health" ]] && smart_health="n/a"
-    [[ -z "$temp" ]]         && temp="n/a"
-    [[ -z "$reallocated" ]]  && reallocated="n/a"
-    [[ -z "$pending" ]]      && pending="n/a"
-
-    # Health colouring via symbols
-    local health_str="$smart_health"
-    if [[ "$smart_health" == "PASSED" ]]; then
-        health_str="PASSED ✓"
-    elif [[ "$smart_health" == "FAILED"* ]]; then
-        health_str="FAILED ✗  <-- ATTENTION: drive may be failing!"
-    fi
+    # Health symbols
+    local health_str="n/a"
+    [[ "$smart_health" == "PASSED" ]] && health_str="PASSED ✓"
+    [[ "$smart_health" == "FAILED"* ]] && health_str="FAILED ✗  <-- ATTENTION!"
 
     echo "    Health      : $health_str"
-    echo "    Temperature : ${temp}°C"
+    echo "    Temperature : ${temp:-n/a}°C"
     echo "    Power-on    : $hours_display"
-    echo "    Reallocated : $reallocated sectors"
-    echo "    Pending     : $pending sectors"
+    echo "    Reallocated : ${realloc:-0} sectors"
+    echo "    Pending     : ${pending:-0} sectors"
+}
 
-    if [[ "$reallocated" =~ ^[0-9]+$ && "$reallocated" -gt 0 ]]; then
-        warn "$disk has $reallocated reallocated sectors — monitor this drive closely!"
-    fi
-    if [[ "$pending" =~ ^[0-9]+$ && "$pending" -gt 0 ]]; then
-        warn "$disk has $pending pending sectors — possible read errors!"
+function show_usage() {
+    echo -e "\n── Current Disk Usage ──"
+    if command -v duf &>/dev/null; then
+        # Removed the '/' to show all matched devices, and included fuseblk for ntfs-3g
+        duf -only-fs ntfs,ntfs3,fuseblk,ext4 2>/dev/null || duf
+    else
+        df -h -t ntfs -t ntfs3 -t fuseblk -t ext4 2>/dev/null || df -h
     fi
 }
 
@@ -114,6 +108,9 @@ if [[ "$SUDO_MODE" == false ]]; then
 echo " *** DIAGNOSTIC MODE (no sudo) ***"
 fi
 echo "========================================"
+
+show_usage
+echo ""
 
 # ════════════════════════════════════════════════════════════════════════════
 # SECTION A — DRIVE DISCOVERY (no sudo needed)
@@ -238,19 +235,61 @@ SHARED=0
 MOUNT_ERR=$(mktemp /tmp/ntfs_mount_err.XXXXXX)
 trap 'rm -f "$MOUNT_ERR"' EXIT
 
-# ── Dependencies ──────────────────────────────────────────────────────────────
+# ── Checking Dependencies ──────────────────────────────────────────────────
 section "Checking Dependencies"
 
-for pkg_check in "ntfs-3g:ntfs-3g" "smbd:samba" "smartctl:smartmontools"; do
+for pkg_check in "ntfs-3g:ntfs-3g" "smbd:samba" "smartctl:smartmontools" "duf:duf"; do
     cmd="${pkg_check%%:*}"
     pkg="${pkg_check##*:}"
     if ! command -v "$cmd" &>/dev/null; then
-        info "$pkg not found. Installing..."
-        apt-get install -y "$pkg"
+        info "$pkg not found. Attempting to install..."
+        apt-get install -y "$pkg" &>/dev/null
     else
         ok "$pkg is installed"
     fi
 done
+
+# ── Driver Detection ─────────────────────────────────────────────────────────
+NTFS_DRIVER="ntfs-3g"
+# Attempt to load the module
+MOD_ERR=$(modprobe ntfs3 2>&1)
+
+if grep -qs "ntfs3" /proc/filesystems; then
+    NTFS_DRIVER="ntfs3"
+    ok "Native high-speed 'ntfs3' kernel driver detected! (2-3x faster, low CPU)"
+else
+    warn "Native 'ntfs3' driver NOT found. You are currently using the slower FUSE driver."
+    echo ""
+    echo -e "${YELLOW}PRO-TIP: Why this matters?${NC}"
+    echo -e "   - ${BOLD}The Bad (FUSE/ntfs-3g)${NC}: High CPU usage, bottlenecks on 8TB drives."
+    echo -e "   - ${BOLD}The Good (ntfs3/Kernel)${NC}: Native performance, 2-3x speed, low power."
+    echo ""
+    
+    # Only ask for update if interactive and not already root (or we have sudo permissions)
+    if [[ -t 0 ]]; then
+        echo -n "Would you like me to try and fix this by installing the kernel modules? [y/N] "
+        read -r choice
+        if [[ "$choice" =~ ^[Yy]$ ]]; then
+            info "Attempting to install 'linux-image-amd64'..."
+            if apt-get install -y linux-image-amd64 &>/dev/null; then
+                ok "Update successful. Re-trying modprobe..."
+                modprobe ntfs3 &>/dev/null
+                if grep -qs "ntfs3" /proc/filesystems; then
+                    NTFS_DRIVER="ntfs3"
+                    ok "Success! Switched to high-speed driver."
+                else
+                    warn "Update finished but 'ntfs3' still not found. A reboot might be needed."
+                    note "Continuing with legacy 'ntfs-3g' for now."
+                fi
+            else
+                fail "Apt update failed. Keeping 'ntfs-3g'."
+            fi
+        fi
+    else
+        note "Skipping interactive driver-fix (non-interactive mode)."
+        note "Falling back to legacy 'ntfs-3g' (FUSE)."
+    fi
+fi
 
 # ── Samba user check ──────────────────────────────────────────────────────────
 section "Checking Samba User"
@@ -317,25 +356,38 @@ while IFS= read -r partition; do
     MOUNT_POINT="${MOUNT_BASE}/${DIR_NAME}"
     mkdir -p "$MOUNT_POINT"
 
-    echo -n "[ MOUNT ] $partition -> $MOUNT_POINT ... "
-    if mount -t ntfs-3g \
-        -o uid="$USER_ID",gid="$GROUP_ID",umask=022,noatime \
-        "$partition" "$MOUNT_POINT" 2>"$MOUNT_ERR"; then
+    echo -n "[ MOUNT ] $partition -> $MOUNT_POINT ($NTFS_DRIVER) ... "
+    
+    # Generic mount options that work for both drivers or are translated
+    # ntfs3 uses: uid, gid, fmask, dmask
+    # ntfs-3g uses: uid, gid, umask
+    # We use a wrapper to handle the translation
+    if [[ "$NTFS_DRIVER" == "ntfs3" ]]; then
+        MOUNT_OPTS="uid=$USER_ID,gid=$GROUP_ID,fmask=111,dmask=022,noatime,prealloc"
+    else
+        MOUNT_OPTS="uid=$USER_ID,gid=$GROUP_ID,umask=022,noatime"
+    fi
+
+    if mount -t "$NTFS_DRIVER" -o "$MOUNT_OPTS" "$partition" "$MOUNT_POINT" 2>"$MOUNT_ERR"; then
         echo "OK"
         MOUNTED=$((MOUNTED + 1))
     else
         ERR=$(cat "$MOUNT_ERR")
-        if echo "$ERR" | grep -qi "hibernat\|dirty"; then
+        # If ntfs3 failed, it might be due to a dirty bit which ntfs3 refuses to touch
+        if [[ "$NTFS_DRIVER" == "ntfs3" ]] || echo "$ERR" | grep -qi "hibernat\|dirty"; then
             echo ""
-            info "$partition appears dirty/hibernated, attempting recovery..."
+            info "$partition may be dirty or hibernated, attempting recovery with ntfsfix..."
             ntfsfix "$partition" &>/dev/null
-            if mount -t ntfs-3g \
-                -o uid="$USER_ID",gid="$GROUP_ID",umask=022,noatime,remove_hiberfile \
-                "$partition" "$MOUNT_POINT" 2>/dev/null; then
-                ok "Mounted after recovery: $MOUNT_POINT"
+            
+            # Try mounting again with ntfs3 first, then fallback to ntfs-3g
+            if mount -t ntfs3 -o "$MOUNT_OPTS,force" "$partition" "$MOUNT_POINT" 2>/dev/null; then
+                ok "Mounted with ntfs3 after recovery: $MOUNT_POINT"
+                MOUNTED=$((MOUNTED + 1))
+            elif mount -t ntfs-3g -o "uid=$USER_ID,gid=$GROUP_ID,umask=022,noatime,remove_hiberfile" "$partition" "$MOUNT_POINT" 2>/dev/null; then
+                ok "Mounted with legacy ntfs-3g after recovery: $MOUNT_POINT"
                 MOUNTED=$((MOUNTED + 1))
             else
-                fail "Could not recover $partition"
+                fail "Could not mount $partition after recovery attempt"
                 rmdir "$MOUNT_POINT" 2>/dev/null
             fi
         else
@@ -353,9 +405,10 @@ SMB_CHANGED=0
 while IFS= read -r line; do
     DEVICE=$(echo "$line" | awk '{print $1}')
     MOUNT_POINT=$(echo "$line" | awk '{print $2}')
+    MOUNT_TYPE=$(echo "$line" | awk '{print $3}')
 
-    FS_TYPE=$(blkid -s TYPE -o value "$DEVICE" 2>/dev/null)
-    if [[ "$FS_TYPE" != "ntfs" && "$FS_TYPE" != "ntfs-3g" ]]; then
+    # Check if this mount is one we care about
+    if [[ "$MOUNT_TYPE" != "ntfs" && "$MOUNT_TYPE" != "ntfs-3g" && "$MOUNT_TYPE" != "ntfs3" && "$MOUNT_TYPE" != "fuseblk" ]]; then
         continue
     fi
 
@@ -397,8 +450,10 @@ fi
 # ── Final Summary ─────────────────────────────────────────────────────────────
 echo ""
 echo "========================================"
-echo " Final Summary"
+echo " NTFS Mount + Samba Share Script"
 echo "========================================"
+
+show_usage
 if [[ "$MOUNTED" -eq 0 && "$SHARED" -eq 0 ]]; then
     ok "Everything is already up-to-date and configured."
 fi
