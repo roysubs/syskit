@@ -260,6 +260,9 @@ if [ -f $HOME/syskit/0-scripts/g ]; then alias gacp='g acp'; fi
 
 # Create 'bat' alias for 'batcat' (apt install bat) *unless* 'bat' from bluez-tools package (Bluetooth Audio Tool) is present
 if ! dpkg -s bluez-tools &> /dev/null && command -v batcat &> /dev/null && ! command -v bat &> /dev/null; then alias bat='batcat'; fi # Use batcat as bat on Debian/Ubuntu if 'bat' isn't the bluetooth tool
+# 'mdcat paginate' / 'mdcat less'
+command -v ml >/dev/null || alias ml='mdcat -p'
+command -v mp >/dev/null || alias mp='mdcat -p'
 
 # The below will load ~/.bashrc_personal if it is present. This is more for personal jump
 # locations and personal functions and aliases that don't fit as more generic. A sample set
@@ -273,6 +276,7 @@ if [ -f ~/.bashrc_personal ]; then . ~/.bashrc_personal; fi
 0h()  { cd "$HOME/syskit/0-help" || return; ls; }          # Jump to syskit/0-help
 0i()  { cd "$HOME/syskit/0-install" || return; ls; }       # Jump to syskit/0-install
 0n()  { cd "$HOME/syskit/0-new-system" || return; ls; }    # Jump to syskit/0-new-system
+0ns() { cd "$HOME/syskit/0-new-system" || return; ls; }    # Jump to syskit/0-new-system
 0s()  { cd "$HOME/syskit/0-scripts" || return; ls; }       # Jump to syskit/0-scripts
 0w()  { cd "$HOME/syskit/0-web-apps" || return; ls; }      # Jump to syskit/0-web-apps
 0ms() { cd "$HOME/syskit/0-docker/0-media-stack" || return; ls; }    # Jump to docker media-stack setup folder
@@ -287,17 +291,17 @@ c() {
         cat <<EOF
 'c' quick jump. Usage: c [destination]
 -- syskit --
-  0, k syskit : \$HOME/syskit
-  n, new      : syskit/0-new-system
-  s, scripts  : syskit/0-scripts
-  hp, help    : syskit/0-help
-  dk, docker  : syskit/0-docker
-  g, games    : syskit/0-games
-  i, install  : syskit/0-install
-  w, web      : syskit/0-web-apps
+  0, k syskit  : \$HOME/syskit
+  n, ns, new   : syskit/0-new-system
+  s, scripts   : syskit/0-scripts
+  hh, hp, help : syskit/0-help
+  dk, docker   : syskit/0-docker
+  g, games     : syskit/0-games
+  i, install   : syskit/0-install
+  w, web       : syskit/0-web-apps
 -- custom --
-  ms          : syskit/0-docker/0-media-stack
-  q, qbit, qc : ~/.config/media-stack/qbittorrent
+  ms           : syskit/0-docker/0-media-stack
+  q, qbit, qc  : ~/.config/media-stack/qbittorrent
 -- System --
   h            : \$HOME (same as just 'cd')
   d, down      : \$HOME/Downloads
@@ -316,9 +320,9 @@ EOF
     
     case "$dest" in
         0|k|syskit)  cd "$HOME/syskit" ;;
-        n|new)       cd "$HOME/syskit/0-new-system" ;;
+        n|ns|new)    cd "$HOME/syskit/0-new-system" ;;
         s|scripts)   cd "$HOME/syskit/0-scripts" ;;
-        hp|help)     cd "$HOME/syskit/0-help" ;;
+        hh|hp|help)  cd "$HOME/syskit/0-help" ;;
         dk|docker)   cd "$HOME/syskit/0-docker" ;;
         g|games)     cd "$HOME/syskit/0-games" ;;
         i|install)   cd "$HOME/syskit/0-install" ;;

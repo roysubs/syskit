@@ -12,7 +12,7 @@ set -e
 set -o pipefail
 
 # ---------------[ CONFIG ]---------------
-DEFAULT_OUTDIR="$HOME/Desktop/chop-video"   # DEFAULT_OUTDIR="$HOME"
+DEFAULT_OUTDIR="$HOME/chop-video"   # DEFAULT_OUTDIR="$HOME"
 DEFAULT_QUALITY_PROFILE="sd" # Options: phone_small, phone_fast, sd, hd, source_mp4, half, quarter, 10mb
 YTDLP_CMD=""                 # Global variable to hold the yt-dlp command path
 fetched_title=""             # Global variable to store fetched title for later rename

@@ -50,9 +50,9 @@ display_section() {
 
 # --- Section 1: Basics and Windows Terminal Tabs and Splits ---
 
-intro_content="A quick refresher on useful features of Windows Terminal when connecting
-via SSH to Linux systems, with buffers/pasting (and tools like xclip),
-tiling (and pros and cons Windows Terminal tiles vs tmux).
+intro_content="
+Using Windows Terminal features when connecting by SSH to Linux systems. Bbuffers/pasting, using tools
+like xclip, tiling (and the pros and cons of using Windows Terminal tiles vs tmux).
 
 Windows Terminal allows you to manage multiple connections or shells
 in one window.
@@ -67,7 +67,6 @@ in one window.
     - ${YELLOW}Ctrl-Shift-W${NC} Close the current tab
     - ${YELLOW}Ctrl-Tab${NC} or ${YELLOW}Ctrl-Page Up/Down${NC} Navigate between tabs
     - ${YELLOW}Ctrl-Alt-[number]${NC} Jump to a specific tab (1-9)
-
 3.  ${GREEN}Splits (Panes):${NC}
     - ${YELLOW}Alt-Shift-+${NC} or ${YELLOW}Alt-Shift-D${NC} Split the current pane
       horizontally
@@ -79,10 +78,8 @@ in one window.
     - ${YELLOW}Alt-Shift-L${NC} Switch to layout mode (for more complex pane
       management) (Then use Arrow Keys and Enter)
 
-Note: An advantage of Windows Terminal splits over tmux is that it is fully mouse aware
-at all times (not just when in mouse mode like tmux); just move the over a pan and key-
-presses will go to that pane (and no mouse-click is required to change pane as in tmux).
-This is very useful for diff compares etc.
+Note: Windows Terminal splits are fully mouse aware at all times (not just when in mouse mode like tmux);
+just move over a pane and keypresses go to that pane (no mouse-click is required to change pane as in tmux).
 
 Using splits is great for:
 -   Running a command in one pane while editing a file in another.

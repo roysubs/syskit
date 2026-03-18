@@ -12,18 +12,13 @@ BOLD='\033[1m'
 
 usage() {
     echo "Usage: f [OPTIONS] [PATTERN] [PATH]"
+    echo "       f [OPTIONS] [COMMAND] [ARGS] [PATH]"
     echo
     echo "Enhanced find and grep utility with common operations"
     echo
-    echo "Basic Search (default action):"
-    echo "  f PATTERN [PATH]      Recursively find files matching PATTERN (use quotes for wildcards)"
-    echo
-    echo "Examples:"
-    echo "  f myfile.txt                              Find myfile.txt recursively from current dir"
-    echo "  f \"*.log\"                                 Find all .log files recursively"
-    echo "  f myfile.txt /var/log                     Find myfile.txt in /var/log"
-    echo "  f -L 1 \"*.txt\"                            Find .txt files in current dir only"
-    echo "  f -L 2 \"config*\" /etc                     Find config* files in /etc, max 2 levels deep"
+    echo "Simple Search (default):"
+    echo "  f PATTERN [PATH]      Find files containing PATTERN in their name (case-insensitive)"
+    echo "                        If PATTERN has no wildcards, it's treated as *PATTERN*"
     echo
     echo "General Options:"
     echo "  h, help               Show this help message"
@@ -53,23 +48,17 @@ usage() {
     echo
     echo "Grep Options (uses 'grep' command directly for recursive content search):"
     echo "  hg, h-grep                        Show various grep syntax examples"
-    echo "  gl, grep-lines PATTERN [PATH]     Recursively grep for PATTERN, show matching lines"
+    echo "  gl,  grep-lines PATTERN [PATH]    Recursively grep for PATTERN, show matching lines"
     echo "  gli, grep-lines-i PATTERN [PATH]  Case-insensitive recursive grep, show matching lines"
     echo "  glw, grep-lines-w PATTERN [PATH]  Recursive grep for whole word PATTERN, show matching lines"
-    echo "  gf, grep-files PATTERN [PATH]     Recursively grep for PATTERN, list matching filenames only"
+    echo "  gf,  grep-files PATTERN [PATH]    Recursively grep for PATTERN, list matching filenames only"
+    echo "  gfi, grep-files-i PATTERN [PATH]   Case-insensitive recursive grep, list filenames only"
     echo
-    echo "More Examples:"
+    echo "Examples:"
+    echo "  f myfile                              Find files with 'myfile' in the name (anywhere)"
+    echo "  f \"*.log\"                             Find all .log files recursively"
     echo "  f b 5 /home                           Find 5 biggest files in /home"
-    echo "  f -s b 5 /home                        Find 5 biggest files in /home with sudo"
-    echo "  f b 50 -s -c -e \"Downloads\"           Find 50 biggest files, exclude Downloads, with sudo"
-    echo "  f b 50 -c -s -e \"Downloads\" -e \".git\" Exclude multiple directories"
-    echo "  f n /var/log                          Find 10 newest files in /var/log"
-    echo "  f s +100M /var -e \"cache\"             Find files larger than 100MB in /var, exclude cache"
-    echo "  f m 7 ~                               Find files modified in the last 7 days in home directory"
-    echo "  f x 'chmod 644 {}'                    Find files and change permissions to 644"
-    echo "  f g \"myFunction\" ./src                Find files under ./src containing \"myFunction\""
-    echo "  f gl \"ERROR_CODE\" /var/log            Recursively search lines with \"ERROR_CODE\" in /var/log"
-    echo "  f gf \"debug_mode\" .                   List files containing \"debug_mode\" in current dir"
+    echo "  f gl \"ERROR\" /var/log                 Search for \"ERROR\" in files under /var/log"
     exit 1
 }
 
@@ -279,19 +268,13 @@ while [[ $# -gt 0 ]]; do
             if [[ -n "$2" ]]; then PATTERN="$2"; shift; else echo "Error: Pattern required for gf"; exit 1; fi
             shift
             ;;
+        gfi|grep-files-i)
+            ACTION="grep_files_i"
+            if [[ -n "$2" ]]; then PATTERN="$2"; shift; else echo "Error: Pattern required for gfi"; exit 1; fi
+            shift
+            ;;
         *)
-            if [[ ! "$1" =~ ^- ]] && [[ "$SEARCH_PATH" == "." ]]; then
-                SEARCH_PATH="$1"
-            elif [[ ! "$1" =~ ^- ]] && [[ -n "$ACTION" ]] && \
-                 ( [[ "$ACTION" == "grep_lines" ]] || \
-                   [[ "$ACTION" == "grep_lines_i" ]] || \
-                   [[ "$ACTION" == "grep_lines_w" ]] || \
-                   [[ "$ACTION" == "grep_files" ]] ) && \
-                 [[ -z "${POSITIONAL[0]}" ]] ; then # if it's a path for a grep option
-                SEARCH_PATH="$1"
-            else
-                POSITIONAL+=("$1") # Store unknown options or path if already set
-            fi
+            POSITIONAL+=("$1")
             shift
             ;;
     esac
@@ -361,7 +344,13 @@ case "$ACTION" in
         if [[ -n "$MAX_DEPTH" ]]; then
             DEPTH_ARG="-maxdepth $MAX_DEPTH"
         fi
-        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR $DEPTH_ARG -name \"$PATTERN\" $FAST_ARG"
+        
+        # If pattern has no wildcards, wrap in * for a "contains" search
+        if [[ "$PATTERN" != *[*?[]* ]]; then
+            PATTERN="*$PATTERN*"
+        fi
+        
+        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR $DEPTH_ARG -iname \"$PATTERN\" $FAST_ARG"
         execute_command "$CMD"
         ;;
     biggest)
@@ -504,6 +493,10 @@ $(tput setaf 2)Note: Always quote patterns with wildcards or spaces to avoid she
         ;;
     grep_files)
         CMD="$USE_SUDO grep --color=auto -rIl \"$PATTERN\" \"$SEARCH_PATH\"" # l=list filenames, I=ignore binary
+        execute_command "$CMD"
+        ;;
+    grep_files_i)
+        CMD="$USE_SUDO grep --color=auto -rIil \"$PATTERN\" \"$SEARCH_PATH\"" # i=case-insensitive
         execute_command "$CMD"
         ;;
     *)

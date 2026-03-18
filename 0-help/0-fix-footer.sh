@@ -48,6 +48,7 @@ for file in "${FILES[@]}"; do
   } >> "${file}.tmp"
 
   mv "${file}.tmp" "$file"
+  chmod +x "$file"  # Re-apply execute bit
 done
 
 echo "Footer fix applied to all matching files."

@@ -11,15 +11,21 @@ WHITE='\033[1;37m'
 BOLD='\033[1m'
 
 usage() {
-    echo "Usage: f [OPTIONS] [PATH] [ARGUMENTS]"
+    echo "Usage: f [OPTIONS] [PATTERN] [PATH]"
+    echo "       f [OPTIONS] [COMMAND] [ARGS] [PATH]"
     echo
     echo "Enhanced find and grep utility with common operations"
+    echo
+    echo "Simple Search (default):"
+    echo "  f PATTERN [PATH]      Find files containing PATTERN in their name (case-insensitive)"
+    echo "                        If PATTERN has no wildcards, it's treated as *PATTERN*"
     echo
     echo "General Options:"
     echo "  h, help               Show this help message"
     echo "  -c, --cmd             Show the command that was executed after running"
     echo "  -s, --sudo            Run find/grep commands with sudo"
     echo "  -e, --exclude DIR     Exclude a specific directory from search (can be used multiple times)"
+    echo "  -L, --level N         Limit search depth (1=current dir only, 2=one level down, etc.)"
     echo
     echo "Find Options (uses 'find' command):"
     echo "  hf, h-find            Show various find syntax examples"
@@ -42,23 +48,18 @@ usage() {
     echo
     echo "Grep Options (uses 'grep' command directly for recursive content search):"
     echo "  hg, h-grep                        Show various grep syntax examples"
-    echo "  gl, grep-lines PATTERN [PATH]     Recursively grep for PATTERN, show matching lines"
+    echo "  gl,  grep-lines PATTERN [PATH]    Recursively grep for PATTERN, show matching lines"
     echo "  gli, grep-lines-i PATTERN [PATH]  Case-insensitive recursive grep, show matching lines"
     echo "  glw, grep-lines-w PATTERN [PATH]  Recursive grep for whole word PATTERN, show matching lines"
-    echo "  gf, grep-files PATTERN [PATH]     Recursively grep for PATTERN, list matching filenames only"
+    echo "  gf,  grep-files PATTERN [PATH]    Recursively grep for PATTERN, list matching filenames only"
+    echo "  gfi, grep-files-i PATTERN [PATH]   Case-insensitive recursive grep, list filenames only"
     echo
     echo "Examples:"
+    echo "  f myfile                              Find files with 'myfile' in the name (anywhere)"
+    echo "  f \"*.log\"                             Find all .log files recursively"
     echo "  f b 5 /home                           Find 5 biggest files in /home"
-    echo "  f -s b 5 /home                        Find 5 biggest files in /home with sudo"
-    echo "  f b 50 -s -c -e \"Downloads\"           Find 50 biggest files, exclude Downloads, with sudo"
-    echo "  f b 50 -c -s -e \"Downloads\" -e \".git\" Exclude multiple directories"
-    echo "  f n /var/log                          Find 10 newest files in /var/log"
-    echo "  f s +100M /var -e \"cache\"             Find files larger than 100MB in /var, exclude cache"
-    echo "  f m 7 ~                               Find files modified in the last 7 days in home directory"
-    echo "  f x 'chmod 644 {}'                    Find files and change permissions to 644"
-    echo "  f g \"myFunction\" ./src                Find files under ./src containing \"myFunction\""
-    echo "  f gl \"ERROR_CODE\" /var/log            Recursively search lines with \"ERROR_CODE\" in /var/log"
-    echo "  f gfi \"debug_mode\" .                  Case-insensitively list files containing \"debug_mode\" in current dir"
+    echo "  f gl \"ERROR\" /var/log                 Search for lines with \"ERROR\" under /var/log"
+    echo "  f gf \"debug_mode\" .                   List filenames containing \"debug_mode\" in current dir"
     exit 1
 }
 
@@ -127,13 +128,14 @@ USE_SUDO=""
 EXCLUDE_DIRS=()
 SEARCH_PATH="."
 FAST_ARG="" # Changed from FAST to FAST_ARG to avoid conflict
+MAX_DEPTH=""
 
 # Parse command line arguments
 POSITIONAL=()
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
-        -h|--help)
+        -h|--help|h|help)
             usage
             ;;
         -c|--cmd)
@@ -154,25 +156,35 @@ while [[ $# -gt 0 ]]; do
             fi
             shift
             ;;
+        -L|--level)
+            if [[ $2 =~ ^[0-9]+$ ]]; then 
+                MAX_DEPTH="$2"
+                shift
+            else 
+                echo "Error: Numeric depth required for -L"
+                exit 1
+            fi
+            shift
+            ;;
         hf|h-find) # Find examples
             ACTION="find_examples"
             shift
             ;;
-        hg|grep-examples) # Grep examples
+        hg|h-grep|grep-examples) # Grep examples
             ACTION="grep_examples"
             shift
             ;;
-        b|biggest)
+        b|big|biggest)
             ACTION="biggest"
             if [[ $2 =~ ^[0-9]+$ ]]; then N="$2"; shift; fi
             shift
             ;;
-        n|newest)
+        n|new|newest)
             ACTION="newest"
             if [[ $2 =~ ^[0-9]+$ ]]; then N="$2"; shift; fi
             shift
             ;;
-        o|oldest)
+        o|old|oldest)
             ACTION="oldest"
             if [[ $2 =~ ^[0-9]+$ ]]; then N="$2"; shift; fi
             shift
@@ -201,7 +213,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         t|type)
             ACTION="type"
-            if [[ -n "$2" ]]; then TYPE_VAL="$2"; shift; else echo "Error: Type parameter required"; exit 1; fi # Renamed TYPE to TYPE_VAL
+            if [[ -n "$2" ]]; then TYPE_VAL="$2"; shift; else echo "Error: Type parameter required"; exit 1; fi
             shift
             ;;
         m|modified)
@@ -257,31 +269,33 @@ while [[ $# -gt 0 ]]; do
             if [[ -n "$2" ]]; then PATTERN="$2"; shift; else echo "Error: Pattern required for gf"; exit 1; fi
             shift
             ;;
+        gfi|grep-files-i)
+            ACTION="grep_files_i"
+            if [[ -n "$2" ]]; then PATTERN="$2"; shift; else echo "Error: Pattern required for gfi"; exit 1; fi
+            shift
+            ;;
         *)
-            if [[ ! "$1" =~ ^- ]] && [[ "$SEARCH_PATH" == "." ]]; then
-                SEARCH_PATH="$1"
-            elif [[ ! "$1" =~ ^- ]] && [[ -n "$ACTION" ]] && \
-                 ( [[ "$ACTION" == "grep_lines" ]] || \
-                   [[ "$ACTION" == "grep_lines_i" ]] || \
-                   [[ "$ACTION" == "grep_lines_w" ]] || \
-                   [[ "$ACTION" == "grep_files" ]] ) && \
-                 [[ -z "${POSITIONAL[0]}" ]] ; then # if it's a path for a grep option
-                SEARCH_PATH="$1"
-            else
-                POSITIONAL+=("$1") # Store unknown options or path if already set
-            fi
+            POSITIONAL+=("$1")
             shift
             ;;
     esac
 done
 
+# If no action specified but we have positional args, treat as filename search
+if [[ -z "$ACTION" ]] && [[ ${#POSITIONAL[@]} -gt 0 ]]; then
+    ACTION="search_filename"
+    PATTERN="${POSITIONAL[0]}"
+    if [[ ${#POSITIONAL[@]} -gt 1 ]]; then
+        SEARCH_PATH="${POSITIONAL[1]}"
+    fi
+fi
+
 # Restore positional parameters if any were stored for other purposes
 # For this script, primary path is handled, other positionals might indicate an error or future use
-if [ ${#POSITIONAL[@]} -gt 0 ]; then
+if [[ -n "$ACTION" ]] && [[ "$ACTION" != "search_filename" ]] && [ ${#POSITIONAL[@]} -gt 0 ]; then
     # If SEARCH_PATH is still ".", and POSITIONAL[0] looks like a path, use it.
     if [[ "$SEARCH_PATH" == "." ]] && [[ ! "${POSITIONAL[0]}" =~ ^- ]]; then
         SEARCH_PATH="${POSITIONAL[0]}"
-        # Consider shifting POSITIONAL array or handling others if necessary
     else
         echo "Warning: Unhandled positional arguments: ${POSITIONAL[*]}"
     fi
@@ -326,6 +340,20 @@ execute_command() {
 
 # Perform the selected action
 case "$ACTION" in
+    search_filename)
+        DEPTH_ARG=""
+        if [[ -n "$MAX_DEPTH" ]]; then
+            DEPTH_ARG="-maxdepth $MAX_DEPTH"
+        fi
+        
+        # If pattern has no wildcards, wrap in * for a "contains" search
+        if [[ "$PATTERN" != *[*?[]* ]]; then
+            PATTERN="*$PATTERN*"
+        fi
+        
+        CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR $DEPTH_ARG -iname \"$PATTERN\" $FAST_ARG"
+        execute_command "$CMD"
+        ;;
     biggest)
         CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR -type f $FAST_ARG -not -path \"*/\\.*\" -exec du -h {} \\; | sort -hr | head -n $N"
         execute_command "$CMD"
@@ -359,7 +387,7 @@ case "$ACTION" in
         execute_command "$CMD"
         ;;
     type)
-        case "$TYPE_VAL" in # Was TYPE
+        case "$TYPE_VAL" in
             f|file) TYPE_ARG="-type f" ;;
             d|dir|directory) TYPE_ARG="-type d" ;;
             l|link|symlink) TYPE_ARG="-type l" ;;
@@ -392,7 +420,7 @@ case "$ACTION" in
         CMD="$USE_SUDO find \"$SEARCH_PATH\" $EXCLUDE_STR -type l $FAST_ARG -exec test ! -e {} \\; -print"
         execute_command "$CMD"
         ;;
-    find_examples) # Was 'examples'
+    find_examples)
         printf '%s\n' "\
 $(tput bold)$(tput setaf 3)FIND COMMAND – PAGE 1: CORE USAGE$(tput sgr0)
 ==========================================================================================================
@@ -466,6 +494,10 @@ $(tput setaf 2)Note: Always quote patterns with wildcards or spaces to avoid she
         ;;
     grep_files)
         CMD="$USE_SUDO grep --color=auto -rIl \"$PATTERN\" \"$SEARCH_PATH\"" # l=list filenames, I=ignore binary
+        execute_command "$CMD"
+        ;;
+    grep_files_i)
+        CMD="$USE_SUDO grep --color=auto -rIil \"$PATTERN\" \"$SEARCH_PATH\"" # i=case-insensitive
         execute_command "$CMD"
         ;;
     *)

@@ -56,6 +56,7 @@ for file in "${MODIFIED_FILES[@]}"; do
     printf "%s\n" "$header_content" > "$file"
     cat "${file}.tmp" >> "$file"
     rm -f "${file}.tmp"
+    chmod +x "$file"  # Re-apply execute bit
 done
 
 echo "Modifications complete."
