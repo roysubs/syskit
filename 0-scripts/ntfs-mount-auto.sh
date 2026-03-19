@@ -19,14 +19,23 @@ else
     fi
 fi
 
+# ── ANSI Colors ──────────────────────────────────────────────────────────────
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
-section() { echo ""; echo "── $* ──"; }
-info()    { echo "[ INFO ] $*"; }
-ok()      { echo "[ OK   ] $*"; }
-skip()    { echo "[ SKIP ] $*"; }
-warn()    { echo "[ WARN ] $*"; }
-fail()    { echo "[ FAIL ] $*"; }
-note()    { echo "[ NOTE ] $*"; }
+section() { echo ""; echo -e "${BOLD}── $* ──${NC}"; }
+info()    { echo -e "${BLUE}[ INFO ] $*${NC}"; }
+ok()      { echo -e "${GREEN}[ OK   ] $*${NC}"; }
+skip()    { echo -e "${CYAN}[ SKIP ] $*${NC}"; }
+warn()    { echo -e "${YELLOW}[ WARN ] $*${NC}"; }
+fail()    { echo -e "${RED}[ FAIL ] $*${NC}"; }
+note()    { echo -e "${BOLD}[ NOTE ] $*${NC}"; }
 
 SMB_CONF="/etc/samba/smb.conf"
 
@@ -361,30 +370,37 @@ while IFS= read -r partition; do
     # Generic mount options that work for both drivers or are translated
     # ntfs3 uses: uid, gid, fmask, dmask
     # ntfs-3g uses: uid, gid, umask
-    # We use a wrapper to handle the translation
     if [[ "$NTFS_DRIVER" == "ntfs3" ]]; then
-        MOUNT_OPTS="uid=$USER_ID,gid=$GROUP_ID,fmask=111,dmask=022,noatime,prealloc"
+        MOUNT_OPTS="rw,uid=$USER_ID,gid=$GROUP_ID,fmask=111,dmask=022,noatime,prealloc"
     else
-        MOUNT_OPTS="uid=$USER_ID,gid=$GROUP_ID,umask=022,noatime"
+        MOUNT_OPTS="rw,uid=$USER_ID,gid=$GROUP_ID,umask=022,noatime"
     fi
 
     if mount -t "$NTFS_DRIVER" -o "$MOUNT_OPTS" "$partition" "$MOUNT_POINT" 2>"$MOUNT_ERR"; then
-        echo "OK"
+        # Verification: Check if it's actually writable
+        if touch "${MOUNT_POINT}/.mount_test" 2>/dev/null; then
+            rm "${MOUNT_POINT}/.mount_test"
+            echo -e "${GREEN}OK (Read-Write)${NC}"
+        else
+            echo -e "${YELLOW}OK (READ-ONLY)${NC}"
+            warn "$partition was mounted as Read-Only. (Try ntfsfix or check Windows Fast-Startup)"
+        fi
         MOUNTED=$((MOUNTED + 1))
     else
         ERR=$(cat "$MOUNT_ERR")
-        # If ntfs3 failed, it might be due to a dirty bit which ntfs3 refuses to touch
-        if [[ "$NTFS_DRIVER" == "ntfs3" ]] || echo "$ERR" | grep -qi "hibernat\|dirty"; then
+        # If mount failed, it might be due to a dirty bit
+        if [[ "$NTFS_DRIVER" == "ntfs3" ]] || echo "$ERR" | grep -qi "hibernat\|dirty\|unclean"; then
             echo ""
-            info "$partition may be dirty or hibernated, attempting recovery with ntfsfix..."
-            ntfsfix "$partition" &>/dev/null
+            info "$partition has an unclean filesystem, attempting recovery with ntfsfix..."
+            # -d clears the dirty flag
+            ntfsfix -d "$partition" &>/dev/null
             
             # Try mounting again with ntfs3 first, then fallback to ntfs-3g
             if mount -t ntfs3 -o "$MOUNT_OPTS,force" "$partition" "$MOUNT_POINT" 2>/dev/null; then
-                ok "Mounted with ntfs3 after recovery: $MOUNT_POINT"
+                ok "Mounted with ntfs3 after recovery (RW)"
                 MOUNTED=$((MOUNTED + 1))
-            elif mount -t ntfs-3g -o "uid=$USER_ID,gid=$GROUP_ID,umask=022,noatime,remove_hiberfile" "$partition" "$MOUNT_POINT" 2>/dev/null; then
-                ok "Mounted with legacy ntfs-3g after recovery: $MOUNT_POINT"
+            elif mount -t ntfs-3g -o "rw,uid=$USER_ID,gid=$GROUP_ID,umask=022,noatime,remove_hiberfile" "$partition" "$MOUNT_POINT" 2>/dev/null; then
+                ok "Mounted with legacy ntfs-3g after recovery (RW)"
                 MOUNTED=$((MOUNTED + 1))
             else
                 fail "Could not mount $partition after recovery attempt"
