@@ -533,10 +533,11 @@ if [[ "$effective_quality" != "stream_copy" ]]; then
         FFMPEG_CONTENT_MAX_H=480
         ffmpeg_video_params=(-c:v libx264 -crf 25 -preset veryfast)
         ;;
-    sd) 
-        FFMPEG_CONTENT_MAX_H=720
-        ffmpeg_video_params=(-c:v libx264 -crf 19 -preset fast)
-        ;;
+    sd)
+        FFMPEG_CONTENT_MAX_H=720
+        ffmpeg_video_params=(-c:v libx264 -crf 20 -preset fast -profile:v main -level 3.1 -pix_fmt yuv420p)
+        ffmpeg_audio_params=(-c:a aac -b:a 128k -ar 44100)
+        ;;
     hd) 
         FFMPEG_CONTENT_MAX_H=1080
         ffmpeg_video_params=(-c:v libx264 -crf 13 -preset medium)
