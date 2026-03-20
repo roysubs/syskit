@@ -1,4 +1,4 @@
-# `preserve-disks-policy.sh` - Disk Health & Power Manager
+# `optimal-disks-policy.sh` - Disk Health & Power Manager
 
 This utility provides a deep-dive audit of your storage hardware and allows you to apply intelligent power-management policies to extend the life of your mechanical drives.
 

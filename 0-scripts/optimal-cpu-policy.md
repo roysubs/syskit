@@ -1,4 +1,4 @@
-# `preserve-cpu-policy.sh` - CPU Health & Power Manager
+# `optimal-cpu-policy.sh` - CPU Health & Power Manager
 
 This utility allows you to monitor and control the power states of your CPU. It is designed to maximize efficiency without sacrificing the responsiveness required for network services like Syncthing or SSH.
 

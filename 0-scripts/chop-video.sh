@@ -522,37 +522,38 @@ if [[ "$effective_quality" != "stream_copy" ]]; then
 
     msg "Source dimensions: ${video_width}x${video_height}, Size: $(printf "%.2f" "$(echo "$source_size_bytes/1024/1024" | bc -l)") MB"
 
-    ffmpeg_audio_params=(-c:a aac -b:a 128k)
+    ffmpeg_audio_params=(-c:a aac -b:a 128k -ar 44100)
 
     case "$effective_quality" in
-    phone_small) 
+    phone_small)
         FFMPEG_CONTENT_MAX_H=360
-        ffmpeg_video_params=(-c:v libx264 -crf 32 -preset fast)
+        # Added -pix_fmt yuv420p for compatibility
+        ffmpeg_video_params=(-c:v libx264 -crf 32 -preset fast -pix_fmt yuv420p -profile:v baseline -level 3.0)
         ;;
-    phone_fast) 
+    phone_fast)
         FFMPEG_CONTENT_MAX_H=480
-        ffmpeg_video_params=(-c:v libx264 -crf 25 -preset veryfast)
+        ffmpeg_video_params=(-c:v libx264 -crf 25 -preset veryfast -pix_fmt yuv420p -profile:v main -level 3.1)
         ;;
     sd)
-        FFMPEG_CONTENT_MAX_H=720
-        ffmpeg_video_params=(-c:v libx264 -crf 20 -preset fast -profile:v main -level 3.1 -pix_fmt yuv420p)
-        ffmpeg_audio_params=(-c:a aac -b:a 128k -ar 44100)
-        ;;
-    hd) 
-        FFMPEG_CONTENT_MAX_H=1080
-        ffmpeg_video_params=(-c:v libx264 -crf 13 -preset medium)
+        FFMPEG_CONTENT_MAX_H=720
+        # The "WhatsApp Sweet Spot"
+        ffmpeg_video_params=(-c:v libx264 -crf 19 -preset fast -pix_fmt yuv420p -profile:v main -level 3.1)
         ;;
-    source_mp4) 
+    hd)
+        FFMPEG_CONTENT_MAX_H=1080
+        # Higher quality but still compatible
+        ffmpeg_video_params=(-c:v libx264 -crf 17 -preset medium -pix_fmt yuv420p -profile:v high -level 4.1)
+        ;;
+    source_mp4)
         FFMPEG_CONTENT_MAX_H=2160
-        ffmpeg_video_params=(-c:v libx264 -crf 22 -preset medium)
-        ffmpeg_audio_params=(-c:a aac -b:a 192k)
+        ffmpeg_video_params=(-c:v libx264 -crf 22 -preset medium -pix_fmt yuv420p)
+        ffmpeg_audio_params=(-c:a aac -b:a 192k -ar 44100)
         ;;
     10mb|half|quarter)
         target_size_bytes=0
         if [[ "$effective_quality" == "10mb" ]]; then
             target_size_bytes=$(echo "9.8 * 1024 * 1024" | bc)
         else
-            # CORRECTED: Base target size on the proportional size of the clip, not the whole file
             estimated_clipped_source_size_bytes=$(echo "($calc_duration_sec / $full_source_duration_sec) * $source_size_bytes" | bc)
             if [[ "$effective_quality" == "half" ]]; then
                 target_size_bytes=$(echo "$estimated_clipped_source_size_bytes / 2" | bc)
@@ -560,19 +561,20 @@ if [[ "$effective_quality" != "stream_copy" ]]; then
                 target_size_bytes=$(echo "$estimated_clipped_source_size_bytes / 4" | bc)
             fi
         fi
-        
+
         target_size_mb=$(printf "%.2f" "$(echo "$target_size_bytes/1024/1024" | bc -l)")
         msg "Calculating bitrate for target size: ${target_size_mb} MB over ${calc_duration_sec}s"
         audio_bitrate_k=128
         target_total_bitrate_k=$(echo "($target_size_bytes * 8 / $calc_duration_sec) / 1000" | bc)
         target_video_bitrate_k=$(echo "$target_total_bitrate_k - $audio_bitrate_k" | bc)
-        
+
         if (( $(echo "$target_video_bitrate_k < 100" | bc -l) )); then
             msg_warn "Calculated video bitrate is very low (${target_video_bitrate_k}k). Quality may be poor."
         fi
-        
-        ffmpeg_video_params=(-c:v libx264 -b:v "${target_video_bitrate_k}k" -pass 1 -an -f null /dev/null)
-        ffmpeg_video_params_pass2=(-c:v libx264 -b:v "${target_video_bitrate_k}k" -pass 2)
+
+        # Added -pix_fmt yuv420p to BOTH passes
+        ffmpeg_video_params=(-c:v libx264 -b:v "${target_video_bitrate_k}k" -pass 1 -pix_fmt yuv420p -an -f null /dev/null)
+        ffmpeg_video_params_pass2=(-c:v libx264 -b:v "${target_video_bitrate_k}k" -pass 2 -pix_fmt yuv420p -profile:v main -level 3.1)
         FFMPEG_CONTENT_MAX_H=$video_height
         ;;
     *)
