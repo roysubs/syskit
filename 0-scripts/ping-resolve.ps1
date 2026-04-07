@@ -9,8 +9,22 @@ param (
 
 # --- 1. Range Generation (Handling your /22) ---
 $allIPs = @()
+
 if ($StartAddress -and $EndAddress) {
-    # ... (Standard range logic)
+    $startBytes = $StartAddress.GetAddressBytes()
+    $endBytes   = $EndAddress.GetAddressBytes()
+    if ([System.BitConverter]::IsLittleEndian) {
+        [System.Array]::Reverse($startBytes)
+        [System.Array]::Reverse($endBytes)
+    }
+    $startNum = [System.BitConverter]::ToUInt32($startBytes, 0)
+    $endNum   = [System.BitConverter]::ToUInt32($endBytes,   0)
+
+    for ($i = $startNum; $i -le $endNum; $i++) {
+        $bytes = [System.BitConverter]::GetBytes([uint32]$i)
+        if ([System.BitConverter]::IsLittleEndian) { [System.Array]::Reverse($bytes) }
+        $allIPs += ([System.Net.IPAddress]$bytes).IPAddressToString
+    }
 } else {
     $interface = (netstat -rn | Select-String "default" | Select-Object -First 1 | ForEach-Object { ($_ -split '\s+')[3] })
     $config = ifconfig $interface
@@ -47,12 +61,69 @@ $results = foreach ($ip in $activeIPs) {
     if ($myIp -contains $ip) { $name = "$(hostname) (this mac)" }
 
     # 2. SMB/NetBIOS Probe (The winner for Windows/Linux)
-    if (-not $name) {
-        # Probing Port 137 (NetBIOS Name Service)
-        $smb = smbutil lookup $ip 2>$null | Select-String "Got response from"
-        if ($smb -match "from\s+(\S+)") { $name = $matches[1] }
-    }
+    # if (-not $name) {
+    #     # Probing Port 137 (NetBIOS Name Service)
+    #     $smb = smbutil lookup $ip 2>$null | Select-String "Got response from"
+    #     if ($smb -match "from\s+(\S+)") { $name = $matches[1] }
+    # }
 
+    if (-not $name) {
+        try {
+            $client = [System.Net.Sockets.TcpClient]::new()
+            $ar = $client.BeginConnect($ip, 445, $null, $null)
+            if ($ar.AsyncWaitHandle.WaitOne(500)) {
+                $client.EndConnect($ar)
+                $stream = $client.GetStream()
+    
+                # SMB2 Negotiate Request
+                $smb2Neg = [byte[]](
+                    # NetBIOS session header (4 bytes) - length = 0x74
+                    0x00, 0x00, 0x00, 0x74,
+                    # SMB2 header (64 bytes)
+                    0xFE, 0x53, 0x4D, 0x42,  # ProtocolId: \xFESMB
+                    0x40, 0x00,              # StructureSize: 64
+                    0x00, 0x00,              # CreditCharge
+                    0x00, 0x00, 0x00, 0x00,  # Status
+                    0x00, 0x00,              # Command: Negotiate (0)
+                    0x1F, 0x00,              # Credits requested
+                    0x00, 0x00, 0x00, 0x00,  # Flags
+                    0x00, 0x00, 0x00, 0x00,  # NextCommand
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # MessageId
+                    0x00, 0x00, 0x00, 0x00,  # Reserved
+                    0x00, 0x00, 0x00, 0x00,  # TreeId
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # SessionId
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # Signature (part 1)
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # Signature (part 2)
+                    # SMB2 Negotiate body
+                    0x24, 0x00,              # StructureSize: 36
+                    0x02, 0x00,              # DialectCount: 2
+                    0x01, 0x00,              # SecurityMode
+                    0x00, 0x00,              # Reserved
+                    0x7F, 0x00, 0x00, 0x00,  # Capabilities
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # ClientGuid (part 1)
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # ClientGuid (part 2)
+                    0x00, 0x00, 0x00, 0x00,  # ClientStartTime
+                    0x00, 0x00, 0x00, 0x00,  # ClientStartTime
+                    0x02, 0x02,              # Dialect: SMB 2.0.2
+                    0x10, 0x02               # Dialect: SMB 2.1
+                )
+                $stream.Write($smb2Neg, 0, $smb2Neg.Length)
+    
+                $buf = New-Object byte[] 512
+                $stream.ReadTimeout = 1000
+                $read = $stream.Read($buf, 0, 512)
+    
+                # Server name in SMB2 negotiate response is in the NTLM CHALLENGE blob
+                # Simpler: just scan for a UTF-16LE hostname pattern in the response
+                $utf16 = [System.Text.Encoding]::Unicode.GetString($buf, 0, $read)
+                # Match a plausible Windows hostname: 1-15 chars, word characters only
+                if ($utf16 -match '\b([A-Za-z][A-Za-z0-9\-]{1,14})\b') {
+                    $name = $matches[1].ToUpper()
+                }
+            }
+            $client.Close()
+        } catch {}
+    }
     # 3. DNS Lookup (Standard)
     if (-not $name) {
         try { 
