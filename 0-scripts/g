@@ -252,17 +252,41 @@ case "$option" in
         ;;
     ps|push) display_and_run git push ;;
     pl|pull)
-        echo_blue "📡 Fetching..."
+        echo_blue "📡 Safe-Pull Workflow:"
+        echo "   1. Fetching latest remote changes (without merging)..."
         display_and_run "git fetch"
+        
         LOCAL_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
         REMOTE_BRANCH="origin/$LOCAL_BRANCH"
+        
         if git show-ref --verify --quiet "refs/remotes/$REMOTE_BRANCH"; then
+            echo "   2. Checking for incoming changes (remote vs. local)..."
+            DIFF_COUNT=$(git diff --name-only "$LOCAL_BRANCH...$REMOTE_BRANCH" | wc -l | tr -d ' ')
+            
+            if [[ "$DIFF_COUNT" -eq 0 ]]; then
+                echo_green "✅ Already up to date with $REMOTE_BRANCH. No new commits to pull."
+                exit 0
+            fi
+            
+            echo "   --------------------------------------------------"
+            echo "   Incoming Summary ($DIFF_COUNT file(s) changed on server):"
             display_and_run "git diff --name-status $LOCAL_BRANCH...$REMOTE_BRANCH"
+            echo "   --------------------------------------------------"
+            
+            echo "   y = Show detailed line-by-line changes (uses 'git diff')"
+            echo "   n = Keep the current summary and proceed to pull"
+            echo "   --------------------------------------------------"
             read -rp "🔍 Review full diffs? (y/N): " confirm_diff
             [[ "$confirm_diff" =~ ^[Yy]$ ]] && git diff "$LOCAL_BRANCH...$REMOTE_BRANCH"
+            
+            echo "   --------------------------------------------------"
+            echo "   Y = Pull ONLY if there are no conflicts (fast-forward)"
+            echo "   n = Cancel the pull"
+            echo "   --------------------------------------------------"
             read -rp "❓ Pull (fast-forward only)? (Y/n): " confirm_pull
             [[ ! "$confirm_pull" =~ ^[Nn]$ ]] && display_and_run "git pull --ff-only origin $LOCAL_BRANCH"
         else
+            echo_yellow "ℹ️ No remote tracking branch found; attempting standard pull..."
             display_and_run "git pull"
         fi
         ;;

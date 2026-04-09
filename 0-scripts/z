@@ -23,20 +23,43 @@ SHOW_CMD_BEFORE_EXEC=true
 COMPRESSION_LEVEL=""  # Override with --level=<1-9>
 BACKUP_DIR="$HOME/.backups"  # Default backup location
 USE_SUDO=false  # For backup operations
+AUTO_APPROVE=false  # Skip confirmations with --force/-y
+
+# Detect 7-Zip binary (7z or 7zz on macOS/Linux)
+BIN_7Z=""
+for cmd in "7z" "7zz"; do
+    if command -v "$cmd" &>/dev/null; then
+        BIN_7Z="$cmd"
+        break
+    fi
+done
+
+# If not in PATH, check common macOS/Homebrew locations
+if [[ -z "$BIN_7Z" ]]; then
+    for loc in "/opt/homebrew/bin/7zz" "/opt/homebrew/bin/7z" "/usr/local/bin/7z" "/usr/local/bin/7zz"; do
+        if [[ -x "$loc" ]]; then
+            BIN_7Z="$loc"
+            break
+        fi
+    done
+fi
+
+# Fallback for error message context
+[[ -z "$BIN_7Z" ]] && BIN_7Z="7z"
 
 # Known archive extensions
-declare -A ARCHIVE_EXTENSIONS=(
-    [7z]=".7z"
-    [zip]=".zip"
-    [tar]=".tar"
-    [tar.gz]=".tar.gz"
-    [tgz]=".tgz"
-    [tar.bz2]=".tar.bz2"
-    [tbz2]=".tbz2"
-    [tar.xz]=".tar.xz"
-    [txz]=".txz"
-    [tar.zst]=".tar.zst"
-    [tzst]=".tzst"
+ARCHIVE_EXTENSIONS=(
+    ".7z"
+    ".zip"
+    ".tar"
+    ".tar.gz"
+    ".tgz"
+    ".tar.bz2"
+    ".tbz2"
+    ".tar.xz"
+    ".txz"
+    ".tar.zst"
+    ".tzst"
 )
 
 # ============================================================================
@@ -59,13 +82,32 @@ print_info() {
     echo -e "${BLUE}→ $1${NC}"
 }
 
+confirm_action() {
+    local prompt="$1"
+    [[ "$AUTO_APPROVE" == "true" ]] && return 0
+    
+    printf "${YELLOW}$prompt [y/N]${NC} "    # Use printf for portable and consistent behavior
+    read -r response < /dev/tty || return 1 # Read directly from TTY to handle pipes
+    case "$response" in
+        [yY][eE][sS]|[yY]) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 check_command() {
     local cmd_name="$1"
     local critical="${2:-false}"
     
-    if ! command -v "$cmd_name" &>/dev/null; then
+    local check_cmd="$cmd_name"
+    [[ "$cmd_name" == "7z" ]] && check_cmd="$BIN_7Z"
+
+    if ! command -v "$check_cmd" &>/dev/null; then
         if [[ "$critical" == "true" ]]; then
-            print_error "Command '$cmd_name' not found. Please install it."
+            if [[ "$cmd_name" == "7z" ]]; then
+                print_error "7-Zip not found (tried '7z', '7zz'). Install with: brew install 7zip"
+            else
+                print_error "Command '$cmd_name' not found. Please install it."
+            fi
             exit 1
         else
             print_warning "Command '$cmd_name' not found. Some features may be limited."
@@ -132,8 +174,9 @@ append_extension_if_needed() {
     
     # Check if archive already has a known extension
     local has_extension=false
+    local archive_lower=$(echo "$archive" | tr '[:upper:]' '[:lower:]')
     for ext in "${ARCHIVE_EXTENSIONS[@]}"; do
-        if [[ "${archive,,}" == *"$ext" ]]; then
+        if [[ "$archive_lower" == *"$ext" ]]; then
             has_extension=true
             break
         fi
@@ -301,13 +344,47 @@ create_archive() {
     verify_sources_exist "${sources[@]}"
     archive=$(append_extension_if_needed "$archive" "$archiver")
     
+    # Check if archive exists and offer choices
+    if [[ -f "$archive" ]]; then
+        print_warning "Archive '$archive' already exists."
+        print_info "Actions: [U]pdate (default) | [o]verwrite (fresh start) | [c]ancel"
+        
+        local choice="u"
+        if [[ "$AUTO_APPROVE" == "false" ]]; then
+            printf "${YELLOW}Your choice? [U/o/c]${NC} "
+            read -r choice < /dev/tty || choice="c"
+        fi
+        
+        case "$choice" in
+            [oO]) 
+                rm "$archive" || { print_error "Failed to remove old archive"; exit 1; }
+                print_info "Old archive removed. Creating fresh..."
+                ;;
+            [uU]|"") 
+                print_info "Mode: UPDATE (new/changed files will be added, existing files preserved)"
+                ;;
+            *) 
+                print_info "Operation cancelled by user."
+                exit 0 
+                ;;
+        esac
+    fi
+    
+    # Intelligently detect format for the user message
+    local archive_lower=$(echo "$archive" | tr '[:upper:]' '[:lower:]')
+    local format="7-Zip"
+    [[ "$archive_lower" == *.zip ]] && format="ZIP"
+    [[ "$archive_lower" == *.tar ]] && format="tar"
+    
+    print_info "Creating $format archive: $archive (using $archiver)"
+    
     case "$archiver" in
         7z)
             check_command "7z" "true"
             local opts=("a")
             [[ -n "$COMPRESSION_LEVEL" ]] && opts+=("-mx=${COMPRESSION_LEVEL}")
             [[ "$recursive" == "false" ]] && opts+=("-r-")
-            run_command 7z "${opts[@]}" "$archive" "${sources[@]}"
+            run_command "$BIN_7Z" "${opts[@]}" "$archive" "${sources[@]}"
             ;;
         zip)
             check_command "zip" "true"
@@ -335,20 +412,46 @@ create_tar_archive() {
     verify_sources_exist "${sources[@]}"
     
     # Ensure proper extension
+    local archive_lower=$(echo "$archive" | tr '[:upper:]' '[:lower:]')
     case "$compression" in
         gz) 
-            [[ "${archive,,}" != *.tar.gz && "${archive,,}" != *.tgz ]] && archive="${archive}.tar.gz"
+            [[ "$archive_lower" != *.tar.gz && "$archive_lower" != *.tgz ]] && archive="${archive}.tar.gz"
             ;;
         bz2) 
-            [[ "${archive,,}" != *.tar.bz2 && "${archive,,}" != *.tbz2 ]] && archive="${archive}.tar.bz2"
+            [[ "$archive_lower" != *.tar.bz2 && "$archive_lower" != *.tbz2 ]] && archive="${archive}.tar.bz2"
             ;;
         xz) 
-            [[ "${archive,,}" != *.tar.xz && "${archive,,}" != *.txz ]] && archive="${archive}.tar.xz"
+            [[ "$archive_lower" != *.tar.xz && "$archive_lower" != *.txz ]] && archive="${archive}.tar.xz"
             ;;
         zst) 
-            [[ "${archive,,}" != *.tar.zst && "${archive,,}" != *.tzst ]] && archive="${archive}.tar.zst"
+            [[ "$archive_lower" != *.tar.zst && "$archive_lower" != *.tzst ]] && archive="${archive}.tar.zst"
             ;;
     esac
+    
+    if [[ -f "$archive" ]]; then
+        print_warning "Archive '$archive' already exists."
+        print_info "Actions: [U]pdate (default) | [o]verwrite (fresh start) | [c]ancel"
+        
+        local choice="u"
+        if [[ "$AUTO_APPROVE" == "false" ]]; then
+            printf "${YELLOW}Your choice? [U/o/c]${NC} "
+            read -r choice < /dev/tty || choice="c"
+        fi
+        
+        case "$choice" in
+            [oO]) 
+                rm "$archive" || { print_error "Failed to remove old archive"; exit 1; }
+                print_info "Old archive removed. Creating fresh..."
+                ;;
+            [uU]|"") 
+                print_info "Mode: UPDATE (merging changes into existing tarball)"
+                ;;
+            *) 
+                print_info "Operation cancelled by user."
+                exit 0 
+                ;;
+        esac
+    fi
     
     local tar_opts="-caf"
     run_command tar $tar_opts "$archive" "${sources[@]}"
@@ -365,11 +468,12 @@ extract_archive() {
     file_type=$(file -b "$archive")
     local base_name="${archive%%.*}"
     local is_single_compressed=false
+    local archive_lower=$(echo "$archive" | tr '[:upper:]' '[:lower:]')
     
     # Detect single-file compression formats
-    case "${archive,,}" in
+    case "$archive_lower" in
         *.gz|*.bz2|*.xz|*.zst)
-            if [[ ! "${archive,,}" =~ \.tar\. ]]; then
+            if [[ ! "$archive_lower" =~ \.tar\. ]]; then
                 is_single_compressed=true
             fi
             ;;
@@ -396,7 +500,7 @@ extract_archive() {
     
     # Try single-file decompression first
     if [[ "$is_single_compressed" == "true" && "$final_dest" == "." ]]; then
-        case "${archive,,}" in
+        case "$archive_lower" in
             *.gz)  check_command "gunzip" && run_command gunzip "$archive" && success=true ;;
             *.bz2) check_command "bunzip2" && run_command bunzip2 "$archive" && success=true ;;
             *.xz)  check_command "unxz" && run_command unxz "$archive" && success=true ;;
@@ -406,14 +510,14 @@ extract_archive() {
     
     # Try 7z (handles most formats)
     if [[ "$success" == "false" ]] && check_command "7z"; then
-        print_info "Using 7z..."
-        if run_command 7z x "$archive" "-o${final_dest}"; then
+        print_info "Using 7-Zip ($BIN_7Z)..."
+        if run_command "$BIN_7Z" x "$archive" "-o${final_dest}"; then
             success=true
         fi
     fi
     
     # Try tar for tar-based archives
-    if [[ "$success" == "false" ]] && [[ "$file_type" == *tar* || "${archive,,}" =~ \.(tar|tgz|tbz2?|txz|tzst)$ ]]; then
+    if [[ "$success" == "false" ]] && [[ "$file_type" == *tar* || "$archive_lower" =~ \.(tar|tgz|tbz2?|txz|tzst)$ ]]; then
         if check_command "tar"; then
             print_info "Using tar..."
             local tar_opts=("-xaf" "$archive")
@@ -425,7 +529,7 @@ extract_archive() {
     fi
     
     # Try unzip for ZIP files
-    if [[ "$success" == "false" ]] && [[ "$file_type" == *Zip\ archive* || "${archive,,}" == *.zip ]]; then
+    if [[ "$success" == "false" ]] && [[ "$file_type" == *Zip\ archive* || "$archive_lower" == *.zip ]]; then
         if check_command "unzip"; then
             print_info "Using unzip..."
             local unzip_opts=("-q" "$archive")
@@ -452,16 +556,17 @@ list_archive() {
     local file_type
     file_type=$(file -b "$archive")
     local success=false
+    local archive_lower=$(echo "$archive" | tr '[:upper:]' '[:lower:]')
     
     # Try 7z first (handles most formats)
     if check_command "7z"; then
-        if run_command 7z l "$archive"; then
+        if run_command "$BIN_7Z" l "$archive"; then
             success=true
         fi
     fi
     
     # Try tar
-    if [[ "$success" == "false" ]] && [[ "$file_type" == *tar* || "${archive,,}" =~ \.(tar|tgz|tbz2?|txz|tzst)$ ]]; then
+    if [[ "$success" == "false" ]] && [[ "$file_type" == *tar* || "$archive_lower" =~ \.(tar|tgz|tbz2?|txz|tzst)$ ]]; then
         if check_command "tar"; then
             if run_command tar -tvaf "$archive"; then
                 success=true
@@ -470,7 +575,7 @@ list_archive() {
     fi
     
     # Try unzip
-    if [[ "$success" == "false" ]] && [[ "$file_type" == *Zip\ archive* || "${archive,,}" == *.zip ]]; then
+    if [[ "$success" == "false" ]] && [[ "$file_type" == *Zip\ archive* || "$archive_lower" == *.zip ]]; then
         if check_command "unzip"; then
             if run_command unzip -l "$archive"; then
                 success=true
@@ -489,18 +594,19 @@ test_archive() {
     verify_file_exists "$archive"
     
     local success=false
+    local archive_lower=$(echo "$archive" | tr '[:upper:]' '[:lower:]')
     
     # Try 7z test
     if check_command "7z"; then
         print_info "Testing archive integrity..."
-        if run_command 7z t "$archive"; then
+        if run_command "$BIN_7Z" t "$archive"; then
             success=true
             print_success "Archive integrity verified"
         fi
     fi
     
     # Try tar test
-    if [[ "$success" == "false" ]] && [[ "${archive,,}" =~ \.(tar|tgz|tbz2?|txz|tzst)$ ]]; then
+    if [[ "$success" == "false" ]] && [[ "$archive_lower" =~ \.(tar|tgz|tbz2?|txz|tzst)$ ]]; then
         if check_command "tar"; then
             print_info "Testing archive integrity..."
             if run_command tar -tf "$archive" >/dev/null; then
@@ -511,7 +617,7 @@ test_archive() {
     fi
     
     # Try unzip test
-    if [[ "$success" == "false" ]] && [[ "${archive,,}" == *.zip ]]; then
+    if [[ "$success" == "false" ]] && [[ "$archive_lower" == *.zip ]]; then
         if check_command "unzip"; then
             print_info "Testing archive integrity..."
             if run_command unzip -t "$archive"; then
@@ -671,7 +777,8 @@ decompress_files() {
     check_command "$tool" "true"
     
     for file in "${files[@]}"; do
-        if [[ -f "$file" && "${file,,}" == *"$extension" ]]; then
+        local file_lower=$(echo "$file" | tr '[:upper:]' '[:lower:]')
+        if [[ -f "$file" && "$file_lower" == *"$extension" ]]; then
             run_command "$tool" "$file"
         else
             print_warning "Skipping: $file (not a $extension file or doesn't exist)"
@@ -691,6 +798,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --no-cmd)
             SHOW_CMD_BEFORE_EXEC=false
+            shift
+            ;;
+        --force|-y|--yes)
+            AUTO_APPROVE=true
             shift
             ;;
         --archiver)

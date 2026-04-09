@@ -4,6 +4,21 @@ While Syskit is designed to be highly portable across Linux distributions (Debia
 
 This guide outlines the core issues and provides a "Best Practice" setup to make your Mac behave like a modern Linux system.
 
+### Summary A: "Vanilla" macOS Script Compatibility (Defensive Coding)
+*Use these rules when writing scripts that must run "out of the box" on any Mac without extra tools.*
+*   **Use `printf` instead of `echo`**: This is the #1 way to avoid broken formatting and escape sequence bugs.
+*   **Avoid Bash 4+ Features**: No associative arrays (`declare -A`), mapfiles, or lowercase operators (`${var,,}`).
+*   **Portable `sed -i`**: Use the `[[ "$OSTYPE" == "darwin"* ]]` check or pipe to a temp file and `mv`.
+*   **Quoting**: Always use `"$VAR"` to handle the frequent spaces in macOS paths (e.g., `OneDrive`, `Application Support`).
+*   **Shebang**: Use `#!/usr/bin/env bash` to find the best available Bash in the user's path.
+
+### Summary B: The "Pro Linux" Environment (Homebrew & GNUtools Integration)
+*Use these steps when you want to make your local Mac environment behave like a standard Linux machine.*
+*   **Install `coreutils`**: Provides the GNU versions of `ls`, `cp`, `mv`, etc. (plus `find`, `sed`, `grep`).
+*   **Install Modern Bash**: Use `brew install bash` to get Bash 5.x and set it as your default.
+*   **Path Hijacking**: Add the `gnubin` directories to the *start* of your `PATH` so `grep` calls GNU grep instead of BSD.
+*   **Shebang Mapping**: Map `/bin/bash` calls to your new Homebrew version where possible.
+
 ---
 
 ## 1. The Core Challenges
@@ -53,14 +68,20 @@ To use these tools without the `g` prefix (so Syskit scripts just work), add the
 # GNU Tools for macOS Compatibility
 if [[ "$OSTYPE" == "darwin"* ]]; then
     # Add GNU coreutils to PATH (without 'g' prefix)
-    # For Intel Macs:
-    export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
-    # For Apple Silicon (M1/M2/M3) Macs:
-    export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
-    
-    # Add other GNU tools
-    export PATH="/usr/local/opt/gnu-sed/libexec/gnubin:$PATH"
-    export PATH="/usr/local/opt/grep/libexec/gnubin:$PATH"
+    # Check both potential Homebrew locations
+    if [[ -d "/opt/homebrew/opt/coreutils/libexec/gnubin" ]]; then
+        # Apple Silicon (M1/M2/M3)
+        export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
+        export PATH="/opt/homebrew/opt/gnu-sed/libexec/gnubin:$PATH"
+        export PATH="/opt/homebrew/opt/grep/libexec/gnubin:$PATH"
+        export PATH="/opt/homebrew/opt/findutils/libexec/gnubin:$PATH"
+    elif [[ -d "/usr/local/opt/coreutils/libexec/gnubin" ]]; then
+        # Intel Macs
+        export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
+        export PATH="/usr/local/opt/gnu-sed/libexec/gnubin:$PATH"
+        export PATH="/usr/local/opt/grep/libexec/gnubin:$PATH"
+        export PATH="/usr/local/opt/findutils/libexec/gnubin:$PATH"
+    fi
 fi
 ```
 
@@ -83,6 +104,12 @@ If you want your scripts to be truly cross-platform without forcing the user to 
     fi
     ```
 4.  **Zsh Glob Compatibility**: If running in Zsh, add `unsetopt NOMATCH` at the top of the script so that empty globs don't crash the execution.
+5.  **Use `tr` for Case Transformation**: Since `${var,,}` is Bash 4 only, use `echo "$var" | tr '[:upper:]' '[:lower:]'`.
+6.  **Always use `printf`**: Replace `echo -e` or `echo -n` with `printf` for bulletproof results.
+    ```bash
+    # Instead of echo -e "\033[32mSuccess\033[0m"
+    printf "\033[32m%%s\033[0m\n" "Success"
+    ```
 
 ---
 
