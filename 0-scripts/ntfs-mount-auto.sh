@@ -276,7 +276,8 @@ else
     
     # Only ask for update if interactive and not already root (or we have sudo permissions)
     if [[ -t 0 ]]; then
-        echo -n "Would you like me to try and fix this by installing the kernel modules? [y/N] "
+        # echo -n "Would you like me to try and fix this by installing the kernel modules? [y/N] "
+        read -r -t 30 -p $'\n\e[1;33m[INPUT NEEDED]\e[0m Install kernel modules for ntfs3? [y/N] ' choice
         read -r choice
         if [[ "$choice" =~ ^[Yy]$ ]]; then
             info "Attempting to install 'linux-image-amd64'..."
