@@ -118,14 +118,12 @@ FB_DB="/home/$ACTUAL_USER/filebrowser.db"
 if [[ -x /usr/bin/filebrowser ]]; then
     echo_green "✓ FileBrowser binary present. Configuring for admin/admin..."
     systemctl stop filebrowser
-    # Force set the minLength to 4 (bypass 12-char limit in newer FileBrowser via SQLite)
+    # Force set the minLength to 4 (bypass 12-char limit via SQLite + Direct Hash)
     if ! command -v sqlite3 &>/dev/null; then zypper install -y sqlite3; fi
     sqlite3 "$FB_DB" "UPDATE settings SET password_min_length = 4; UPDATE settings SET min_password_length = 4;" 2>/dev/null
-    /usr/bin/filebrowser -d "$FB_DB" config set --auth.password.minLength 4 2>/dev/null
-
-    # Reset password to admin
-    /usr/bin/filebrowser -d "$FB_DB" users update admin --password admin 2>/dev/null || \
-    /usr/bin/filebrowser -d "$FB_DB" users add admin admin --perm.admin
+    # Forced admin/admin password update via hash
+    ADMIN_HASH=$(/usr/bin/filebrowser hash admin)
+    sqlite3 "$FB_DB" "UPDATE users SET password = '$ADMIN_HASH' WHERE username = 'admin';" 2>/dev/null
     
     # Update Service to 9091
     cat <<EOF > /etc/systemd/system/filebrowser.service
@@ -151,8 +149,9 @@ else
         /usr/bin/filebrowser -d "$FB_DB" config init 2>/dev/null
         if ! command -v sqlite3 &>/dev/null; then zypper install -y sqlite3; fi
         sqlite3 "$FB_DB" "UPDATE settings SET password_min_length = 4; UPDATE settings SET min_password_length = 4;" 2>/dev/null
-        /usr/bin/filebrowser -d "$FB_DB" config set --auth.password.minLength 4 2>/dev/null
-        /usr/bin/filebrowser -d "$FB_DB" users add admin admin --perm.admin
+        # Set admin password directly to bypass length check
+        ADMIN_HASH=$(/usr/bin/filebrowser hash admin)
+        sqlite3 "$FB_DB" "INSERT OR REPLACE INTO users (username, password, scope, locale, view_mode, single_click, perm_admin, perm_execute, perm_create, perm_rename, perm_modify, perm_delete, perm_share, perm_download, perm_copy) VALUES ('admin', '$ADMIN_HASH', '.', 'en', 'list', 0, 1, 1, 1, 1, 1, 1, 1, 1, 1);" 2>/dev/null
         # (Service file logic as above)
         cat <<EOF > /etc/systemd/system/filebrowser.service
 [Unit]
@@ -182,15 +181,15 @@ else
         rpm --import https://download.sftpgo.com/yum/gpg.key 2>/dev/null
         zypper addrepo -f "https://download.sftpgo.com/yum/$(uname -m)" sftpgo 2>/dev/null
         zypper refresh sftpgo
-        zypper install -y sftpgo
+        zypper install -y libcap-progs sftpgo
         
         # Configure SFTPGo to use port 9092 for HTTP and listen on all interfaces
-        # Note: sftpgo usually uses sftpgo.json or env vars. We'll use a drop-in override for the port.
+        # Note: Newer SFTPGo uses BINDINGS array format for environment variables.
         mkdir -p /etc/systemd/system/sftpgo.service.d
         cat <<EOF > /etc/systemd/system/sftpgo.service.d/override.conf
 [Service]
-Environment=SFTPGO_HTTPD__BIND_PORT=9092
-Environment=SFTPGO_HTTPD__BIND_ADDRESS=0.0.0.0
+Environment=SFTPGO_HTTPD__BINDINGS__0__PORT=9092
+Environment=SFTPGO_HTTPD__BINDINGS__0__ADDRESS=0.0.0.0
 EOF
         systemctl daemon-reload; systemctl enable --now sftpgo
         firewall-cmd --permanent --add-port=9092/tcp; firewall-cmd --permanent --add-port=2022/tcp; firewall-cmd --reload
