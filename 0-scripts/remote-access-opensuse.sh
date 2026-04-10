@@ -118,8 +118,11 @@ FB_DB="/home/$ACTUAL_USER/filebrowser.db"
 if [[ -x /usr/bin/filebrowser ]]; then
     echo_green "✓ FileBrowser binary present. Configuring for admin/admin..."
     systemctl stop filebrowser
-    # Force set the minLength to 4
+    # Force set the minLength to 4 (bypass 12-char limit in newer FileBrowser via SQLite)
+    if ! command -v sqlite3 &>/dev/null; then zypper install -y sqlite3; fi
+    sqlite3 "$FB_DB" "UPDATE settings SET password_min_length = 4; UPDATE settings SET min_password_length = 4;" 2>/dev/null
     /usr/bin/filebrowser -d "$FB_DB" config set --auth.password.minLength 4 2>/dev/null
+
     # Reset password to admin
     /usr/bin/filebrowser -d "$FB_DB" users update admin --password admin 2>/dev/null || \
     /usr/bin/filebrowser -d "$FB_DB" users add admin admin --perm.admin
@@ -146,6 +149,8 @@ else
         curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash
         cp $(command -v filebrowser) /usr/bin/filebrowser
         /usr/bin/filebrowser -d "$FB_DB" config init 2>/dev/null
+        if ! command -v sqlite3 &>/dev/null; then zypper install -y sqlite3; fi
+        sqlite3 "$FB_DB" "UPDATE settings SET password_min_length = 4; UPDATE settings SET min_password_length = 4;" 2>/dev/null
         /usr/bin/filebrowser -d "$FB_DB" config set --auth.password.minLength 4 2>/dev/null
         /usr/bin/filebrowser -d "$FB_DB" users add admin admin --perm.admin
         # (Service file logic as above)
@@ -174,6 +179,9 @@ else
     read -rp "Install SFTPGo Advanced File Server (SFTP/Web)? [y/N]: " INSTALL_SFTPGO
     if [[ "$INSTALL_SFTPGO" =~ ^[Yy]$ ]]; then
         echo "Installing SFTPGo..."
+        rpm --import https://download.sftpgo.com/yum/gpg.key 2>/dev/null
+        zypper addrepo -f "https://download.sftpgo.com/yum/$(uname -m)" sftpgo 2>/dev/null
+        zypper refresh sftpgo
         zypper install -y sftpgo
         
         # Configure SFTPGo to use port 9092 for HTTP and listen on all interfaces
