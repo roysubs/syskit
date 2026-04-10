@@ -4,7 +4,7 @@
 #   disk-tool.sh                        Show all disks and partition info
 #   disk-tool.sh -wipe sda              Wipe entire disk (partition table + all signatures)
 #   disk-tool.sh -wipe sda2             Wipe a single partition (filesystem signature only)
-#   disk-tool.sh -create sda -type btrfs|ext4|ext3|xfs|ntfs
+#   disk-tool.sh -create sda -type btrfs|ext4|ext3|xfs|ntfs [-label MYDRIVE]
 #                                       Create GPT table, single partition, format it
 
 set -euo pipefail
@@ -142,6 +142,74 @@ cmd_wipe() {
     fi
 }
 
+# ─── Btrfs Setup (Subvolumes & Ops) ──────────────────────────────────────────
+
+cmd_btrfs_setup() {
+    require_root
+    require_cmd btrfs
+
+    local dev_input="$1"
+    local dev
+    dev=$(resolve_dev "$dev_input")
+
+    if [[ ! -b "$dev" ]]; then
+        echo -e "${RED}Error:${RST} '$dev' is not a block device."
+        exit 1
+    fi
+
+    # Check if it's actually btrfs
+    local fstype
+    fstype=$(lsblk -no FSTYPE "$dev" || echo "unknown")
+    if [[ "$fstype" != "btrfs" ]]; then
+        echo -e "${RED}Error:${RST} Device $dev is not formatted as Btrfs (found $fstype)."
+        exit 1
+    fi
+
+    echo -e "\n${BLD}${CYN}══════════════════════════════════════════${RST}"
+    echo -e "${BLD}${CYN}  Btrfs Subvolume Wizard${RST}"
+    echo -e "${BLD}${CYN}══════════════════════════════════════════${RST}\n"
+
+    local mnt="/tmp/btrfs_setup_mnt"
+    mkdir -p "$mnt"
+    
+    echo -e "${GRN}→${RST} Mounting $dev to $mnt..."
+    mount "$dev" "$mnt"
+
+    # Create standard subvolumes
+    local subvols=("@data" "@snapshots" "@backups")
+    for s in "${subvols[@]}"; do
+        if [[ ! -d "$mnt/$s" ]]; then
+            echo -e "   ${GRN}+${RST} Creating subvolume: $s"
+            btrfs subvolume create "$mnt/$s"
+        else
+            echo -e "   ${YEL}!${RST} Subvolume $s already exists, skipping."
+        fi
+    done
+
+    # Disable COW on @data if it's a large drive meant for DBs/VMs/Torrents (Optional)
+    # echo -ne "\nDisable COW on @data? (good for large files/VMs) [y/N]: "
+    # read -r nocow
+    # if [[ "$nocow" =~ ^[Yy]$ ]]; then
+    #     chattr +C "$mnt/@data"
+    #     echo -e "   ${GRN}→${RST} NoCOW set on @data."
+    # fi
+
+    umount "$mnt"
+    rmdir "$mnt"
+
+    local uuid
+    uuid=$(blkid -s UUID -o value "$dev")
+
+    echo -e "\n${GRN}✔ Btrfs Setup Complete!${RST}"
+    echo -e "\n${BLD}Recommended fstab entry for maximum performance/safety:${RST}"
+    echo -e "${CYN}UUID=$uuid  /mnt/data  btrfs  subvol=@data,compress=zstd:3,noatime,autodefrag,space_cache=v2  0  0${RST}"
+    echo -e "${CYN}UUID=$uuid  /mnt/snaps btrfs  subvol=@snapshots,compress=zstd:3,noatime,autodefrag,space_cache=v2  0  0${RST}"
+    echo ""
+    echo -e "${YEL}Note:${RST} 'compress=zstd' is highly recommended for 8TB drives to save space and IO."
+    echo -e "      'autodefrag' is good for HDDs (spinning disks)."
+    echo ""
+}
+
 # ─── Create ───────────────────────────────────────────────────────────────────
 
 cmd_create() {
@@ -150,6 +218,7 @@ cmd_create() {
 
     local disk_input="$1"
     local fstype="$2"
+    local label="${3:-}"
 
     local dev
     dev=$(resolve_dev "$disk_input")
@@ -197,8 +266,9 @@ cmd_create() {
     echo -e "${GRN}[2/4]${RST} Writing GPT partition table..."
     parted -s "$dev" mklabel gpt
 
-    echo -e "${GRN}[3/4]${RST} Creating single partition spanning 100% of disk..."
-    parted -s "$dev" mkpart primary "${fstype}" 0% 100%
+    echo -e "${GRN}[3/4]${RST} Creating single partition (1MiB aligned)..."
+    # Use 1MiB for start to ensure optimal alignment for 4k sectors/advanced format drives
+    parted -a optimal -s "$dev" mkpart primary "${fstype}" 1MiB 100%
     partprobe "$dev"
     sleep 1   # give kernel a moment to register the new partition
 
@@ -216,12 +286,29 @@ cmd_create() {
     fi
 
     echo -e "${GRN}[4/4]${RST} Formatting $new_part as ${fstype}..."
+    local lbl_arg=""
     case "$fstype" in
-        btrfs) mkfs.btrfs -f "$new_part" ;;
-        ext4)  mkfs.ext4  -F "$new_part" ;;
-        ext3)  mkfs.ext3  -F "$new_part" ;;
-        xfs)   mkfs.xfs   -f "$new_part" ;;
-        ntfs)  mkfs.ntfs  -f "$new_part" ;;
+        btrfs) 
+            [[ -n "$label" ]] && lbl_arg="-L $label"
+            # metadata DUP is default on single devices, but let's be explicit for safety on large drives
+            mkfs.btrfs -f $lbl_arg -m dup "$new_part" 
+            ;;
+        ext4)  
+            [[ -n "$label" ]] && lbl_arg="-L $label"
+            mkfs.ext4  -F $lbl_arg "$new_part" 
+            ;;
+        ext3)  
+            [[ -n "$label" ]] && lbl_arg="-L $label"
+            mkfs.ext3  -F $lbl_arg "$new_part" 
+            ;;
+        xfs)   
+            [[ -n "$label" ]] && lbl_arg="-L $label"
+            mkfs.xfs   -f $lbl_arg "$new_part" 
+            ;;
+        ntfs)  
+            [[ -n "$label" ]] && lbl_arg="-L $label"
+            mkfs.ntfs  -f $lbl_arg "$new_part" 
+            ;;
     esac
 
     echo -e "\n${GRN}✔ Done!${RST}"
@@ -248,15 +335,16 @@ usage() {
     echo "  ${BLD}Usage:${RST}"
     echo "    disk-tool.sh                          Show all disks, partitions, usage"
     echo "    disk-tool.sh -wipe <disk|partition>   Wipe disk or partition"
-    echo "    disk-tool.sh -create <disk> -type <fs> Create partition + format"
+    echo "    disk-tool.sh -create <disk> -type <fs> [-label <lbl>] Create + Format"
+    echo "    disk-tool.sh -setup-btrfs <partition> Create subvolumes + get fstab"
     echo ""
     echo "  ${BLD}Filesystem types:${RST} btrfs  ext4  ext3  xfs  ntfs"
     echo ""
     echo "  ${BLD}Examples:${RST}"
     echo "    disk-tool.sh"
     echo "    sudo disk-tool.sh -wipe sda"
-    echo "    sudo disk-tool.sh -wipe sda2"
-    echo "    sudo disk-tool.sh -create sda -type btrfs"
+    echo "    sudo disk-tool.sh -create sda -type btrfs -label MY_8TB_DATA"
+    echo "    sudo disk-tool.sh -setup-btrfs sda1"
     echo ""
 }
 
@@ -274,11 +362,29 @@ case "${1:-}" in
         cmd_wipe "$2"
         ;;
     -create)
-        if [[ -z "${2:-}" || "${3:-}" != "-type" || -z "${4:-}" ]]; then
-            echo -e "${RED}Error:${RST} Usage: disk-tool.sh -create <disk> -type <fstype>"
+        # Shift to handle potential label
+        shift
+        local disk="" fstype="" label=""
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                -type)  fstype="$2"; shift 2 ;;
+                -label) label="$2";  shift 2 ;;
+                *)      disk="$1";   shift   ;;
+            esac
+        done
+
+        if [[ -z "$disk" || -z "$fstype" ]]; then
+            echo -e "${RED}Error:${RST} Missing disk or type."
             usage; exit 1
         fi
-        cmd_create "$2" "$4"
+        cmd_create "$disk" "$fstype" "$label"
+        ;;
+    -setup-btrfs)
+        if [[ -z "${2:-}" ]]; then
+            echo -e "${RED}Error:${RST} -setup-btrfs requires a partition (e.g. sda1)"
+            usage; exit 1
+        fi
+        cmd_btrfs_setup "$2"
         ;;
     -h|--help)
         usage
