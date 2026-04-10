@@ -172,9 +172,7 @@ echo
 
 # --- [6] SFTPGO ---
 echo_blue "--- [6] SFTPGO ADVANCED FILE SERVER (PORT 9092) ---"
-if systemctl is-active --quiet sftpgo; then
-    echo_green "✓ SFTPGo is ACTIVE at http://$IP_ADDR:9092"
-else
+if ! systemctl is-active --quiet sftpgo; then
     read -rp "Install SFTPGo Advanced File Server (SFTP/Web)? [y/N]: " INSTALL_SFTPGO
     if [[ "$INSTALL_SFTPGO" =~ ^[Yy]$ ]]; then
         echo "Installing SFTPGo..."
@@ -182,20 +180,26 @@ else
         zypper addrepo -f "https://download.sftpgo.com/yum/$(uname -m)" sftpgo 2>/dev/null
         zypper refresh sftpgo
         zypper install -y libcap-progs sftpgo
-        
-        # Configure SFTPGo to use port 9092 for HTTP and listen on all interfaces
-        # Note: Newer SFTPGo uses BINDINGS array format for environment variables.
-        mkdir -p /etc/systemd/system/sftpgo.service.d
-        cat <<EOF > /etc/systemd/system/sftpgo.service.d/override.conf
+    fi
+fi
+
+# Always re-seal configuration and restart to ensure port 9092 (ensures fix for existing installs)
+if [[ -f /usr/lib/systemd/system/sftpgo.service || -f /etc/systemd/system/sftpgo.service ]]; then
+    echo "Configuring SFTPGo Port 9092..."
+    mkdir -p /etc/systemd/system/sftpgo.service.d
+    cat <<EOF > /etc/systemd/system/sftpgo.service.d/override.conf
 [Service]
 Environment=SFTPGO_HTTPD__BINDINGS__0__PORT=9092
 Environment=SFTPGO_HTTPD__BINDINGS__0__ADDRESS=0.0.0.0
 EOF
-        systemctl daemon-reload; systemctl enable --now sftpgo
-        firewall-cmd --permanent --add-port=9092/tcp; firewall-cmd --permanent --add-port=2022/tcp; firewall-cmd --reload
-        echo_green "✓ SFTPGo installed. SFTP Port: 2022, Web UI: http://$IP_ADDR:9092"
-        echo_yellow "(!) Please visit the Web UI to create your initial admin account."
+    # Backup fix: modify JSON if it exists
+    if [[ -f /etc/sftpgo/sftpgo.json ]]; then
+        sed -i 's/"port": 8080/"port": 9092/g' /etc/sftpgo/sftpgo.json
     fi
+    systemctl daemon-reload
+    systemctl restart sftpgo
+    firewall-cmd --permanent --add-port=9092/tcp; firewall-cmd --permanent --add-port=2022/tcp; firewall-cmd --reload
+    echo_green "✓ SFTPGo active at http://$IP_ADDR:9092"
 fi
 echo
 
@@ -244,8 +248,8 @@ if systemctl is-active --quiet fail2ban; then echo_green "✓ Fail2Ban Active.";
 read -rp "Install Fail2Ban? [y/N]: " I_F; [[ "$I_F" =~ ^[Yy]$ ]] && { zypper install -y fail2ban; systemctl enable --now fail2ban; }
 fi
 # Auto Update
-if systemctl is-enabled --quiet zypper-automatic.timer 2>/dev/null; then echo_green "✓ Auto-updates Active."; else
-read -rp "Enable Security Auto-Updates? [y/N]: " I_U; [[ "$I_U" =~ ^[Yy]$ ]] && { zypper install -y zypper-automatic; systemctl enable --now zypper-automatic.timer; }
+if systemctl is-enabled --quiet transactional-update.timer 2>/dev/null; then echo_green "✓ Auto-updates Active."; else
+read -rp "Enable Security Auto-Updates? [y/N]: " I_U; [[ "$I_U" =~ ^[Yy]$ ]] && { zypper install -y transactional-update; systemctl enable --now transactional-update.timer 2>/dev/null || echo "(!) Note: transactional-update setup skipped."; }
 fi
 # Samba
 if grep -q "\[$ACTUAL_USER-home\]" /etc/samba/smb.conf 2>/dev/null; then echo_green "✓ Samba Active."; else
