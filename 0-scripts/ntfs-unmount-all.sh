@@ -10,10 +10,36 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-if [[ $EUID -ne 0 ]]; then
-    echo -e "${RED}Please run as root: sudo $0${NC}"
-    exit 1
+# ── Auto-sudo elevation ───────────────────────────────────────────────────────
+SUDO_MODE=false
+if [[ $EUID -eq 0 ]]; then
+    SUDO_MODE=true
+else
+    echo "[ INFO ] Not running as root — attempting to re-launch with sudo..."
+    if sudo -v 2>/dev/null; then
+        exec sudo "$0" "$@"
+    else
+        echo -e "${RED}[ FAIL ] Could not obtain sudo — cannot unmount drives.${NC}"
+        exit 1
+    fi
 fi
+
+# ── Step 0: Confirmation ─────────────────────────────────────────────────────
+echo -e "${YELLOW}${BOLD}⚠️  WARNING: This will unmount all NTFS drives and may disconnect Samba clients!${NC}"
+echo -e "Currently mounted drives:"
+if command -v duf &>/dev/null; then
+    duf -only-fs ntfs,ntfs3,fuseblk 2>/dev/null
+else
+    df -h -t ntfs -t ntfs3 -t fuseblk 2>/dev/null
+fi
+echo ""
+echo -n "Do you want to continue? [y/N] "
+read -r choice
+if [[ ! "$choice" =~ ^[Yy]$ ]]; then
+    echo "Aborted."
+    exit 0
+fi
+
 
 function show_usage() {
     echo -e "\n── Current Disk Usage ──"

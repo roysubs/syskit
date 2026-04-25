@@ -15,7 +15,7 @@ echo -e "${COLOR_LOCAL_HEADER}\nDisplay all current mount options:${COLOR_RESET}
 # Regex to exclude common system/virtual mounts and the root mount
 # This pattern looks for filesystem types or mount points to exclude.
 # Add or remove patterns here if you see other unwanted entries.
-EXCLUDE_REGEX=' type (sysfs|proc|devtmpfs|devpts|tmpfs|securityfs|cgroup|pstore|bpf|autofs|mqueue|hugetlbfs|debugfs|tracefs|configfs|ramfs|fusectl|nsfs|portal|overlay|squashfs|binfmt_misc|rpc_pipefs|fuse.*|nfsd)| on / type | on /snap/| on /var/lib/docker/| on /run/| on /sys/| on /dev/| on /proc/'
+EXCLUDE_REGEX=' type (sysfs|proc|devtmpfs|devpts|tmpfs|securityfs|cgroup|pstore|bpf|autofs|mqueue|hugetlbfs|debugfs|tracefs|configfs|ramfs|fusectl|nsfs|portal|overlay|squashfs|binfmt_misc|rpc_pipefs|fuse.*|nfsd)| on /snap/| on /var/lib/docker/| on /run/| on /sys/| on /dev/| on /proc/'
 
 # --- Processing ---
 

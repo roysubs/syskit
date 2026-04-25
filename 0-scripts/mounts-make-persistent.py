@@ -152,8 +152,10 @@ def parse_fstab():
 
 def is_system_mount_target(mount_target):
     """Checks if a mount target path is likely a system/internal mount location."""
+    if mount_target == '/':
+        return True # Root is definitely system
+
     system_prefixes = [
-        '/', # Root filesystem (especially important for WSL)
         '/proc', '/sys', '/dev', '/run', '/snap',
         '/var/lib/docker',
         '/lost+found',
@@ -161,14 +163,12 @@ def is_system_mount_target(mount_target):
         '/mnt/wsl', # WSL internal mounts (docker-desktop, etc.)
         '/mnt/wslg', # WSLg (GUI) mounts
         '/tmp/.X11-unix' # Standard X11 socket location (often tmpfs or bind)
-        # Keep /mnt itself as it's common for user mounts like /mnt/sdX
-        # Windows drive mounts like /mnt/c are filtered by fstype '9p'
     ]
     for prefix in system_prefixes:
-        # Use startswith for most, exact match for '/' and '/init' if preferred, but startswith is safer
         if mount_target.startswith(prefix):
             return True
     return False
+
 
 def is_dynamic_or_pseudo_filesystem_type(fstype):
     """Checks if a filesystem type is typically dynamic or pseudo."""
@@ -302,7 +302,7 @@ def generate_fstab_line(mount_info):
 
 
     # --- Handling other standard filesystems (ext4, vfat, etc.) ---
-    elif fstype in ['ext4', 'xfs', 'vfat', 'ntfs', 'fuseblk']:
+    elif fstype in ['ext4', 'xfs', 'vfat', 'ntfs', 'ntfs3', 'fuseblk']:
         notes.append(f"Detected as a standard {fstype} mount.")
         current_options_list = fstab_options.split(',')
         if not fstab_options or set(current_options_list).issubset({'rw', 'relatime', 'errors=remount-ro'}):
@@ -429,7 +429,12 @@ def main():
 
     generated_lines_info = []
 
-    print("\nChecking active mounts against /etc/fstab and generating potential entries...")
+    print(f"\nScanning complete. Found {len(active_mounts)} total mounts.")
+    print(f"Checking each against {fstab_path}...")
+
+    skipped_system = 0
+    skipped_dynamic = 0
+    already_in_fstab = 0
 
     for mount in active_mounts:
         target = mount.get('target')
@@ -439,36 +444,46 @@ def main():
         is_subpath_mount = mount.get('is_subpath_mount', False)
         source_path = mount.get('source_path')
 
-
-        # Skip entries that might be incomplete from parsing
         if not target or source is None or fstype is None:
              continue
 
-
         # Skip system mount targets unless --show-all is used
         if not args.show_all and is_system_mount_target(target):
+            skipped_system += 1
             continue
 
         # Skip dynamic or pseudo filesystems unless it's a subpath mount AND --show-all is used
         if is_dynamic_or_pseudo_filesystem_type(fstype) and not args.show_all and not is_subpath_mount:
+             skipped_dynamic += 1
              continue
 
-
         # Check if this target already exists in fstab
-        if target not in fstab_entries:
-            line, notes = generate_fstab_line(mount)
+        if target in fstab_entries:
+            already_in_fstab += 1
+            continue
 
-            if line:
-                 generated_lines_info.append((line, notes))
+        line, notes = generate_fstab_line(mount)
+        if line:
+             generated_lines_info.append((line, notes))
+
+    if skipped_system or skipped_dynamic or already_in_fstab:
+        print(f"  - Skipped {skipped_system} system mounts.")
+        print(f"  - Skipped {skipped_dynamic} dynamic/pseudo mounts.")
+        print(f"  - Skipped {already_in_fstab} mounts already present in fstab.")
+
 
 
     if not generated_lines_info:
-        print("\nNo new active user-relevant mounts found that are not already in /etc/fstab (or were skipped by default).")
-        if args.show_all:
-            print("Note: You used --show-all, so system and dynamic mounts were included in the check, but none needed fstab entries or were skipped for other reasons.")
-        else:
-             print("Note: System and dynamic mounts were skipped by default. Use --show-all to include them.")
+        print("\n[ RESULT ] No new active user-relevant mounts found that are not already in /etc/fstab.")
+        if not args.show_all:
+             print("Note: System and dynamic mounts were hidden. Use --show-all if you expected to see them.")
         return
+
+    print("\n[ SUCCESS ] Found the following new mounts to make persistent:")
+    for line, notes in generated_lines_info:
+        # Extract target from the generated line (second field)
+        target_path = line.split('\t')[1]
+        print(f"  * {target_path}")
 
     print("\n--- Potential fstab entries to add ---")
     print("Review the lines below and add them to your /etc/fstab file.")

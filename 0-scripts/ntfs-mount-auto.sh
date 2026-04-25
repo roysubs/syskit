@@ -194,7 +194,7 @@ done < <(lsblk -lno NAME,TYPE | awk '$2=="disk"{print "/dev/"$1}' | grep -v "sda
 # ════════════════════════════════════════════════════════════════════════════
 section "Current NTFS Mounts"
 
-NTFS_MOUNTS=$(grep -E '\s(ntfs|fuseblk)\s' /proc/mounts 2>/dev/null)
+NTFS_MOUNTS=$(grep -E '\s(ntfs|ntfs3|fuseblk)\s' /proc/mounts 2>/dev/null)
 if [[ -n "$NTFS_MOUNTS" ]]; then
     echo "$NTFS_MOUNTS" | awk '{printf "  %-15s -> %-25s (%s)\n", $1, $2, $3}'
 else
@@ -372,9 +372,15 @@ while IFS= read -r partition; do
     # ntfs3 uses: uid, gid, fmask, dmask
     # ntfs-3g uses: uid, gid, umask
     if [[ "$NTFS_DRIVER" == "ntfs3" ]]; then
-        MOUNT_OPTS="rw,uid=$USER_ID,gid=$GROUP_ID,fmask=111,dmask=022,noatime,prealloc"
+        # umask=000 is the "sledgehammer" that ensures you have full R/W/X permissions
+        # iocharset=utf8 ensures filenames don't get garbled
+        # noatime - don't bother updating on every file read
+        # prealloc - try to preallocate space before copying onto disk to reduce fragmentation
+        MOUNT_OPTS="rw,uid=$USER_ID,gid=$GROUP_ID,umask=000,iocharset=utf8,noatime,prealloc"
+        # Manually forcing it to the main user (usually 1000)
+        MOUNT_OPTS="rw,uid=1000,gid=1000,umask=000,iocharset=utf8,noatime,prealloc"
     else
-        MOUNT_OPTS="rw,uid=$USER_ID,gid=$GROUP_ID,umask=022,noatime"
+        MOUNT_OPTS="rw,uid=$USER_ID,gid=$GROUP_ID,umask=000,noatime"
     fi
 
     if mount -t "$NTFS_DRIVER" -o "$MOUNT_OPTS" "$partition" "$MOUNT_POINT" 2>"$MOUNT_ERR"; then
@@ -442,7 +448,7 @@ while IFS= read -r line; do
         SHARED=$((SHARED + 1))
     fi
 
-done < <(grep -E '\s(ntfs|fuseblk)\s' /proc/mounts)
+done < <(grep -E '\s(ntfs|ntfs3|fuseblk)\s' /proc/mounts)
 
 # ── Restart Samba ─────────────────────────────────────────────────────────────
 if [[ "$SMB_CHANGED" -eq 1 ]]; then
@@ -480,7 +486,7 @@ echo "  Newly added SMB shares        : $SHARED"
 
 echo ""
 echo "  Disk Usage:"
-grep -E '\s(ntfs|fuseblk)\s' /proc/mounts | awk '{print $2}' | while read -r mp; do
+grep -E '\s(ntfs|ntfs3|fuseblk)\s' /proc/mounts | awk '{print $2}' | while read -r mp; do
     df -h "$mp" 2>/dev/null | tail -1 | awk -v path="$mp" '{
         printf "  %-25s  size=%-8s used=%-8s avail=%-8s use%%=%s\n", path, $2, $3, $4, $5
     }'
@@ -488,7 +494,7 @@ done
 
 echo ""
 echo "  Mounted NTFS partitions:"
-grep -E '\s(ntfs|fuseblk)\s' /proc/mounts | awk '{printf "  %-15s -> %s\n", $1, $2}' || echo "  (none)"
+grep -E '\s(ntfs|ntfs3|fuseblk)\s' /proc/mounts | awk '{printf "  %-15s -> %s\n", $1, $2}' || echo "  (none)"
 
 echo ""
 echo "  SMB shares:"
