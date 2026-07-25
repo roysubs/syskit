@@ -78,6 +78,26 @@ fi
 # ----------------------
 # Dependency Checks & Installation
 # ----------------------
+pkg_install() {
+    local package_name="$1"
+    if command -v zypper &>/dev/null; then
+        zypper refresh && zypper install -y "$package_name"
+    elif command -v apt-get &>/dev/null; then
+        apt-get update && apt-get install -y "$package_name"
+    elif command -v dnf &>/dev/null; then
+        dnf install -y "$package_name"
+    elif command -v yum &>/dev/null; then
+        yum install -y "$package_name"
+    elif command -v pacman &>/dev/null; then
+        pacman -Sy --noconfirm "$package_name"
+    elif command -v apk &>/dev/null; then
+        apk add "$package_name"
+    else
+        echo "Error: Could not detect supported package manager." >&2
+        return 1
+    fi
+}
+
 install_dependency() {
     local package_name="$1"
     local command_name="$2"
@@ -85,7 +105,7 @@ install_dependency() {
         read -p "'$command_name' (from '$package_name') is not available. Install it? [Y/n] " yn
         if [[ $yn =~ ^[Yy]$ ]] || [[ -z $yn ]]; then
             echo "Installing $package_name..."
-            apt-get update && apt-get install -y "$package_name" || {
+            pkg_install "$package_name" || {
                 echo "Failed to install $package_name. Exiting."
                 exit 1
             }
@@ -96,6 +116,16 @@ install_dependency() {
     fi
 }
 
+get_os_name() {
+    if command -v lsb_release &>/dev/null; then
+        lsb_release -ds 2>/dev/null | tr -d '"'
+    elif [[ -f /etc/os-release ]]; then
+        ( . /etc/os-release && echo "${PRETTY_NAME:-$NAME}" )
+    else
+        uname -rs
+    fi
+}
+
 install_dependency "dmidecode" "dmidecode"
 install_dependency "pciutils" "lspci"
 install_dependency "procps" "free" # procps provides free, ps, top, uptime, etc.
@@ -103,7 +133,6 @@ install_dependency "util-linux" "lscpu" # util-linux provides lscpu, df, mount e
 # uptime is often in procps, but let's ensure util-linux for 'df' as well.
 install_dependency "util-linux" "df"
 install_dependency "util-linux" "uptime"
-install_dependency "lsb-release" "lsb_release"
 install_dependency "coreutils" "nproc" # coreutils provides nproc, date, etc.
 install_dependency "upower" "upower"
 install_dependency "systemd" "systemd-detect-virt"
@@ -157,7 +186,7 @@ print_aligned "Uptime" "$(uptime -p | sed 's/up //g' || echo 'Unknown')"
 # ----------------------
 print_section "🖥️ Hardware Information"
 print_aligned "Hostname" "$(hostname)"
-print_aligned "Operating System" "$(lsb_release -ds 2>/dev/null || uname -rs)"
+print_aligned "Operating System" "$(get_os_name)"
 print_aligned "Kernel Version" "$(uname -r)"
 print_aligned "Architecture" "$(uname -m)"
 domain_name=$(hostname -d 2>/dev/null || safe_cmd dnsdomainname)
