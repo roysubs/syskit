@@ -43,6 +43,8 @@ QUALITY PROFILES:
   half:         Aims for 1/2 original file size with the best possible quality.
   quarter:      Aims for 1/4 original file size with the best possible quality.
   10mb:         Compresses to just under 10MB for Discord/social media.
+  64mb:         Compresses to just under 64MB (WhatsApp safe limit for slow connections).
+  100mb:        Compresses to just under 100MB (WhatsApp standard media limit).
 
 SUPPORTED PLATFORMS:
   - YouTube (videos, shorts, live)
@@ -76,10 +78,13 @@ COLOR_RED='\033[0;31m'
 COLOR_BLUE='\033[0;34m'
 COLOR_GREEN='\033[0;32m'
 COLOR_YELLOW='\033[0;33m'
+COLOR_MAGENTA_BOLD='\033[1;95m'  # Bright bold magenta
 msg_error() { echo -e "${COLOR_RED}[-]${COLOR_RESET} $1" >&2; }
 msg() { echo -e "${COLOR_BLUE}[*]${COLOR_RESET} $1"; }
 msg_ok() { echo -e "${COLOR_GREEN}[+]${COLOR_RESET} $1"; }
 msg_warn() { echo -e "${COLOR_YELLOW}[!]${COLOR_RESET} $1"; }
+# Used exclusively for the VPN warning — high-visibility bright magenta
+msg_vpn_warn() { echo -e "${COLOR_MAGENTA_BOLD}[!] $1${COLOR_RESET}"; }
 
 # Function to check if a command exists on the system (robust version)
 command_exists() {
@@ -96,20 +101,44 @@ command_exists() {
     return 1 # Failure
 }
 
-# Function to check for common signs of a VPN connection
+# Function to check for common signs of an *active* VPN connection.
+# On macOS, a 'utun' interface can persist even after disconnecting from a VPN
+# endpoint (e.g. WireGuard/NordVPN), so we prefer the authoritative scutil --nc
+# list which reports actual connection state. Only if no VPN service manager is
+# found do we fall back to interface inspection.
 check_for_vpn() {
-    # Detect OS type
-    local os_type=$(uname -s)
-    
+    local os_type
+    os_type=$(uname -s)
+
     if [[ "$os_type" == "Darwin" ]]; then
-        # macOS-specific VPN detection
-        # Check for common VPN interface names (utun, ppp, ipsec)
-        if ifconfig 2>/dev/null | grep -q -E '^(utun|ppp|ipsec)[0-9]+:'; then
-            return 0 # VPN likely detected
+        # Primary check: ask the system VPN service manager for connected tunnels.
+        # scutil --nc list lines look like:
+        #   * (Connected)     VPN Name  [...]  (IKEv2)
+        # Only trigger when a service is explicitly "Connected".
+        local nc_list
+        nc_list=$(scutil --nc list 2>/dev/null)
+        if echo "$nc_list" | grep -qE '\(Connected\)'; then
+            return 0  # A named VPN service is actively connected
         fi
-        # Check for VPN services in network setup
-        if scutil --nc list 2>/dev/null | grep -q "Connected"; then
-            return 0 # VPN likely detected
+
+        # Secondary check: look for ppp or ipsec interfaces (utun is deliberately
+        # excluded here because macOS always creates utun0 for iCloud Private Relay
+        # and leaves extra utun interfaces around after VPN disconnection).
+        if ifconfig 2>/dev/null | grep -q -E '^(ppp|ipsec)[0-9]+:'; then
+            return 0  # PPP/IPSec tunnel interface present
+        fi
+
+        # Tertiary check: if a utun interface (beyond utun0 which is always
+        # present) exists AND it has an inet address that isn't link-local,
+        # a WireGuard/OpenVPN-style tunnel may be active.
+        local utun_with_addr
+        utun_with_addr=$(ifconfig 2>/dev/null | awk '
+            /^utun[1-9][0-9]*:/ { in_block=1; next }
+            /^[^ \t]/ { in_block=0 }
+            in_block && /inet / && !/169\.254\./ { print; exit }
+        ')
+        if [[ -n "$utun_with_addr" ]]; then
+            return 0  # utun interface with a routable address detected
         fi
     else
         # Linux-specific VPN detection
@@ -376,6 +405,24 @@ if [[ -z "$source_input" ]]; then
     exit 1
 fi
 
+# Quoting hint for URLs with shell-special characters.
+# zsh (and bash with globbing) will reject an unquoted URL containing '?', '&',
+# '=' etc. with "zsh: no matches found: <url>" BEFORE the script even starts,
+# so we cannot catch that error here. What we CAN do is emit a proactive tip
+# whenever a URL is provided, so it appears in the run history.
+if [[ "$source_input" =~ ^https?:// ]]; then
+    # Use case/glob to safely detect '?' or '&' without regex parsing issues
+    case "$source_input" in
+        *'?'*|*'&'*)
+            # URL contains query-string characters — it was correctly quoted/escaped
+            # since we received it intact. Print a subtle reminder for future runs.
+            msg "TIP: This URL contains special shell characters (? &). Always wrap"
+            msg "     URLs in quotes to avoid 'zsh: no matches found' errors, e.g.:"
+            msg "     $(basename "$0") '${source_input}' ..."
+            ;;
+    esac
+fi
+
 # Initial setup and checks
 main_dep_install
 msg_ok "All dependencies are satisfied."
@@ -390,7 +437,8 @@ fi
 
 # Check for VPN after dependencies are confirmed
 if check_for_vpn; then
-    msg_warn "A VPN connection appears to be active. This may cause network timeouts. If the script fails, try disabling your VPN."
+    msg_vpn_warn "VPN ACTIVE — This may cause network timeouts or rate-limiting."
+    msg_vpn_warn "If the download fails or hangs, try disabling your VPN and re-running."
 fi
 
 if [[ "$outdir" == "~" ]]; then outdir="$HOME"; fi
@@ -412,7 +460,10 @@ fi
 output_filename_stem=""
 input_file=""
 media_id=""
-YTDLP_OPTS=(--socket-timeout 60) # Add timeout for network robustness
+# --no-warnings suppresses the JS-runtime deprecation notice; the script works
+# fine without deno/node because yt-dlp falls back to its android API client.
+# Remove --no-warnings here if you ever need to debug extraction issues.
+YTDLP_OPTS=(--socket-timeout 60 --no-warnings) # Add timeout for network robustness
 
 if [[ -f "$source_input" ]]; then
     msg_ok "Source is a local file: $source_input"
@@ -549,10 +600,14 @@ if [[ "$effective_quality" != "stream_copy" ]]; then
         ffmpeg_video_params=(-c:v libx264 -crf 22 -preset medium -pix_fmt yuv420p)
         ffmpeg_audio_params=(-c:a aac -b:a 192k -ar 44100)
         ;;
-    10mb|half|quarter)
+    10mb|64mb|100mb|half|quarter)
         target_size_bytes=0
         if [[ "$effective_quality" == "10mb" ]]; then
             target_size_bytes=$(echo "9.8 * 1024 * 1024" | bc)
+        elif [[ "$effective_quality" == "64mb" ]]; then
+            target_size_bytes=$(echo "63.0 * 1024 * 1024" | bc)
+        elif [[ "$effective_quality" == "100mb" ]]; then
+            target_size_bytes=$(echo "98.0 * 1024 * 1024" | bc)
         else
             estimated_clipped_source_size_bytes=$(echo "($calc_duration_sec / $full_source_duration_sec) * $source_size_bytes" | bc)
             if [[ "$effective_quality" == "half" ]]; then
@@ -594,9 +649,10 @@ else
     ffmpeg_audio_params=(-c:a copy)
 fi
 
-# CRITICAL: Use OUTPUT seeking (after -i) for accuracy and proper A/V sync
-# All timing arguments go in trim_args, which are applied AFTER the input
-trim_args=()
+# CRITICAL: Use INPUT seeking (before -i) to prevent black screens at the start.
+# For stream copy, this snaps to the nearest keyframe. For re-encoding, FFmpeg handles accurate seeking.
+input_seek_args=()
+output_trim_args=()
 time_suffix=""
 output_quality_label=$(if [[ "$effective_quality" == "stream_copy" ]]; then echo "trimmed"; else echo "$effective_quality"; fi)
 
@@ -604,9 +660,17 @@ if [[ "$is_trimming" == true ]]; then
     start_label=$(to_hms_label "$start_sec")
     end_label=$(to_hms_label "$end_sec")
     time_suffix="_${start_label}_to_${end_label}"
-    if [[ -n "$start_sec" && -n "$end_sec" ]]; then
-        ffmpeg_duration=$(echo "$end_sec - $start_sec" | bc)
-        trim_args=(-ss "$start_sec" -t "$ffmpeg_duration")
+    
+    if [[ -n "$start_sec" ]]; then
+        input_seek_args=(-ss "$start_sec")
+    fi
+    if [[ -n "$end_sec" ]]; then
+        if [[ -n "$start_sec" ]]; then
+            ffmpeg_duration=$(echo "$end_sec - $start_sec" | bc)
+        else
+            ffmpeg_duration="$end_sec"
+        fi
+        output_trim_args=(-t "$ffmpeg_duration")
     fi
 fi
 
@@ -617,12 +681,12 @@ process_success=false
 
 if [[ -n "${ffmpeg_video_params_pass2[*]+x}" ]]; then
     # Two-pass encoding
-    "${ffmpeg_cmd_base[@]}" -i "$input_file" "${trim_args[@]}" -vf "$ffmpeg_vf" "${ffmpeg_video_params[@]}"
-    "${ffmpeg_cmd_base[@]}" -i "$input_file" "${trim_args[@]}" -vf "$ffmpeg_vf" "${ffmpeg_video_params_pass2[@]}" "${ffmpeg_audio_params[@]}" -movflags +faststart "$output_final_mp4"
+    "${ffmpeg_cmd_base[@]}" "${input_seek_args[@]}" -i "$input_file" "${output_trim_args[@]}" -vf "$ffmpeg_vf" "${ffmpeg_video_params[@]}"
+    "${ffmpeg_cmd_base[@]}" "${input_seek_args[@]}" -i "$input_file" "${output_trim_args[@]}" -vf "$ffmpeg_vf" "${ffmpeg_video_params_pass2[@]}" "${ffmpeg_audio_params[@]}" -movflags +faststart "$output_final_mp4"
     if [[ $? -eq 0 ]]; then process_success=true; fi
 else
     # Single-pass encoding or stream copy
-    "${ffmpeg_cmd_base[@]}" -i "$input_file" "${trim_args[@]}" $(if [[ -n "$ffmpeg_vf" ]]; then echo "-vf" "$ffmpeg_vf"; fi) "${ffmpeg_video_params[@]}" "${ffmpeg_audio_params[@]}" -movflags +faststart "$output_final_mp4"
+    "${ffmpeg_cmd_base[@]}" "${input_seek_args[@]}" -i "$input_file" "${output_trim_args[@]}" $(if [[ -n "$ffmpeg_vf" ]]; then echo "-vf" "$ffmpeg_vf"; fi) "${ffmpeg_video_params[@]}" "${ffmpeg_audio_params[@]}" -movflags +faststart "$output_final_mp4"
     if [[ $? -eq 0 ]]; then process_success=true; fi
 fi
 

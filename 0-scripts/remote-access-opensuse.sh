@@ -247,9 +247,17 @@ echo_blue "--- [9-13] SECURITY & SHARES ---"
 if systemctl is-active --quiet fail2ban; then echo_green "✓ Fail2Ban Active."; else
 read -rp "Install Fail2Ban? [y/N]: " I_F; [[ "$I_F" =~ ^[Yy]$ ]] && { zypper install -y fail2ban; systemctl enable --now fail2ban; }
 fi
-# Auto Update
+# Auto Update (transactional-update is the modern way for Tumbleweed/MicroOS)
 if systemctl is-enabled --quiet transactional-update.timer 2>/dev/null; then echo_green "✓ Auto-updates Active."; else
-read -rp "Enable Security Auto-Updates? [y/N]: " I_U; [[ "$I_U" =~ ^[Yy]$ ]] && { zypper install -y transactional-update; systemctl enable --now transactional-update.timer 2>/dev/null || echo "(!) Note: transactional-update setup skipped."; }
+read -rp "Enable Security Auto-Updates? [y/N]: " I_U; [[ "$I_U" =~ ^[Yy]$ ]] && { 
+    zypper install -y transactional-update
+    # Set reboot strategy to manual to prevent unexpected reboots!
+    if command -v rebootmgrctl &>/dev/null; then
+        rebootmgrctl set-strategy manual
+        echo_yellow "(!) Reboot strategy set to MANUAL (prevents auto-reboots)."
+    fi
+    systemctl enable --now transactional-update.timer 2>/dev/null || echo "(!) Note: transactional-update timer setup skipped."
+}
 fi
 # Samba
 if grep -q "\[$ACTUAL_USER-home\]" /etc/samba/smb.conf 2>/dev/null; then echo_green "✓ Samba Active."; else
