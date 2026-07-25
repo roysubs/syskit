@@ -126,6 +126,41 @@ get_os_name() {
     fi
 }
 
+get_last_boot() {
+    if uptime -s &>/dev/null; then
+        uptime -s
+    elif who -b 2>/dev/null | grep -q "boot"; then
+        who -b 2>/dev/null | awk '{print $3, $4}'
+    elif [[ -f /proc/uptime ]]; then
+        date -d "@$(awk -v b="$(date +%s)" -v u="$(cut -d' ' -f1 /proc/uptime)" 'BEGIN{print int(b-u)}')" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo 'Unknown'
+    else
+        echo 'Unknown'
+    fi
+}
+
+get_uptime() {
+    if uptime -p &>/dev/null; then
+        uptime -p | sed 's/up //g'
+    elif [[ -f /proc/uptime ]]; then
+        awk '{u=$1; d=int(u/86400); h=int((u%86400)/3600); m=int((u%3600)/60); 
+              if (d > 0) printf "%d days, %d hours, %d minutes\n", d, h, m;
+              else if (h > 0) printf "%d hours, %d minutes\n", h, m;
+              else printf "%d minutes\n", m}' /proc/uptime
+    else
+        uptime 2>/dev/null | sed -E 's/.*up +([^,]+),.*/\1/' || echo 'Unknown'
+    fi
+}
+
+get_hostname() {
+    if command -v hostname &>/dev/null; then
+        hostname
+    elif command -v hostnamectl &>/dev/null; then
+        hostnamectl hostname 2>/dev/null || uname -n
+    else
+        uname -n
+    fi
+}
+
 install_dependency "dmidecode" "dmidecode"
 install_dependency "pciutils" "lspci"
 install_dependency "procps" "free" # procps provides free, ps, top, uptime, etc.
@@ -178,18 +213,18 @@ exec > >(tee "$OUT_FILE")
 # ----------------------
 print_section "📋 System Overview"
 print_aligned "Collected At" "$(date '+%Y-%m-%d %H:%M:%S')"
-print_aligned "Last Boot Time" "$(uptime -s || echo 'Unknown')"
-print_aligned "Uptime" "$(uptime -p | sed 's/up //g' || echo 'Unknown')"
+print_aligned "Last Boot Time" "$(get_last_boot)"
+print_aligned "Uptime" "$(get_uptime)"
 
 # ----------------------
 # Hardware Information
 # ----------------------
 print_section "🖥️ Hardware Information"
-print_aligned "Hostname" "$(hostname)"
+print_aligned "Hostname" "$(get_hostname)"
 print_aligned "Operating System" "$(get_os_name)"
 print_aligned "Kernel Version" "$(uname -r)"
 print_aligned "Architecture" "$(uname -m)"
-domain_name=$(hostname -d 2>/dev/null || safe_cmd dnsdomainname)
+domain_name=$(get_hostname -d 2>/dev/null || safe_cmd dnsdomainname 2>/dev/null || true)
 print_aligned "Domain" "${domain_name:-(none)}"
 
 owner_for_display="${SUDO_USER:-}"
@@ -516,13 +551,8 @@ echo "Display processes: $X_SERVER"
 # ----------------------
 print_section "💾 Storage Information"
 echo "    Filesystem          Type   Size  Used Avail Use% Mounted on"
-# Run df and capture its raw output, including stderr for debugging if needed (for manual run)
-# The `2>/dev/null || true` makes it robust in script
-df_raw_output=$(df -hT --output=source,fstype,size,used,avail,pcent,target \
-                -x tmpfs -x devtmpfs -x overlay -x squashfs 2>/dev/null || true)
+df_raw_output=$(df -hT -x tmpfs -x devtmpfs -x overlay -x squashfs 2>/dev/null || true)
 
-# Check if df_raw_output has more than just a header line (or is not empty)
-# A simple check: count lines. If > 1, there's data.
 if [[ $(echo "$df_raw_output" | wc -l) -gt 1 ]]; then
     echo "$df_raw_output" | \
         awk 'NR==1 {next} {gsub(/\/dev\//, "", $1); printf "    %-19s %-6s %5s %5s %5s %4s %s\n", $1, $2, $3, $4, $5, $6, $7}'
@@ -591,20 +621,35 @@ print_aligned "Virtualization" "${virt_type}"
 # Software & Repositories
 # ----------------------
 print_section "📦 Software & Repositories"
-echo "    APT Repository URLs (Suite, URL, Components):"
-grep_output=$(grep -rhE '^deb ' /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null || true)
-if [[ -n "$grep_output" ]]; then
-    echo "$grep_output" | \
-    awk '{
-        url = $2; 
-        suite = $3; 
-        components = ""; 
-        for (i=4; i<=NF; i++) components = components " " $i; 
-        sub(/^[ \t]+/, "", components); 
-        printf "        %-25s %s (%s)\n", suite, url, components
-    }' | sort -u
+if command -v zypper &>/dev/null; then
+    echo "    Zypper Repositories (Alias, Name, Enabled, URL):"
+    zypper_repos=$(zypper lr -u 2>/dev/null | awk -F'|' 'NR>4 && NF>=6 {gsub(/^[ \t]+|[ \t]+$/, "", $2); gsub(/^[ \t]+|[ \t]+$/, "", $3); gsub(/^[ \t]+|[ \t]+$/, "", $4); gsub(/^[ \t]+|[ \t]+$/, "", $7); if ($4~/[Yy]es/ || $4=="1") printf "        %-20s %-30s %s\n", $2, $3, $7}' || true)
+    if [[ -n "$zypper_repos" ]]; then
+        echo "$zypper_repos"
+    else
+        echo "        No enabled Zypper repositories found."
+    fi
+elif command -v apt-get &>/dev/null; then
+    echo "    APT Repository URLs (Suite, URL, Components):"
+    grep_output=$(grep -rhE '^deb ' /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null || true)
+    if [[ -n "$grep_output" ]]; then
+        echo "$grep_output" | \
+        awk '{
+            url = $2; 
+            suite = $3; 
+            components = ""; 
+            for (i=4; i<=NF; i++) components = components " " $i; 
+            sub(/^[ \t]+/, "", components); 
+            printf "        %-25s %s (%s)\n", suite, url, components
+        }' | sort -u
+    else
+        echo "        No APT repositories found."
+    fi
+elif command -v dnf &>/dev/null || command -v yum &>/dev/null; then
+    echo "    RPM Repositories:"
+    (dnf repolist 2>/dev/null || yum repolist 2>/dev/null) | awk 'NR>1 {printf "        %s\n", $0}' || echo "        No RPM repositories found."
 else
-    echo "        No repositories found or non-APT system."
+    echo "        No recognized repository manager found."
 fi
 
 # ----------------------
