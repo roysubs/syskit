@@ -59,6 +59,18 @@ format_timestamp() {
     date "+%Y-%m-%d %H:%M:%S"
 }
 
+# Format epoch seconds to readable date/time (cross-platform GNU/BSD)
+format_epoch() {
+    local ts="$1"
+    if date -d @"$ts" "+%Y-%m-%d %H:%M:%S" &>/dev/null; then
+        date -d @"$ts" "+%Y-%m-%d %H:%M:%S"
+    elif date -r "$ts" "+%Y-%m-%d %H:%M:%S" &>/dev/null; then
+        date -r "$ts" "+%Y-%m-%d %H:%M:%S"
+    else
+        echo "$ts"
+    fi
+}
+
 # Get current disk usage for home directory
 get_disk_usage() {
     du -sh "$HOME" 2>/dev/null | awk '{print $1}'
@@ -67,7 +79,6 @@ get_disk_usage() {
 # Get CPU and memory usage of a process
 get_process_usage() {
     local PID=$1
-    # Get CPU and memory usage
     ps -p $PID -o %cpu=,%mem= 2>/dev/null || echo "0.0 0.0"
 }
 
@@ -75,6 +86,52 @@ get_process_usage() {
 print_header() {
     echo -e "\n${BOLD}${BLUE}$1${RESET}"
     echo -e "${BLUE}$(printf '%.s-' $(seq 1 ${#1}))${RESET}\n"
+}
+
+# Cross-platform system CPU usage
+get_system_cpu() {
+    if command -v top &>/dev/null; then
+        if [[ "$(uname)" == "Darwin" ]]; then
+            top -l 1 -n 0 2>/dev/null | awk '/CPU usage/ {print $3}' | tr -d '%' || echo "N/A"
+        else
+            top -bn1 2>/dev/null | grep "Cpu(s)" | awk '{print $2 + $4}' || echo "N/A"
+        fi
+    else
+        echo "N/A"
+    fi
+}
+
+# Cross-platform memory stats
+print_memory_info() {
+    if command -v free &>/dev/null; then
+        echo "Memory Free: $(free -h 2>/dev/null | awk '/Mem:/ {print $4}')"
+        echo "Memory Used: $(free -h 2>/dev/null | awk '/Mem:/ {print $3}')"
+    elif [[ "$(uname)" == "Darwin" ]]; then
+        local free_pages=$(vm_stat 2>/dev/null | awk '/Pages free/ {print $3}' | tr -d '.')
+        local page_size=4096
+        if [[ -n "$free_pages" ]]; then
+            local free_mb=$((free_pages * page_size / 1024 / 1024))
+            echo "Memory Free: ${free_mb}M"
+        else
+            echo "Memory Free: N/A"
+        fi
+        echo "Memory Used: (N/A on macOS)"
+    else
+        echo "Memory Free: N/A"
+        echo "Memory Used: N/A"
+    fi
+}
+
+# Cross-platform filesystem scan
+scan_filesystem() {
+    local out_file="$1"
+    if find "$HOME" -maxdepth 1 -type f -printf '' &>/dev/null; then
+        find "$HOME" -type f -printf '%T@ %s %p\n' 2>/dev/null | sort > "$out_file"
+    elif [[ "$(uname)" == "Darwin" ]]; then
+        find "$HOME" -type f -exec stat -f '%m %z %N' {} + 2>/dev/null | sort > "$out_file"
+    else
+        find "$HOME" -type f 2>/dev/null | sort > "$out_file"
+    fi
 }
 
 # =====================================================
@@ -96,7 +153,7 @@ echo -e "${CYAN}Initial Disk Usage (Home):${RESET} $BEFORE_DISK_USAGE"
 # Start filesystem scan
 echo -e "\n${YELLOW}Scanning filesystem before running the application...${RESET}"
 SCAN_START_TIME=$(date +%s)
-find "$HOME" -type f -printf '%T@ %s %p\n' 2>/dev/null | sort > "$BEFORE_FILES"
+scan_filesystem "$BEFORE_FILES"
 SCAN_END_TIME=$(date +%s)
 SCAN_DURATION=$((SCAN_END_TIME - SCAN_START_TIME))
 echo -e "${GREEN}Filesystem scan completed in ${SCAN_DURATION} seconds${RESET}"
@@ -113,26 +170,23 @@ echo -e "${YELLOW}Press Ctrl+C to terminate if the application doesn't exit prop
 
 # Get initial resource stats
 echo -e "\n${CYAN}Resource Usage Before Start:${RESET}"
-echo "CPU Usage (System): $(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4}')%"
-echo "Memory Free: $(free -h | grep Mem | awk '{print $4}')"
-echo "Memory Used: $(free -h | grep Mem | awk '{print $3}')"
+echo "CPU Usage (System): $(get_system_cpu)%"
+print_memory_info
 
 # Start CPU/memory monitoring in background
 echo "timestamp,cpu_usage,memory_usage" > "$MONITORING_DATA"
 (
+    exec 2>/dev/null
     while true; do
-        # Find all PIDs related to our application
         APP_PIDS=$(pgrep -f "$APP_NAME" 2>/dev/null)
         if [[ -z "$APP_PIDS" ]]; then
             sleep 1
-            # Double check before deciding the app has terminated
             APP_PIDS=$(pgrep -f "$APP_NAME" 2>/dev/null)
             if [[ -z "$APP_PIDS" ]]; then
                 break
             fi
         fi
         
-        # Sum CPU/memory for all matching processes
         TOTAL_CPU=0
         TOTAL_MEM=0
         for pid in $APP_PIDS; do
@@ -145,7 +199,6 @@ echo "timestamp,cpu_usage,memory_usage" > "$MONITORING_DATA"
             fi
         done
         
-        # Only record non-zero values
         if [[ $(echo "$TOTAL_CPU > 0 || $TOTAL_MEM > 0" | bc) -eq 1 ]]; then
             echo "$(date +%s),$TOTAL_CPU,$TOTAL_MEM" >> "$MONITORING_DATA"
         fi
@@ -169,14 +222,14 @@ APP_DURATION=$((APP_END_TIME - APP_START_TIME))
 echo -e "\n${GREEN}Application finished at: $APP_END_TIMESTAMP${RESET}"
 echo -e "${GREEN}Application ran for: $APP_DURATION seconds${RESET}"
 
-# Stop the monitoring
-kill $MONITOR_PID 2>/dev/null
+# Stop the monitoring silently
+kill $MONITOR_PID 2>/dev/null || true
+wait $MONITOR_PID 2>/dev/null || true
 
 # Get final resource stats
 echo -e "\n${CYAN}Resource Usage After Exit:${RESET}"
-echo "CPU Usage (System): $(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4}')%"
-echo "Memory Free: $(free -h | grep Mem | awk '{print $4}')"
-echo "Memory Used: $(free -h | grep Mem | awk '{print $3}')"
+echo "CPU Usage (System): $(get_system_cpu)%"
+print_memory_info
 
 # =====================================================
 # Post-run monitoring
@@ -191,7 +244,7 @@ echo -e "${CYAN}Final Disk Usage (Home):${RESET} $AFTER_DISK_USAGE"
 # Scan filesystem after running
 echo -e "\n${YELLOW}Scanning filesystem after running the application...${RESET}"
 SCAN2_START_TIME=$(date +%s)
-find "$HOME" -type f -printf '%T@ %s %p\n' 2>/dev/null | sort > "$AFTER_FILES"
+scan_filesystem "$AFTER_FILES"
 SCAN2_END_TIME=$(date +%s)
 SCAN2_DURATION=$((SCAN2_END_TIME - SCAN2_START_TIME))
 echo -e "${GREEN}Filesystem scan completed in ${SCAN2_DURATION} seconds${RESET}"
@@ -210,10 +263,8 @@ NUM_CHANGED=$(wc -l < "$CHANGED_FILES")
 # Display the changed files with details
 if [[ $NUM_CHANGED -gt 0 ]]; then
     while IFS=' ' read -r timestamp size path; do
-        # Convert timestamp to human readable format
-        date_str=$(date -d @"$timestamp" "+%Y-%m-%d %H:%M:%S")
+        date_str=$(format_epoch "$timestamp")
         
-        # Format size to be human readable
         if [[ $size -gt 1048576 ]]; then
             size_str=$(echo "scale=2; $size/1048576" | bc)" MB"
         elif [[ $size -gt 1024 ]]; then
@@ -240,17 +291,16 @@ if [[ -s "$MONITORING_DATA" ]]; then
     AVG_MEM=$(tail -n +2 "$MONITORING_DATA" | cut -d, -f3 | awk '{sum+=$1} END {if(NR>0) print sum/NR; else print "0"}')
     
     echo -e "\n${CYAN}Resource Usage Summary:${RESET}"
-    printf "Peak CPU Usage: %6.1f%%\n" $PEAK_CPU
-    printf "Peak Memory Usage: %6.1f%%\n" $PEAK_MEM
-    printf "Average CPU Usage: %6.1f%%\n" $AVG_CPU
-    printf "Average Memory Usage: %6.1f%%\n" $AVG_MEM
+    printf "Peak CPU Usage: %6.1f%%\n" ${PEAK_CPU:-0}
+    printf "Peak Memory Usage: %6.1f%%\n" ${PEAK_MEM:-0}
+    printf "Average CPU Usage: %6.1f%%\n" ${AVG_CPU:-0}
+    printf "Average Memory Usage: %6.1f%%\n" ${AVG_MEM:-0}
 fi
 
 # =====================================================
 # Generate summary report
 # =====================================================
 
-# Create a simple ASCII box for the summary
 print_header "Summary Report"
 
 echo -e "┌───────────────────────────────────────────────────────────────────────────"
@@ -274,7 +324,6 @@ echo -e "└──────────────────────�
 
 # Display resource usage over time if available
 if [[ -s "$MONITORING_DATA" && $(wc -l < "$MONITORING_DATA") -gt 2 ]]; then
-    # Check if we actually gathered any useful data
     HAS_DATA=0
     tail -n +2 "$MONITORING_DATA" | while IFS=, read timestamp cpu mem; do
         if (( $(echo "$cpu > 0.1 || $mem > 0.1" | bc -l) )); then
@@ -288,10 +337,9 @@ if [[ -s "$MONITORING_DATA" && $(wc -l < "$MONITORING_DATA") -gt 2 ]]; then
         echo -e "Time      CPU%    MEM%"
         echo -e "─────────────────────────"
         
-        # Display samples with non-zero values
         tail -n +2 "$MONITORING_DATA" | while IFS=, read timestamp cpu mem; do
             if (( $(echo "$cpu > 0.1 || $mem > 0.1" | bc -l) )); then
-                time_str=$(date -d @"$timestamp" "+%H:%M:%S")
+                time_str=$(format_epoch "$timestamp")
                 printf "%-9s %-7s %-7s\n" "$time_str" "$(printf "%.1f" $cpu)" "$(printf "%.1f" $mem)"
             fi
         done
