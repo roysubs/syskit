@@ -97,12 +97,19 @@ openSUSE includes a security management tool called **`chkstat`**.
 
 ---
 
-### 3.2 AppArmor Mandatory Access Control
+### 3.2 AppArmor Mandatory Access Control (vs. SELinux on Red Hat)
 
 openSUSE uses **AppArmor** as its default Linux Security Module (LSM).
-* AppArmor profiles live in `/etc/apparmor.d/`.
-* The Samba daemon (`/usr/sbin/smbd`) operates under an AppArmor profile that permits access to standard mount points (`/mnt/`, `/media/`, `/srv/`, `/home/`).
-* *Note:* Unlike RHEL/Fedora (where SELinux blocks custom Samba paths unless `samba_share_t` labels are set), openSUSE's AppArmor profile allows `/mnt/` storage shares out of the box.
+
+* **On openSUSE (AppArmor):** **No interference!** AppArmor's default Samba profile (`/etc/apparmor.d/usr.sbin.smbd`) permits reading and writing to `/mnt/`, `/media/`, and `/srv/` out of the box. You do not need SELinux labels or booleans.
+* **On Red Hat / RHEL (SELinux):** SELinux **will** block Samba shares on custom folders like `/mnt/sda1` unless you label the directory or set the SELinux boolean:
+  ```bash
+  # Option A (Red Hat): Label directory for Samba
+  sudo chcon -t samba_share_t /mnt/sda1
+
+  # Option B (Red Hat): Allow Samba to share any folder
+  sudo setsebool -P samba_export_all_rw 1
+  ```
 
 ---
 
