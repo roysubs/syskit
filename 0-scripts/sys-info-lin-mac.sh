@@ -235,12 +235,17 @@ if [[ "$IS_MAC" == "true" ]]; then
     print_aligned "Physical Cores" "$(sysctl -n hw.physicalcpu 2>/dev/null)"
     print_aligned "Logical Processors" "$(sysctl -n hw.logicalcpu 2>/dev/null)"
 else
-    cpu_model=$(lscpu | awk -F: '/Model name/ {print $2}' | xargs || true)
-    print_aligned "CPU Model" "${cpu_model:-Unknown}"
-    print_aligned "Sockets" "$(lscpu | awk -F: '/Socket\(s\)/ {print $2}' | xargs || echo '1')"
-    print_aligned "Core(s) per socket" "$(lscpu | awk -F: '/Core\(s\) per socket/ {print $2}' | xargs || echo '1')"
-    print_aligned "Thread(s) per core" "$(lscpu | awk -F: '/Thread\(s\) per core/ {print $2}' | xargs || echo '1')"
-    print_aligned "Total Physical Cores" "$(lscpu | awk -F: '/CPU\(s\)/ {print $2}' | xargs || echo '1')"
+    cpu_model=$(lscpu | awk -F: '/Model name/ {gsub(/^[ \t]+/, "", $2); print $2; exit}' || echo "Unknown CPU Model")
+    sockets=$(lscpu | awk -F: '/^Socket\(s\)/ {print $2}' | xargs || echo '1')
+    cores_per_socket=$(lscpu | awk -F: '/^Core\(s\) per socket/ {print $2}' | xargs || echo '1')
+    threads_per_core=$(lscpu | awk -F: '/Thread\(s\) per core/ {print $2}' | xargs || echo '1')
+    total_physical_cores=$(( (sockets > 0 ? sockets : 1) * (cores_per_socket > 0 ? cores_per_socket : 1) ))
+
+    print_aligned "CPU Model" "$cpu_model"
+    print_aligned "Sockets" "$sockets"
+    print_aligned "Core(s) per socket" "$cores_per_socket"
+    print_aligned "Thread(s) per core" "$threads_per_core"
+    print_aligned "Total Physical Cores" "$total_physical_cores"
     print_aligned "Total Logical Processors" "$(nproc 2>/dev/null || echo '1')"
 fi
 
@@ -255,28 +260,43 @@ if [[ "$IS_MAC" == "true" ]]; then
     free_mem_mb=$(( free_pages * 4096 / 1024 / 1024 ))
     print_aligned "Free Memory (Approx)" "${free_mem_mb} MB"
 else
-    print_aligned "Total Memory" "$(free -h | awk '/Mem:/ {print $2}')"
-    print_aligned "Used Memory" "$(free -h | awk '/Mem:/ {print $3}')"
-    print_aligned "Free Memory" "$(free -h | awk '/Mem:/ {print $4}')"
-    print_aligned "Available Memory" "$(free -h | awk '/Mem:/ {print $7}')"
+    print_aligned "Total Memory" "$(free -h | awk '/^Mem:/ {print $2}')"
+    print_aligned "Used Memory" "$(free -h | awk '/^Mem:/ {print $3}')"
+    print_aligned "Free Memory" "$(free -h | awk '/^Mem:/ {print $4}')"
+    print_aligned "Available Memory" "$(free -h | awk '/^Mem:/ {print $7}')"
 
     echo
-    echo "  RAM Module Details (from dmidecode):"
-    dmi_ram=$(dmidecode -t memory 2>/dev/null || true)
-    if [[ -n "$dmi_ram" ]]; then
-        echo "$dmi_ram" | awk '/Memory Device/,/^$/ {
-            if ($0 ~ /Locator: / && $0 !~ /Bank/) loc=$2;
-            if ($0 ~ /Size: /) size=$2 " " $3;
-            if ($0 ~ /Type: / && $0 !~ /Detail/) type=$2;
-            if ($0 ~ /Speed: / && $0 !~ /Configured/) speed=$2 " " $3;
-            if ($0 ~ /Manufacturer: /) mfr=$2;
-            if ($0 ~ /Part Number: /) part=$2;
-            if ($0 ~ /Serial Number: /) serial=$2;
-        } END {
-            if (size != "" && size !~ /No Module Installed/) {
-                printf "    Slot %s (%s, %s, PN: %s, Type: %s, Speed: %s)\n", loc, size, serial, part, type, speed;
+    if command -v dmidecode &>/dev/null && [[ $EUID -eq 0 ]]; then
+        echo "  RAM Module Details (from dmidecode):"
+        parsed_ram_info=$(dmidecode -t memory 2>/dev/null | awk '
+            function trim(s) { sub(/^[\s\t]+/, "", s); sub(/[\s\t]+$/, "", s); return s; }
+            BEGIN { RS = "\n\n"; FS = "\n"; }
+            /Memory Device/ {
+                size = "N/A"; manufacturer = "N/A"; part_number = "N/A";
+                type = "N/A"; speed = "N/A"; locator = "N/A"; is_empty_flag = 0;
+                for (i=1; i<=NF; i++) {
+                    current_line = trim($i);
+                    if (current_line ~ /^Size: No Module Installed$/) { is_empty_flag = 1; size = "Empty"; }
+                    else if (current_line ~ /^Size: /) { size = current_line; sub(/^Size: /, "", size); }
+                    if (current_line ~ /^Manufacturer: /) { manufacturer = current_line; sub(/^Manufacturer: /, "", manufacturer); }
+                    if (current_line ~ /^Part Number: /) { part_number = current_line; sub(/^Part Number: /, "", part_number); }
+                    if (current_line ~ /^Type: /) { type = current_line; sub(/^Type: /, "", type); }
+                    if (current_line ~ /^Speed: /) { speed = current_line; sub(/^Speed: /, "", speed); }
+                    if (current_line ~ /^Locator: /) { locator = current_line; sub(/^Locator: /, "", locator); }
+                }
+                if (is_empty_flag) { print "empty_slot," locator "," type; }
+                else if (size != "N/A" && size != "Empty") { print "populated_slot," locator "," size "," manufacturer "," part_number "," type "," speed; }
             }
-        }'
+        ' || true)
+        if [[ -n "$parsed_ram_info" ]]; then
+            echo "$parsed_ram_info" | while IFS=',' read -r tag loc size mfr part type speed; do
+                if [[ "$tag" == "populated_slot" ]]; then
+                    printf "    Slot %s (%s, %s, PN: %s, Type: %s, Speed: %s)\n" "$loc" "$size" "$mfr" "$part" "$type" "$speed"
+                elif [[ "$tag" == "empty_slot" ]]; then
+                    printf "    Slot %s (Empty Slot)\n" "$loc"
+                fi
+            done
+        fi
     fi
 fi
 
