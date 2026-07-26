@@ -100,21 +100,30 @@ openSUSE includes a security management tool called **`chkstat`**.
 ### 3.2 Security Module (AppArmor vs. SELinux in Leap 16.0+)
 
 * **openSUSE Leap 15.x & Tumbleweed (AppArmor default):** Uses AppArmor (`/etc/apparmor.d/`). AppArmor's default Samba profile permits reading and writing to `/mnt/`, `/media/`, and `/srv/` out of the box.
-* **openSUSE Leap 16.0+ (SELinux default):** Starting with **openSUSE Leap 16.0** (built on SUSE's new ALP / Adaptable Linux Platform code base), SUSE officially transitioned to **SELinux** as the default security module to align with containerized and enterprise standards!
-* **Checking SELinux Mode:**
-  ```bash
-  sestatus
-  # or
-  getenforce
-  ```
-* **Samba under SELinux (Leap 16.0 & Red Hat):**
-  If SELinux is active in `Enforcing` mode, grant Samba permission on custom mount folders:
-  ```bash
-  # Option A: Label directory specifically for Samba
-  sudo chcon -R -t samba_share_t /mnt/sda1
+* **openSUSE Leap 16.0+ (SELinux default):** Starting with **openSUSE Leap 16.0** (built on SUSE's new ALP / Adaptable Linux Platform codebase), SUSE officially transitioned to **SELinux** as the default security module!
 
-  # Option B: Allow Samba to share any read/write directory
+#### ⚠️ The Disk Format / Wipe SELinux Gotcha
+Why does a Samba share stop working after wiping/reformatting a disk?
+1. When you format or wipe a disk (e.g. `mkfs.btrfs -f /dev/sda1`), the underlying filesystem inode is destroyed and recreated.
+2. Upon mounting the fresh filesystem at `/mnt/sda1`, SELinux assigns the default unlabeled security context (`unlabeled_t` / `default_t`) to the new root directory.
+3. Even if POSIX permissions are `chmod 777`, SELinux blocks `smbd` from opening `/mnt/sda1` with a `Permission Denied` error in `journalctl`:
+   ```text
+   smbd: make_connection_snum: '/mnt/sda1' does not exist or permission denied when connecting to [sda1] Error was Permission denied
+   ```
+
+#### 🛠️ Solution & Diagnostics:
+* **Label the directory for Samba (Required after formatting):**
+  ```bash
+  sudo chcon -R -t samba_share_t /mnt/sda1
+  ```
+* **Allow Samba to export all writable mounts:**
+  ```bash
   sudo setsebool -P samba_export_all_rw 1
+  ```
+* **Verify Samba local status & logs:**
+  ```bash
+  smbclient -L localhost -N
+  sudo journalctl -u smb -n 20 --no-pager
   ```
 
 ---
