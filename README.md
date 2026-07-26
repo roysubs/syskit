@@ -196,3 +196,9 @@ Scripts for user-specific personalizations.
 * `new4-bashrc_personal.sh`: Configures personal `.bashrc` additions. An optional script to manage user specific aliases, functions, or settings unique to a user's preference.
 
 ---
+
+## Documentation & Guides
+
+* **[openSUSE Security Architecture Guide](file:///Users/boss/syskit/0-docs/security-opensuse.md)**: Deep dive into openSUSE security defaults, `chkstat` permission auditing, AppArmor MAC, `firewalld` setup, `pam_faillock`, Snapper rollbacks, and the Samba/NFS 2-layer permissions model.
+* **[macOS Compatibility & Portable Scripting Guide](file:///Users/boss/syskit/macos-compatibility.md)**: Guide for cross-platform GNU vs BSD `date`, `sysctl`, and `system_profiler` tools across macOS and Linux.
+
