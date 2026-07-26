@@ -427,9 +427,29 @@ if mount | grep -q "^$new_partition "; then
     echo -e "${ERROR_COLOR}CRITICAL ERROR: Partition '$new_partition' is ALREADY MOUNTED. Cannot format.${RESET_COLOR}"; exit 1;
 fi
 
-echo "Formatting $new_partition as ext4 (lazy init options)..."
-run_command mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 "$new_partition"
-echo -e "${SUCCESS_COLOR}$new_partition successfully formatted as ext4.${RESET_COLOR}"
+FS_TYPE="btrfs"
+if [ "$PROMPT_USER" = true ]; then
+    echo -e "\n${INFO_COLOR}Select Filesystem Type:${RESET_COLOR}"
+    echo "  1) btrfs (Recommended for openSUSE — snapshots, checksums)"
+    echo "  2) ext4  (Standard Linux filesystem)"
+    echo "  3) xfs   (High performance enterprise filesystem)"
+    read -r -p "$(echo -e "${PROMPT_COLOR}Choose filesystem [1-3, default: 1 (btrfs)]: ${RESET_COLOR}")" fs_choice
+    case "$fs_choice" in
+        2|ext4) FS_TYPE="ext4" ;;
+        3|xfs)  FS_TYPE="xfs" ;;
+        *)      FS_TYPE="btrfs" ;;
+    esac
+fi
+
+echo "Formatting $new_partition as $FS_TYPE..."
+if [ "$FS_TYPE" = "btrfs" ]; then
+    run_command mkfs.btrfs -f -L "${USER_CONFIG_NAME:-data}" "$new_partition"
+elif [ "$FS_TYPE" = "xfs" ]; then
+    run_command mkfs.xfs -f -L "${USER_CONFIG_NAME:-data}" "$new_partition"
+else
+    run_command mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L "${USER_CONFIG_NAME:-data}" "$new_partition"
+fi
+echo -e "${SUCCESS_COLOR}$new_partition successfully formatted as $FS_TYPE.${RESET_COLOR}"
 
 # --- Optional: tune2fs for reserved space ---
 perform_tune2fs=false
