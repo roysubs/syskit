@@ -37,6 +37,9 @@ if [[ -z "$APP_PATH" ]]; then
     exit 1
 fi
 
+# Target directory to monitor (defaults to current directory for speed; set MONITOR_DIR to override)
+TARGET_DIR="${MONITOR_DIR:-.}"
+
 # Create a temporary directory for our monitoring files
 TEMP_DIR=$(mktemp -d)
 chmod 755 "$TEMP_DIR"
@@ -71,9 +74,9 @@ format_epoch() {
     fi
 }
 
-# Get current disk usage for home directory
+# Get current disk usage for target directory
 get_disk_usage() {
-    du -sh "$HOME" 2>/dev/null | awk '{print $1}'
+    du -sh "$TARGET_DIR" 2>/dev/null | awk '{print $1}'
 }
 
 # Get CPU and memory usage of a process
@@ -122,15 +125,31 @@ print_memory_info() {
     fi
 }
 
-# Cross-platform filesystem scan
+# Cross-platform fast filesystem scan
 scan_filesystem() {
     local out_file="$1"
-    if find "$HOME" -maxdepth 1 -type f -printf '' &>/dev/null; then
-        find "$HOME" -type f -printf '%T@ %s %p\n' 2>/dev/null | sort > "$out_file"
-    elif [[ "$(uname)" == "Darwin" ]]; then
-        find "$HOME" -type f -exec stat -f '%m %z %N' {} + 2>/dev/null | sort > "$out_file"
+    if command -v python3 &>/dev/null; then
+        python3 -c '
+import os, sys
+target = sys.argv[1]
+out_file = sys.argv[2]
+skip_dirs = {".git", ".cache", "node_modules", "Library", "CloudStorage", ".Trash"}
+with open(out_file, "w") as f:
+    for root, dirs, files in os.walk(target):
+        dirs[:] = [d for d in dirs if d not in skip_dirs and not d.startswith(".git")]
+        for name in files:
+            path = os.path.join(root, name)
+            try:
+                st = os.lstat(path)
+                f.write(f"{int(st.st_mtime)} {st.st_size} {path}\n")
+            except Exception:
+                pass
+' "$TARGET_DIR" "$out_file"
+        sort -o "$out_file" "$out_file" 2>/dev/null || true
+    elif find "$TARGET_DIR" -maxdepth 1 -type f -printf '' &>/dev/null; then
+        find "$TARGET_DIR" -type f -printf '%T@ %s %p\n' 2>/dev/null | sort > "$out_file"
     else
-        find "$HOME" -type f 2>/dev/null | sort > "$out_file"
+        find "$TARGET_DIR" -type f 2>/dev/null | sort > "$out_file"
     fi
 }
 
@@ -140,6 +159,7 @@ scan_filesystem() {
 
 print_header "Starting Filesystem Monitoring"
 echo -e "${YELLOW}Target Application:${RESET} $APP_CMD"
+echo -e "${YELLOW}Target Directory:${RESET} $(cd "$TARGET_DIR" 2>/dev/null && pwd || echo "$TARGET_DIR")"
 
 # Record start time
 START_TIME=$(date +%s)
@@ -148,7 +168,7 @@ echo -e "${CYAN}Start Time:${RESET} $START_TIMESTAMP"
 
 # Get initial disk usage
 BEFORE_DISK_USAGE=$(get_disk_usage)
-echo -e "${CYAN}Initial Disk Usage (Home):${RESET} $BEFORE_DISK_USAGE"
+echo -e "${CYAN}Initial Disk Usage:${RESET} $BEFORE_DISK_USAGE"
 
 # Start filesystem scan
 echo -e "\n${YELLOW}Scanning filesystem before running the application...${RESET}"
@@ -239,7 +259,7 @@ print_header "Post-Run Analysis"
 
 # Get final disk usage
 AFTER_DISK_USAGE=$(get_disk_usage)
-echo -e "${CYAN}Final Disk Usage (Home):${RESET} $AFTER_DISK_USAGE"
+echo -e "${CYAN}Final Disk Usage:${RESET} $AFTER_DISK_USAGE"
 
 # Scan filesystem after running
 echo -e "\n${YELLOW}Scanning filesystem after running the application...${RESET}"
@@ -263,14 +283,21 @@ NUM_CHANGED=$(wc -l < "$CHANGED_FILES")
 # Display the changed files with details
 if [[ $NUM_CHANGED -gt 0 ]]; then
     while IFS=' ' read -r timestamp size path; do
+        if [[ ! "$timestamp" =~ ^[0-9]+$ ]]; then
+            continue
+        fi
         date_str=$(format_epoch "$timestamp")
         
-        if [[ $size -gt 1048576 ]]; then
-            size_str=$(echo "scale=2; $size/1048576" | bc)" MB"
-        elif [[ $size -gt 1024 ]]; then
-            size_str=$(echo "scale=2; $size/1024" | bc)" KB"
+        if [[ $size =~ ^[0-9]+$ ]]; then
+            if [[ $size -gt 1048576 ]]; then
+                size_str=$(echo "scale=2; $size/1048576" | bc 2>/dev/null)" MB"
+            elif [[ $size -gt 1024 ]]; then
+                size_str=$(echo "scale=2; $size/1024" | bc 2>/dev/null)" KB"
+            else
+                size_str="$size B"
+            fi
         else
-            size_str="$size B"
+            size_str="N/A"
         fi
         
         printf "║ %-23s %-10s %s\n" "$date_str" "$size_str" "$path"
