@@ -732,21 +732,18 @@ if [ -n "$new_partition" ]; then
     fi
 
     if [ "$should_setup_nfs" = true ] && [ -n "$mount_point" ] && command -v exportfs &>/dev/null; then
-        escaped_mount_point_for_grep_nfs_final=$(echo "$mount_point" | sed 's/[].[*^$(){}?+|/\\]/\\&/g')
-        if grep -q "^\s*${escaped_mount_point_for_grep_nfs_final}[[:space:]]" "$exports_file"; then
+        if grep -Fq "$mount_point" "$exports_file"; then
             echo -e "\n${HEADER_COLOR}NFS Share Status for $mount_point (grep ... $exports_file):${RESET_COLOR}"
-            grep --color=always "^\s*${escaped_mount_point_for_grep_nfs_final}[[:space:]]" "$exports_file" || true
+            grep --color=always -F "$mount_point" "$exports_file" || true
             echo "Currently exported by NFS server (filtered for $mount_point):"
-            (exportfs -v | grep --color=always "$mount_point") || echo "(Share for $mount_point not found in active NFS exports)"
+            (exportfs -v | grep --color=always -F "$mount_point") || echo "(Share for $mount_point not found in active NFS exports)"
         fi
     fi
 
-    if [ "$should_setup_samba" = true ] && [ -n "$mount_point" ] && [ -n "$samba_share_name" ] && command -v smbd &>/dev/null; then
-        escaped_samba_share_name_final=$(echo "$samba_share_name" | sed 's/[].[*^$(){}?+|/\\]/\\&/g')
-        escaped_mount_point_path_samba_final=$(echo "$mount_point" | sed 's/[].[*^$(){}?+|/\\]/\\&/g')
-        if grep -qE "(^\[${escaped_samba_share_name_final}\]|^\s*path\s*=\s*${escaped_mount_point_path_samba_final}\s*$)" "$smb_conf_file"; then
+    if [ "$should_setup_samba" = true ] && [ -n "$mount_point" ] && [ -n "$samba_share_name" ]; then
+        if grep -Fq "[$samba_share_name]" "$smb_conf_file"; then
             echo -e "\n${HEADER_COLOR}Samba Share Status for '[$samba_share_name]' ($mount_point) (grep ... $smb_conf_file):${RESET_COLOR}"
-            (grep --color=always -A7 -E "(^\[${escaped_samba_share_name_final}\]|^\s*path\s*=\s*${escaped_mount_point_path_samba_final}\s*$)" "$smb_conf_file" | head -n 8) || true
+            (grep --color=always -A7 -F "[$samba_share_name]" "$smb_conf_file" | head -n 8) || true
         fi
     fi
 else
