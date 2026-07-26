@@ -679,23 +679,23 @@ if [ "$should_setup_samba" = true ] && [ -n "$mount_point" ] && [ -n "$samba_sha
     if command -v smbd &>/dev/null || [ -x /usr/sbin/smbd ]; then
         echo "Samba server tools found."
         if grep -qE "(^\[${samba_share_name}\]|^\s*path\s*=\s*${mount_point}\s*$)" "$smb_conf_file"; then
-            echo -e "${WARN_COLOR}WARNING: A Samba share named '[$samba_share_name]' or for path '$mount_point' seems to exist in $smb_conf_file. Skipping.${RESET_COLOR}"
+            echo -e "${WARN_COLOR}Samba share '[$samba_share_name]' already exists in $smb_conf_file.${RESET_COLOR}"
             (grep --color=always -A7 -E "(^\[${samba_share_name}\]|^\s*path\s*=\s*${mount_point}\s*$)" "$smb_conf_file" | head -n 8) || true
         else
             echo "Adding Samba share configuration to $smb_conf_file for share name '[$samba_share_name]'..."
-            if echo -e "$samba_share_config_block" | sudo tee -a "$smb_conf_file" > /dev/null; then
-                echo "Samba share configuration added. Validating with 'testparm -s'...";
-                if testparm -s &>/dev/null; then
-                    echo "Samba configuration valid. Restarting Samba services..."
-                    if systemctl restart smb 2>/dev/null || systemctl restart smbd 2>/dev/null || service smbd restart 2>/dev/null; then
-                        systemctl restart nmb 2>/dev/null || systemctl restart nmbd 2>/dev/null || true
-                        echo -e "${SUCCESS_COLOR}Samba share '[$samba_share_name]' for '$mount_point' is active.${RESET_COLOR}"
-                    else
-                        echo -e "${ERROR_COLOR}ERROR: Could not restart Samba service.${RESET_COLOR}"
-                    fi
-                else echo -e "${ERROR_COLOR}ERROR: 'testparm -s' reported issues. Review $smb_conf_file. Services NOT restarted.${RESET_COLOR}"; fi
-            else echo -e "${ERROR_COLOR}ERROR: Failed to append Samba config to $smb_conf_file.${RESET_COLOR}"; fi
+            echo -e "$samba_share_config_block" | sudo tee -a "$smb_conf_file" > /dev/null
         fi
+
+        if testparm -s &>/dev/null; then
+            echo "Restarting Samba services to reload config..."
+            if systemctl restart smb 2>/dev/null || systemctl restart smbd 2>/dev/null || service smbd restart 2>/dev/null; then
+                systemctl restart nmb 2>/dev/null || systemctl restart nmbd 2>/dev/null || true
+                echo -e "${SUCCESS_COLOR}Samba share '[$samba_share_name]' for '$mount_point' is active.${RESET_COLOR}"
+            else
+                echo -e "${ERROR_COLOR}ERROR: Could not restart Samba service.${RESET_COLOR}"
+            fi
+        else echo -e "${ERROR_COLOR}ERROR: 'testparm -s' reported issues. Review $smb_conf_file.${RESET_COLOR}"; fi
+
         if ! (systemctl is-active --quiet smb || systemctl is-active --quiet smbd); then
             echo -e "${WARN_COLOR}INFO: Samba services do not seem active/installed. If sharing fails, install samba and enable services.${RESET_COLOR}";
         else echo "Samba service appears to be active."; fi
