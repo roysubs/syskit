@@ -97,17 +97,23 @@ openSUSE includes a security management tool called **`chkstat`**.
 
 ---
 
-### 3.2 AppArmor Mandatory Access Control (vs. SELinux on Red Hat)
+### 3.2 Security Module (AppArmor vs. SELinux in Leap 16.0+)
 
-openSUSE uses **AppArmor** as its default Linux Security Module (LSM).
-
-* **On openSUSE (AppArmor):** **No interference!** AppArmor's default Samba profile (`/etc/apparmor.d/usr.sbin.smbd`) permits reading and writing to `/mnt/`, `/media/`, and `/srv/` out of the box. You do not need SELinux labels or booleans.
-* **On Red Hat / RHEL (SELinux):** SELinux **will** block Samba shares on custom folders like `/mnt/sda1` unless you label the directory or set the SELinux boolean:
+* **openSUSE Leap 15.x & Tumbleweed (AppArmor default):** Uses AppArmor (`/etc/apparmor.d/`). AppArmor's default Samba profile permits reading and writing to `/mnt/`, `/media/`, and `/srv/` out of the box.
+* **openSUSE Leap 16.0+ (SELinux default):** Starting with **openSUSE Leap 16.0** (built on SUSE's new ALP / Adaptable Linux Platform code base), SUSE officially transitioned to **SELinux** as the default security module to align with containerized and enterprise standards!
+* **Checking SELinux Mode:**
   ```bash
-  # Option A (Red Hat): Label directory for Samba
-  sudo chcon -t samba_share_t /mnt/sda1
+  sestatus
+  # or
+  getenforce
+  ```
+* **Samba under SELinux (Leap 16.0 & Red Hat):**
+  If SELinux is active in `Enforcing` mode, grant Samba permission on custom mount folders:
+  ```bash
+  # Option A: Label directory specifically for Samba
+  sudo chcon -R -t samba_share_t /mnt/sda1
 
-  # Option B (Red Hat): Allow Samba to share any folder
+  # Option B: Allow Samba to share any read/write directory
   sudo setsebool -P samba_export_all_rw 1
   ```
 
