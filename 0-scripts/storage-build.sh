@@ -679,8 +679,24 @@ if [ "$should_setup_samba" = true ] && [ -n "$mount_point" ] && [ -n "$samba_sha
     if command -v smbd &>/dev/null || [ -x /usr/sbin/smbd ]; then
         echo "Samba server tools found."
         if grep -qE "(^\[${samba_share_name}\]|^\s*path\s*=\s*${mount_point}\s*$)" "$smb_conf_file"; then
-            echo -e "${WARN_COLOR}Samba share '[$samba_share_name]' already exists in $smb_conf_file.${RESET_COLOR}"
+            echo -e "${WARN_COLOR}Samba share '[$samba_share_name]' already exists in $smb_conf_file:${RESET_COLOR}"
             (grep --color=always -A7 -E "(^\[${samba_share_name}\]|^\s*path\s*=\s*${mount_point}\s*$)" "$smb_conf_file" | head -n 8) || true
+            
+            if [ "$PROMPT_USER" = true ] && ask_yes_no_question "Do you want to update/replace the existing '[$samba_share_name]' share block with new settings?" "no"; then
+                echo "Replacing existing Samba share '[$samba_share_name]' in $smb_conf_file..."
+                python3 -c '
+import re, sys
+smb_path, share = sys.argv[1], sys.argv[2]
+with open(smb_path, "r") as f: content = f.read()
+pattern = r"\n?\s*\[" + re.escape(share) + r"\][^\n]*\n(?:(?!\[).*\n)*"
+new_content = re.sub(pattern, "\n", content)
+with open(smb_path, "w") as f: f.write(new_content)
+' "$smb_conf_file" "$samba_share_name" 2>/dev/null || true
+                echo -e "$samba_share_config_block" | sudo tee -a "$smb_conf_file" > /dev/null
+                echo -e "${SUCCESS_COLOR}Samba share '[$samba_share_name]' configuration updated.${RESET_COLOR}"
+            else
+                echo "Keeping existing Samba share configuration."
+            fi
         else
             echo "Adding Samba share configuration to $smb_conf_file for share name '[$samba_share_name]'..."
             echo -e "$samba_share_config_block" | sudo tee -a "$smb_conf_file" > /dev/null
