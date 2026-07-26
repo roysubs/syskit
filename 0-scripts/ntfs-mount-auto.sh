@@ -72,13 +72,13 @@ print_smart_summary() {
         return
     fi
     local output
-    output=$(sudo smartctl -H "$disk" 2>/dev/null || true)
+    output=$(timeout 5s smartctl -n standby -H "$disk" 2>/dev/null || true)
     if echo "$output" | grep -iq "PASSED\|OK"; then
         ok "$disk: SMART Health PASSED"
     elif echo "$output" | grep -iq "FAILED"; then
         fail "$disk: SMART Health FAILED — BACKUP IMMEDIATELY!"
     else
-        note "$disk: SMART Health status unknown or not supported by controller"
+        note "$disk: SMART Health status unknown or device sleeping"
     fi
 }
 
@@ -219,7 +219,7 @@ done
 
 # ── Driver Detection ─────────────────────────────────────────────────────────
 NTFS_DRIVER="ntfs-3g"
-MOD_ERR=$(modprobe ntfs3 2>&1 || true)
+MOD_ERR=$(timeout 3s modprobe ntfs3 2>&1 || true)
 
 if grep -qs "ntfs3" /proc/filesystems; then
     NTFS_DRIVER="ntfs3"
@@ -232,7 +232,7 @@ fi
 section "Checking Samba User"
 
 SMB_USER="$REAL_USER"
-if pdbedit -L 2>/dev/null | grep -qi "^${SMB_USER}:"; then
+if timeout 5s pdbedit -L 2>/dev/null | grep -qi "^${SMB_USER}:"; then
     ok "Samba user '$SMB_USER' exists"
 else
     echo ""
