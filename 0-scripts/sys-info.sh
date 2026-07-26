@@ -2,14 +2,18 @@
 # Author: Roy Wiseman 2025-04
 set -euo pipefail
 
-# Section 1: Ensure script is run as root. If not, re-execute with sudo.
+# ----------------------
+# Ensure script is run as root. If not, re-execute with sudo.
+# ----------------------
 if [[ $EUID -ne 0 ]]; then
     echo "This script needs root privileges. Re-running with sudo..."
     exec sudo bash "$0" "$@"
     exit $?
 fi
 
-# Section 2: Script is now running as root. Determine where to save the output file.
+# ----------------------
+# Script is now running as root. Determine where to save the output file.
+# ----------------------
 INVOKER_REAL_HOME=""
 TARGET_USER_FOR_OWNERSHIP=""
 
