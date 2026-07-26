@@ -40,7 +40,7 @@ if [[ "$IS_MAC" == "false" ]]; then
     pkg_install() {
         local package_name="$1"
         if command -v zypper &>/dev/null; then
-            zypper refresh && zypper install -y "$package_name"
+            zypper --non-interactive install --auto-agree-with-licenses -y "$package_name"
         elif command -v apt-get &>/dev/null; then
             apt-get update && apt-get install -y "$package_name"
         elif command -v dnf &>/dev/null; then

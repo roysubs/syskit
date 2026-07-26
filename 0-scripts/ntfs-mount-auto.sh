@@ -40,9 +40,9 @@ note()    { echo -e "${BOLD}[ NOTE ] $*${NC}"; }
 pkg_install() {
     local pkgs=("$@")
     if command -v zypper &>/dev/null; then
-        zypper refresh && zypper install -y "${pkgs[@]}"
+        zypper --non-interactive install --auto-agree-with-licenses -y "${pkgs[@]}"
     elif command -v apt-get &>/dev/null; then
-        apt-get update && apt-get install -y "${pkgs[@]}"
+        DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y "${pkgs[@]}"
     elif command -v dnf &>/dev/null; then
         dnf install -y "${pkgs[@]}"
     elif command -v yum &>/dev/null; then
@@ -267,9 +267,9 @@ section "Checking Dependencies"
 for pkg_check in "ntfs-3g:ntfs-3g" "smbd:samba" "smartctl:smartmontools" "duf:duf"; do
     cmd="${pkg_check%%:*}"
     pkg="${pkg_check##*:}"
-    if ! command -v "$cmd" &>/dev/null; then
+    if ! command -v "$cmd" &>/dev/null && ! [ -x "/usr/sbin/$cmd" ] && ! [ -x "/sbin/$cmd" ]; then
         info "$pkg not found. Attempting to install..."
-        pkg_install "$pkg" &>/dev/null
+        pkg_install "$pkg"
     else
         ok "$pkg is installed"
     fi

@@ -45,7 +45,7 @@ print_info() {
 pkg_install() {
     local pkgs=("$@")
     if command -v zypper &>/dev/null; then
-        zypper refresh && zypper install -y "${pkgs[@]}"
+        zypper --non-interactive install --auto-agree-with-licenses -y "${pkgs[@]}"
     elif command -v apt-get &>/dev/null; then
         apt-get update && apt-get install -y "${pkgs[@]}"
     elif command -v dnf &>/dev/null; then

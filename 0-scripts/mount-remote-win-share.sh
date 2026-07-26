@@ -16,7 +16,7 @@ if [ "$(id -u)" -ne 0 ]; then echo "Elevation required; rerunning as sudo..."; s
 pkg_install() {
     local pkgs=("$@")
     if command -v zypper &>/dev/null; then
-        sudo zypper refresh && sudo zypper install -y "${pkgs[@]}"
+        sudo zypper --non-interactive install --auto-agree-with-licenses -y "${pkgs[@]}"
     elif command -v apt-get &>/dev/null; then
         sudo apt-get update && sudo apt-get install -y "${pkgs[@]}"
     elif command -v dnf &>/dev/null; then
