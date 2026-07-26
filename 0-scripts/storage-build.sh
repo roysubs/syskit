@@ -499,43 +499,44 @@ else
 fi
 echo -e "${SUCCESS_COLOR}$new_partition successfully formatted as $FS_TYPE.${RESET_COLOR}"
 
-# --- Optional: tune2fs for reserved space ---
+# --- Optional: tune2fs for reserved space (ext4 only) ---
 perform_tune2fs=false
 new_reserved_percent="$RESERVED_PERCENT_VAL"
 
-if [ -n "$new_reserved_percent" ]; then
-    perform_tune2fs=true
-elif [ "$PROMPT_USER" = true ]; then
-    echo -e "\n${INFO_COLOR}Filesystem Reserved Space Adjustment (tune2fs):${RESET_COLOR}"
-    echo "Newly formatted ext4 partitions reserve space (typically 5%) for root user and system stability."
-    echo "You can adjust this percentage. Reducing it gives more space to users but less buffer for the system."
-    total_blocks=$(tune2fs -l "$new_partition" | awk -F': *' '/^Block count:/ {print $2}')
-    block_size_bytes=$(tune2fs -l "$new_partition" | awk -F': *' '/^Block size:/ {print $2}')
-    current_reserved_blocks=$(tune2fs -l "$new_partition" | awk -F': *' '/^Reserved block count:/ {print $2}')
-    if [ -n "$total_blocks" ] && [ -n "$block_size_bytes" ] && [ -n "$current_reserved_blocks" ]; then
-        partition_size_bytes=$((total_blocks * block_size_bytes))
-        current_reserved_bytes=$((current_reserved_blocks * block_size_bytes))
-        current_reserved_percent_actual=$(awk "BEGIN {printf \"%.2f\", ($current_reserved_blocks/$total_blocks)*100}")
-        echo "Partition size: $(numfmt --to=iec-i --suffix=B --format="%.2f" "$partition_size_bytes")"
-        echo "Current reserved space: $current_reserved_percent_actual% ($(numfmt --to=iec-i --suffix=B --format="%.2f" "$current_reserved_bytes"))"
-        percent_1_bytes=$((partition_size_bytes / 100)); percent_01_bytes=$((partition_size_bytes / 1000))
-        echo "  - 1% reserved would be: $(numfmt --to=iec-i --suffix=B --format="%.2f" "$percent_1_bytes")"
-        echo "  - 0.1% reserved would be: $(numfmt --to=iec-i --suffix=B --format="%.2f" "$percent_01_bytes")"
-    else echo -e "${WARN_COLOR}Could not retrieve detailed block information to calculate current/example reserved sizes.${RESET_COLOR}"; fi
-
-    if ask_yes_no_question "Do you want to adjust the reserved space percentage? (Suggesting 1%)" "no"; then
+if [ "$FS_TYPE" = "ext4" ]; then
+    if [ -n "$new_reserved_percent" ]; then
         perform_tune2fs=true
-        read -r -p "$(echo -e "${PROMPT_COLOR}Enter desired reserved percentage (e.g., 1, 0.5, default 1 if empty): ${RESET_COLOR}")" user_percent
-        new_reserved_percent=${user_percent:-1}
-        if ! [[ "$new_reserved_percent" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-            echo -e "${ERROR_COLOR}Invalid percentage '$new_reserved_percent'. Must be a number. Skipping adjustment.${RESET_COLOR}"; perform_tune2fs=false;
-        else
-            percent_float_val=$(awk "BEGIN {print $new_reserved_percent}")
-            if (( $(echo "$percent_float_val < 0 || $percent_float_val > 50" | bc -l) )); then
-                echo -e "${ERROR_COLOR}Reserved percentage '$new_reserved_percent' must be between 0 and 50. Skipping adjustment.${RESET_COLOR}"; perform_tune2fs=false;
+    elif [ "$PROMPT_USER" = true ]; then
+        echo -e "\n${INFO_COLOR}Filesystem Reserved Space Adjustment (tune2fs):${RESET_COLOR}"
+        echo "Newly formatted ext4 partitions reserve space (typically 5%) for root user and system stability."
+        echo "You can adjust this percentage. Reducing it gives more space to users but less buffer for the system."
+        total_blocks=$(tune2fs -l "$new_partition" | awk -F': *' '/^Block count:/ {print $2}')
+        block_size_bytes=$(tune2fs -l "$new_partition" | awk -F': *' '/^Block size:/ {print $2}')
+        current_reserved_blocks=$(tune2fs -l "$new_partition" | awk -F': *' '/^Reserved block count:/ {print $2}')
+        if [ -n "$total_blocks" ] && [ -n "$block_size_bytes" ] && [ -n "$current_reserved_blocks" ]; then
+            partition_size_bytes=$((total_blocks * block_size_bytes))
+            current_reserved_bytes=$((current_reserved_blocks * block_size_bytes))
+            current_reserved_percent_actual=$(awk "BEGIN {printf \"%.2f\", ($current_reserved_blocks/$total_blocks)*100}")
+            echo "Partition size: $(numfmt --to=iec-i --suffix=B --format="%.2f" "$partition_size_bytes")"
+            echo "Current reserved space: $current_reserved_percent_actual% ($(numfmt --to=iec-i --suffix=B --format="%.2f" "$current_reserved_bytes"))"
+            percent_1_bytes=$((partition_size_bytes / 100)); percent_01_bytes=$((partition_size_bytes / 1000))
+            echo "  - 1% reserved would be: $(numfmt --to=iec-i --suffix=B --format="%.2f" "$percent_1_bytes")"
+            echo "  - 0.1% reserved would be: $(numfmt --to=iec-i --suffix=B --format="%.2f" "$percent_01_bytes")"
+        else echo -e "${WARN_COLOR}Could not retrieve detailed block information to calculate current/example reserved sizes.${RESET_COLOR}"; fi
+
+        if ask_yes_no_question "Do you want to adjust the reserved space percentage? (Suggesting 1%)" "no"; then
+            perform_tune2fs=true
+            read -r -p "$(echo -e "${PROMPT_COLOR}Enter desired reserved percentage (e.g., 1, 0.5, default 1 if empty): ${RESET_COLOR}")" user_percent
+            new_reserved_percent=${user_percent:-1}
+            if ! [[ "$new_reserved_percent" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+                echo -e "${ERROR_COLOR}Invalid percentage '$new_reserved_percent'. Must be a number. Skipping adjustment.${RESET_COLOR}"; perform_tune2fs=false;
+            else
+                if awk "BEGIN {exit ($new_reserved_percent < 0 || $new_reserved_percent > 50 ? 0 : 1)}"; then
+                    echo -e "${ERROR_COLOR}Reserved percentage '$new_reserved_percent' must be between 0 and 50. Skipping adjustment.${RESET_COLOR}"; perform_tune2fs=false;
+                fi
             fi
-        fi
-    else echo "Keeping default reserved space."; fi
+        else echo "Keeping default reserved space."; fi
+    fi
 fi
 if [ "$perform_tune2fs" = true ] && [ -n "$new_reserved_percent" ]; then
     echo "Adjusting reserved space on $new_partition to $new_reserved_percent%...";
