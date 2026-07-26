@@ -265,21 +265,67 @@ else
     echo "Determined sector size (via blockdev): $sector_size_bytes bytes"
 fi
 
-echo -e "\n${INFO_COLOR}Step 1.1: Checking and ensuring GPT partition table on $device...${RESET_COLOR}"
-if ! parted_output=$(parted --script "$device" print 2>&1); then
-    if echo "$parted_output" | grep -qi "unrecognised disk label"; then
+existing_parts=$(lsblk -rn -o NAME,TYPE "$device" 2>/dev/null | awk '$2=="part"{print $1}')
+WIPED_DISK=false
+
+if [ -n "$existing_parts" ]; then
+    echo -e "\n${ERROR_COLOR}============================================================${RESET_COLOR}"
+    echo -e "${ERROR_COLOR}  ⚠️  DANGER WARNING: Target disk $device has existing partitions!${RESET_COLOR}"
+    echo -e "${ERROR_COLOR}============================================================${RESET_COLOR}"
+    lsblk "$device" -o NAME,SIZE,TYPE,FSTYPE,LABEL,MOUNTPOINTS | sed 's/^/  /'
+    echo ""
+
+    if [ "$PROMPT_USER" = true ]; then
+        echo -e "${WARN_COLOR}What would you like to do with $device?${RESET_COLOR}"
+        echo "  1) WIPE the entire disk $device and create a new GPT partition table (ERASES ALL DATA!)"
+        echo "  2) Keep existing partitions and attempt to use free unallocated space"
+        echo "  3) Cancel and Exit"
+        echo ""
+        read -r -p "$(echo -e "${PROMPT_COLOR}Select action [1-3, default: 3 (Cancel)]: ${RESET_COLOR}")" wipe_choice
+
+        case "${wipe_choice:-3}" in
+            1)
+                read -r -p "$(echo -e "${ERROR_COLOR}⚠️  CONFIRMATION REQUIRED: Type 'WIPE' to erase all data on $device: ${RESET_COLOR}")" confirm_wipe
+                if [ "$confirm_wipe" != "WIPE" ]; then
+                    echo -e "${WARN_COLOR}Wipe confirmation failed. Operation cancelled.${RESET_COLOR}"
+                    exit 1
+                fi
+                echo -e "${WARN_COLOR}Unmounting any active mounts on $device...${RESET_COLOR}"
+                umount "${device}"* 2>/dev/null || true
+                echo -e "${INFO_COLOR}Wiping existing partitions and creating a new GPT partition table on $device...${RESET_COLOR}"
+                run_command parted --script "$device" mklabel gpt
+                run_command parted --script -a optimal "$device" mkpart primary 2048s 100%
+                run_command partprobe "$device"
+                sleep 2
+                WIPED_DISK=true
+                ;;
+            2)
+                echo "Proceeding with existing partition table and seeking free space..."
+                ;;
+            *)
+                echo "Operation cancelled by user."
+                exit 0
+                ;;
+        esac
+    fi
+fi
+
+if [ "$WIPED_DISK" = false ]; then
+    if ! parted_output=$(parted --script "$device" print 2>&1); then
+        if echo "$parted_output" | grep -qi "unrecognised disk label"; then
+            echo "Unrecognised disk label on $device. Creating a new GPT partition table..."
+            run_command parted --script "$device" mklabel gpt
+            echo -e "${SUCCESS_COLOR}GPT partition table created successfully.${RESET_COLOR}"
+        else
+            echo -e "${ERROR_COLOR}ERROR: 'parted print' failed for $device for an unknown reason. Output:${RESET_COLOR}"; echo "$parted_output"; exit 1;
+        fi
+    elif echo "$parted_output" | grep -qi "unrecognised disk label"; then
         echo "Unrecognised disk label on $device. Creating a new GPT partition table..."
         run_command parted --script "$device" mklabel gpt
         echo -e "${SUCCESS_COLOR}GPT partition table created successfully.${RESET_COLOR}"
     else
-        echo -e "${ERROR_COLOR}ERROR: 'parted print' failed for $device for an unknown reason. Output:${RESET_COLOR}"; echo "$parted_output"; exit 1;
+        echo "Existing valid partition table found on $device."
     fi
-elif echo "$parted_output" | grep -qi "unrecognised disk label"; then # Should be caught by above, but as a safeguard
-    echo "Unrecognised disk label on $device (despite parted print success). Creating a new GPT partition table..."
-    run_command parted --script "$device" mklabel gpt
-    echo -e "${SUCCESS_COLOR}GPT partition table created successfully.${RESET_COLOR}"
-else
-    echo "Existing valid partition table found on $device."
 fi
 echo "Current partition layout on $device (parted ... print free):"
 run_command parted --script "$device" unit s print free
@@ -291,85 +337,87 @@ echo -e "\n${HEADER_COLOR}Phase 2: Partition Definition and Creation${RESET_COLO
 echo "Analyzing free space on $device (units in sectors)..."
 parted_free_output=$(parted --script "$device" unit s print free)
 echo "$parted_free_output"
-largest_start_s=0; largest_end_s=0; largest_size_s=0
-largest_free_block_info=$(echo "$parted_free_output" | \
-    awk '
-    BEGIN { max_size = 0; start_s = 0; end_s = 0; }
-    /Free Space/ {
-        current_start = ""; current_end = ""; current_size = "";
-        for (i = 1; i <= NF; i++) {
-            if ($i ~ /^[0-9]+s$/) {
-                val = $i; sub(/s$/, "", val);
-                if (current_start == "") current_start = val;
-                else if (current_end == "") current_end = val;
-                else if (current_size == "") { current_size = val; break; }
+if [ "$WIPED_DISK" = false ]; then
+    largest_start_s=0; largest_end_s=0; largest_size_s=0
+    largest_free_block_info=$(echo "$parted_free_output" | \
+        awk '
+        BEGIN { max_size = 0; start_s = 0; end_s = 0; }
+        /Free Space/ {
+            current_start = ""; current_end = ""; current_size = "";
+            for (i = 1; i <= NF; i++) {
+                if ($i ~ /^[0-9]+s$/) {
+                    val = $i; sub(/s$/, "", val);
+                    if (current_start == "") current_start = val;
+                    else if (current_end == "") current_end = val;
+                    else if (current_size == "") { current_size = val; break; }
+                }
+            }
+            if (current_size != "" && current_size + 0 > max_size + 0) {
+                max_size = current_size; start_s = current_start; end_s = current_end;
             }
         }
-        if (current_size != "" && current_size + 0 > max_size + 0) {
-            max_size = current_size; start_s = current_start; end_s = current_end;
-        }
-    }
-    END { if (max_size > 0) print start_s, end_s, max_size; }
-    ')
-if [ -z "$largest_free_block_info" ]; then
-    echo -e "${WARN_COLOR}WARNING: No usable 'Free Space' segments found by primary method. Attempting fallback...${RESET_COLOR}"
-    largest_free_block_info=$(echo "$parted_free_output" | awk '
-        BEGIN { max_size = 0; start_s = 0; end_s = 0; }
-        NF >= 3 && $1 ~ /^[0-9]+s$/ && $2 ~ /^[0-9]+s$/ && $3 ~ /^[0-9]+s$/ && \
-        ($4 == "" || tolower($4) == "loop" || tolower($4) == "free") {
-            cs = $1; sub(/s$/,"",cs); ce = $2; sub(/s$/,"",ce); csize = $3; sub(/s$/,"",csize);
-            if (csize+0 > max_size+0) { max_size=csize; start_s=cs; end_s=ce;}
-        }
         END { if (max_size > 0) print start_s, end_s, max_size; }
-    ')
+        ')
     if [ -z "$largest_free_block_info" ]; then
-        echo -e "${ERROR_COLOR}ERROR: Fallback method also failed to find any usable unallocated space. Inspect '$device' manually.${RESET_COLOR}"; exit 1;
+        echo -e "${WARN_COLOR}WARNING: No usable 'Free Space' segments found by primary method. Attempting fallback...${RESET_COLOR}"
+        largest_free_block_info=$(echo "$parted_free_output" | awk '
+            BEGIN { max_size = 0; start_s = 0; end_s = 0; }
+            NF >= 3 && $1 ~ /^[0-9]+s$/ && $2 ~ /^[0-9]+s$/ && $3 ~ /^[0-9]+s$/ && \
+            ($4 == "" || tolower($4) == "loop" || tolower($4) == "free") {
+                cs = $1; sub(/s$/,"",cs); ce = $2; sub(/s$/,"",ce); csize = $3; sub(/s$/,"",csize);
+                if (csize+0 > max_size+0) { max_size=csize; start_s=cs; end_s=ce;}
+            }
+            END { if (max_size > 0) print start_s, end_s, max_size; }
+        ')
+        if [ -z "$largest_free_block_info" ]; then
+            echo -e "${ERROR_COLOR}ERROR: Fallback method also failed to find any usable unallocated space. Inspect '$device' manually.${RESET_COLOR}"; exit 1;
+        fi
+        echo "Found unallocated space (fallback method)."
     fi
-    echo "Found unallocated space (fallback method)."
-fi
-read -r largest_start_s largest_end_s largest_size_s <<< "$largest_free_block_info"
-echo "Identified largest free/unallocated block: StartSector=${largest_start_s}s, EndSector=${largest_end_s}s, SizeInSectors=${largest_size_s}s"
-sectors_for_1mib_alignment=$((1048576 / sector_size_bytes))
-sectors_for_1mib_alignment=$((sectors_for_1mib_alignment > 0 ? sectors_for_1mib_alignment : 1))
-aligned_start_s=$(( ( (largest_start_s + sectors_for_1mib_alignment - 1) / sectors_for_1mib_alignment ) * sectors_for_1mib_alignment ))
-if [ "$aligned_start_s" -lt "$largest_start_s" ]; then aligned_start_s=$((aligned_start_s + sectors_for_1mib_alignment)); fi
-if [ "$aligned_start_s" -ge "$largest_end_s" ]; then echo -e "${ERROR_COLOR}ERROR: Calculated aligned start sector ($aligned_start_s) is at or beyond free block end ($largest_end_s).${RESET_COLOR}"; exit 1; fi
-echo "Calculated aligned start sector for new partition: ${aligned_start_s}s"
-max_possible_sectors_from_aligned_start=$((largest_end_s - aligned_start_s + 1))
-if [ "$max_possible_sectors_from_aligned_start" -le 0 ]; then echo -e "${ERROR_COLOR}ERROR: No space available after aligning start sector.${RESET_COLOR}"; exit 1; fi
-actual_part_end_s=""; partition_size_desc=""; final_sector_count=0
-if [ -n "$user_requested_size" ]; then
-    echo "Processing user requested size: $user_requested_size"
-    requested_bytes=$(convert_size_to_bytes "$user_requested_size")
-    if [ $? -ne 0 ] || [ -z "$requested_bytes" ]; then exit 1; fi
-    echo "Requested size in bytes: $requested_bytes"
-    if [ "$sector_size_bytes" -le 0 ]; then echo -e "${ERROR_COLOR}CRITICAL ERROR: Sector size invalid.${RESET_COLOR}"; exit 1; fi
-    requested_sectors_count=$((requested_bytes / sector_size_bytes))
-    echo "Requested size in sectors (count): $requested_sectors_count"
-    if [ "$requested_sectors_count" -le 0 ]; then echo -e "${ERROR_COLOR}ERROR: Requested size too small (<=0 sectors).${RESET_COLOR}"; exit 1; fi
-    if [ "$requested_sectors_count" -gt "$max_possible_sectors_from_aligned_start" ]; then
-        echo -e "${WARN_COLOR}WARNING: Requested size ($requested_sectors_count sectors) exceeds available space ($max_possible_sectors_from_aligned_start sectors). Using maximum available.${RESET_COLOR}"
+    read -r largest_start_s largest_end_s largest_size_s <<< "$largest_free_block_info"
+    echo "Identified largest free/unallocated block: StartSector=${largest_start_s}s, EndSector=${largest_end_s}s, SizeInSectors=${largest_size_s}s"
+    sectors_for_1mib_alignment=$((1048576 / sector_size_bytes))
+    sectors_for_1mib_alignment=$((sectors_for_1mib_alignment > 0 ? sectors_for_1mib_alignment : 1))
+    aligned_start_s=$(( ( (largest_start_s + sectors_for_1mib_alignment - 1) / sectors_for_1mib_alignment ) * sectors_for_1mib_alignment ))
+    if [ "$aligned_start_s" -lt "$largest_start_s" ]; then aligned_start_s=$((aligned_start_s + sectors_for_1mib_alignment)); fi
+    if [ "$aligned_start_s" -ge "$largest_end_s" ]; then echo -e "${ERROR_COLOR}ERROR: Calculated aligned start sector ($aligned_start_s) is at or beyond free block end ($largest_end_s).${RESET_COLOR}"; exit 1; fi
+    echo "Calculated aligned start sector for new partition: ${aligned_start_s}s"
+    max_possible_sectors_from_aligned_start=$((largest_end_s - aligned_start_s + 1))
+    if [ "$max_possible_sectors_from_aligned_start" -le 0 ]; then echo -e "${ERROR_COLOR}ERROR: No space available after aligning start sector.${RESET_COLOR}"; exit 1; fi
+    actual_part_end_s=""; partition_size_desc=""; final_sector_count=0
+    if [ -n "$user_requested_size" ]; then
+        echo "Processing user requested size: $user_requested_size"
+        requested_bytes=$(convert_size_to_bytes "$user_requested_size")
+        if [ $? -ne 0 ] || [ -z "$requested_bytes" ]; then exit 1; fi
+        echo "Requested size in bytes: $requested_bytes"
+        if [ "$sector_size_bytes" -le 0 ]; then echo -e "${ERROR_COLOR}CRITICAL ERROR: Sector size invalid.${RESET_COLOR}"; exit 1; fi
+        requested_sectors_count=$((requested_bytes / sector_size_bytes))
+        echo "Requested size in sectors (count): $requested_sectors_count"
+        if [ "$requested_sectors_count" -le 0 ]; then echo -e "${ERROR_COLOR}ERROR: Requested size too small (<=0 sectors).${RESET_COLOR}"; exit 1; fi
+        if [ "$requested_sectors_count" -gt "$max_possible_sectors_from_aligned_start" ]; then
+            echo -e "${WARN_COLOR}WARNING: Requested size ($requested_sectors_count sectors) exceeds available space ($max_possible_sectors_from_aligned_start sectors). Using maximum available.${RESET_COLOR}"
+            actual_part_end_s="$largest_end_s"
+            final_sector_count=$max_possible_sectors_from_aligned_start
+        else
+            actual_part_end_s=$((aligned_start_s + requested_sectors_count - 1))
+            final_sector_count=$requested_sectors_count
+        fi
+        partition_size_desc="$user_requested_size (resolved to $final_sector_count sectors)"
+    else
+        echo "No specific size requested. Using all available space in the largest free block from aligned start."
         actual_part_end_s="$largest_end_s"
         final_sector_count=$max_possible_sectors_from_aligned_start
-    else
-        actual_part_end_s=$((aligned_start_s + requested_sectors_count - 1))
-        final_sector_count=$requested_sectors_count
+        partition_size_desc="maximum available ($final_sector_count sectors from aligned start)"
     fi
-    partition_size_desc="$user_requested_size (resolved to $final_sector_count sectors)"
-else
-    echo "No specific size requested. Using all available space in the largest free block from aligned start."
-    actual_part_end_s="$largest_end_s"
-    final_sector_count=$max_possible_sectors_from_aligned_start
-    partition_size_desc="maximum available ($final_sector_count sectors from aligned start)"
+    if [ "$aligned_start_s" -ge "$actual_part_end_s" ]; then echo -e "${ERROR_COLOR}CRITICAL ERROR: Partition start ($aligned_start_s) not less than end ($actual_part_end_s). Zero or negative size.${RESET_COLOR}"; exit 1; fi
+    if [ "$actual_part_end_s" -gt "$largest_end_s" ]; then echo -e "${ERROR_COLOR}CRITICAL ERROR: Partition end ($actual_part_end_s) exceeds free block end ($largest_end_s).${RESET_COLOR}"; exit 1; fi
+    echo "Creating new partition: StartSector=${aligned_start_s}s, EndSector=${actual_part_end_s}s. Intended size: $partition_size_desc"
+    run_command parted --script -a optimal "$device" mkpart primary ext4 ${aligned_start_s}s ${actual_part_end_s}s
+    echo "Forcing kernel to reload partition table for $device (partprobe)..."
+    run_command partprobe "$device"
+    echo "Waiting a few seconds for kernel to process partition changes..."
+    sleep 3
 fi
-if [ "$aligned_start_s" -ge "$actual_part_end_s" ]; then echo -e "${ERROR_COLOR}CRITICAL ERROR: Partition start ($aligned_start_s) not less than end ($actual_part_end_s). Zero or negative size.${RESET_COLOR}"; exit 1; fi
-if [ "$actual_part_end_s" -gt "$largest_end_s" ]; then echo -e "${ERROR_COLOR}CRITICAL ERROR: Partition end ($actual_part_end_s) exceeds free block end ($largest_end_s).${RESET_COLOR}"; exit 1; fi
-echo "Creating new partition: StartSector=${aligned_start_s}s, EndSector=${actual_part_end_s}s. Intended size: $partition_size_desc"
-run_command parted --script -a optimal "$device" mkpart primary ext4 ${aligned_start_s}s ${actual_part_end_s}s
-echo "Forcing kernel to reload partition table for $device (partprobe)..."
-run_command partprobe "$device"
-echo "Waiting a few seconds for kernel to process partition changes..."
-sleep 3
 echo "Identifying the newly created partition on $device..."
 device_escaped_for_grep=$(echo "$device" | sed 's/[][\/.*^$]/\\&/g')
 new_partition=$(lsblk -rnp -o NAME,TYPE | awk -v dev_pattern="^${device_escaped_for_grep}[p]?[0-9]+$" '$1 ~ dev_pattern && $2 == "part" {print $1}' | tail -n 1)
