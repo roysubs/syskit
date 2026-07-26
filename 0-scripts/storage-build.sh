@@ -587,8 +587,8 @@ if [ "$should_add_to_fstab" = true ] && [ -n "$mount_point" ]; then
         echo -e "UUID for $new_partition is: ${SUCCESS_COLOR}$uuid${RESET_COLOR}"
         echo "Mounting $new_partition (UUID=$uuid) at $mount_point..."
         run_command mount UUID="$uuid" "$mount_point"
-        chmod a+rwX "$mount_point" 2>/dev/null || true
-        echo -e "${SUCCESS_COLOR}$new_partition successfully mounted at $mount_point (permissions set to a+rwX).${RESET_COLOR}"
+        chmod -R 777 "$mount_point" 2>/dev/null || true
+        echo -e "${SUCCESS_COLOR}$new_partition successfully mounted at $mount_point (permissions set to 777 rwx).${RESET_COLOR}"
         fstab_entry="UUID=$uuid $mount_point ${FS_TYPE:-btrfs} defaults,nofail 0 2"
         fstab_file="/etc/fstab"
         echo "Updating $fstab_file for mount point '$mount_point'..."
@@ -677,7 +677,8 @@ fi
 if [ "$should_setup_samba" = true ] && [ -n "$mount_point" ] && [ -n "$samba_share_name" ]; then # Check all needed vars
     echo -e "\n${INFO_COLOR}Attempting to set up Samba Share '[$samba_share_name]' for $mount_point...${RESET_COLOR}"
     smb_conf_file="/etc/samba/smb.conf"
-    samba_share_config_block="\n[$samba_share_name]\n   path = $mount_point\n   browseable = yes\n   writable = yes\n   guest ok = yes\n   read only = no\n   create mask = 0664\n   directory mask = 0775\n   comment = Auto-configured share for $mount_point ($samba_share_name)\n"
+    target_owner="${SUDO_USER:-boss}"
+    samba_share_config_block="\n[$samba_share_name]\n   path = $mount_point\n   browseable = yes\n   writable = yes\n   guest ok = yes\n   read only = no\n   force user = $target_owner\n   create mask = 0777\n   directory mask = 0777\n   comment = Auto-configured share for $mount_point ($samba_share_name)\n"
     if command -v smbd &>/dev/null || [ -x /usr/sbin/smbd ]; then
         echo "Samba server tools found."
         if grep -qE "(^\[${samba_share_name}\]|^\s*path\s*=\s*${mount_point}\s*$)" "$smb_conf_file"; then
