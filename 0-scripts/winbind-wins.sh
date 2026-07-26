@@ -141,6 +141,9 @@ install_packages() {
     elif command -v yum &> /dev/null; then
         PACKAGE_MANAGER="yum"
         PACKAGES="samba samba-winbind-clients"
+    elif command -v zypper &> /dev/null; then
+        PACKAGE_MANAGER="zypper"
+        PACKAGES="samba samba-winbind"
     else
         echo -e "${RED}Error: Unsupported package manager. Please install samba and winbind manually.${NC}"
         exit 1

@@ -165,7 +165,6 @@ install_samba() {
             log_command_execution "sudo yum install -y samba samba-common samba-client" $exit_code "$cmd_output"
         elif command -v dnf &> /dev/null; then
             log_message "INFO" "Detected Red Hat/Fedora based system (dnf)."
-            # dnf clean all is similar to yum clean all
             log_command_intent "sudo dnf clean all"
             cmd_output=$(sudo dnf clean all 2>&1)
             log_command_execution "sudo dnf clean all" $? "$cmd_output"
@@ -174,8 +173,18 @@ install_samba() {
             cmd_output=$(sudo dnf install -y samba samba-common samba-client 2>&1)
             exit_code=$?
             log_command_execution "sudo dnf install -y samba samba-common samba-client" $exit_code "$cmd_output"
+        elif command -v zypper &> /dev/null; then
+            log_message "INFO" "Detected openSUSE/SUSE based system (zypper)."
+            log_command_intent "sudo zypper refresh"
+            cmd_output=$(sudo zypper refresh 2>&1)
+            log_command_execution "sudo zypper refresh" $? "$cmd_output"
+
+            log_command_intent "sudo zypper install -y samba samba-client acl"
+            cmd_output=$(sudo zypper install -y samba samba-client acl 2>&1)
+            exit_code=$?
+            log_command_execution "sudo zypper install -y samba samba-client acl" $exit_code "$cmd_output"
         else
-            log_message "ERROR" "Unsupported distribution or package manager not found (apt-get, yum, dnf). Please install Samba manually."
+            log_message "ERROR" "Unsupported distribution or package manager not found (apt-get, yum, dnf, zypper). Please install Samba manually."
             return 1
         fi
 

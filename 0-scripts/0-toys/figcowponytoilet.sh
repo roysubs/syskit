@@ -97,19 +97,33 @@ if [ ${#MISSING_TOOLS[@]} -gt 0 ]; then
             exit 1
         fi
 
-        sudo apt update || echo "Warning: Failed to update package lists. Installation might fail."
+pkg_install() {
+    local pkgs=("$@")
+    if command -v zypper &>/dev/null; then
+        sudo zypper refresh && sudo zypper install -y "${pkgs[@]}"
+    elif command -v apt-get &>/dev/null; then
+        sudo apt-get update && sudo apt-get install -y "${pkgs[@]}"
+    elif command -v dnf &>/dev/null; then
+        sudo dnf install -y "${pkgs[@]}"
+    elif command -v yum &>/dev/null; then
+        sudo yum install -y "${pkgs[@]}"
+    elif command -v pacman &>/dev/null; then
+        sudo pacman -Sy --noconfirm "${pkgs[@]}"
+    elif command -v apk &>/dev/null; then
+        sudo apk add "${pkgs[@]}"
+    elif command -v brew &>/dev/null; then
+        brew install "${pkgs[@]}"
+    fi
+}
 
         for tool in "${MISSING_TOOLS[@]}"; do
             echo ""
             echo "Installing $tool..."
             case "$tool" in
                 "cowsay"|"figlet"|"toilet")
-                    if sudo apt install -y "$tool"; then
+                    if pkg_install "$tool"; then
                         echo "$tool installed successfully."
-                        # Add to installed list and remove from missing list if successful
                         INSTALLED_TOOLS+=("$tool")
-                        # Remove from missing list using a temporary array or bash 4.4+ array.remove
-                        # For broader compatibility, rebuild the missing list
                         temp_missing=()
                         for mtool in "${MISSING_TOOLS[@]}"; do
                             if [ "$mtool" != "$tool" ]; then
@@ -117,19 +131,32 @@ if [ ${#MISSING_TOOLS[@]} -gt 0 ]; then
                             fi
                         done
                         MISSING_TOOLS=("${temp_missing[@]}")
-
                     else
-                        echo -e "${RED}Error: Failed to install $tool using apt. Please try installing it manually.${NC}"
+                        echo -e "${RED}Error: Failed to install $tool. Please try installing it manually.${NC}"
                     fi
                     ;;
                 "ponysay")
-                    # Special handling for ponysay using the .deb file
-                    echo "Attempting to download ponysay from $PONYSAY_DEB_URL"
-                    if wget -O "$PONYSAY_DEB_FILE" "$PONYSAY_DEB_URL"; then
-                        echo "Download complete. Installing $PONYSAY_DEB_FILE..."
-                        # Use set +e around dpkg to prevent script exit on dependency errors
-                        set +e
-                        sudo dpkg -i "$PONYSAY_DEB_FILE"
+                    if command -v dpkg &>/dev/null; then
+                        echo "Attempting to download ponysay from $PONYSAY_DEB_URL"
+                        if wget -O "$PONYSAY_DEB_FILE" "$PONYSAY_DEB_URL"; then
+                            echo "Download complete. Installing $PONYSAY_DEB_FILE..."
+                            set +e
+                            sudo dpkg -i "$PONYSAY_DEB_FILE"
+                            DPKG_EXIT_CODE=$?
+                            set -e
+                            if [ $DPKG_EXIT_CODE -eq 0 ]; then
+                                echo "ponysay installed successfully."
+                                INSTALLED_TOOLS+=("$tool")
+                                rm -f "$PONYSAY_DEB_FILE"
+                            fi
+                        fi
+                    elif command -v pip3 &>/dev/null; then
+                        echo "Installing ponysay via pip3..."
+                        if pip3 install ponysay &>/dev/null || pip3 install --break-system-packages ponysay &>/dev/null; then
+                            echo "ponysay installed successfully via pip3."
+                            INSTALLED_TOOLS+=("$tool")
+                        fi
+                    fi
                         DPKG_EXIT_CODE=$?
                         set -e
 
