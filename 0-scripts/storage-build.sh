@@ -677,8 +677,7 @@ fi
 if [ "$should_setup_samba" = true ] && [ -n "$mount_point" ] && [ -n "$samba_share_name" ]; then # Check all needed vars
     echo -e "\n${INFO_COLOR}Attempting to set up Samba Share '[$samba_share_name]' for $mount_point...${RESET_COLOR}"
     smb_conf_file="/etc/samba/smb.conf"
-    target_owner="${SUDO_USER:-boss}"
-    samba_share_config_block="\n[$samba_share_name]\n   path = $mount_point\n   browseable = yes\n   writable = yes\n   guest ok = yes\n   read only = no\n   force user = $target_owner\n   create mask = 0777\n   directory mask = 0777\n   comment = Auto-configured share for $mount_point ($samba_share_name)\n"
+    samba_share_config_block="\n[$samba_share_name]\n   path = $mount_point\n   browseable = yes\n   writable = yes\n   guest ok = yes\n   read only = no\n   create mask = 0777\n   directory mask = 0777\n   comment = Auto-configured share for $mount_point ($samba_share_name)\n"
     if command -v smbd &>/dev/null || [ -x /usr/sbin/smbd ]; then
         echo "Samba server tools found."
         if grep -qE "(^\[${samba_share_name}\]|^\s*path\s*=\s*${mount_point}\s*$)" "$smb_conf_file"; then
@@ -688,12 +687,16 @@ if [ "$should_setup_samba" = true ] && [ -n "$mount_point" ] && [ -n "$samba_sha
             if [ "$PROMPT_USER" = true ] && ask_yes_no_question "Do you want to update/replace the existing '[$samba_share_name]' share block with new settings?" "no"; then
                 echo "Replacing existing Samba share '[$samba_share_name]' in $smb_conf_file..."
                 python3 -c '
-import re, sys
-smb_path, share = sys.argv[1], sys.argv[2]
-with open(smb_path, "r") as f: content = f.read()
-pattern = r"\n?\s*\[" + re.escape(share) + r"\][^\n]*\n(?:(?!\[).*\n)*"
-new_content = re.sub(pattern, "\n", content)
-with open(smb_path, "w") as f: f.write(new_content)
+import sys
+smb_path, target_share = sys.argv[1], sys.argv[2]
+with open(smb_path, "r") as f: lines = f.readlines()
+new_lines, in_target = [], False
+for line in lines:
+    stripped = line.strip()
+    if stripped.startswith("[") and stripped.endswith("]"):
+        in_target = (stripped[1:-1].strip() == target_share)
+    if not in_target: new_lines.append(line)
+with open(smb_path, "w") as f: f.writelines(new_lines)
 ' "$smb_conf_file" "$samba_share_name" 2>/dev/null || true
                 echo -e "$samba_share_config_block" | sudo tee -a "$smb_conf_file" > /dev/null
                 echo -e "${SUCCESS_COLOR}Samba share '[$samba_share_name]' configuration updated.${RESET_COLOR}"
