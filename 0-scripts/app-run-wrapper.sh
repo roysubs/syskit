@@ -232,8 +232,8 @@ APP_START_TIME=$(date +%s)
 APP_START_TIMESTAMP=$(format_timestamp)
 echo -e "\n${GREEN}Application started at: $APP_START_TIMESTAMP${RESET}"
 
-# Run the application
-$APP_CMD > "$COMMAND_OUTPUT" 2>&1
+# Run the application directly (supports interactive TTY apps like angband, vim, and live stdout)
+$APP_CMD
 
 # Record application end time
 APP_END_TIME=$(date +%s)
