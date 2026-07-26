@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Define terminal applications with their descriptions
 declare -A terminals

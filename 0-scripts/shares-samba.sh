@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-03
 
 # share-smb.sh - Quick Reference and Troubleshooting for Samba Shares

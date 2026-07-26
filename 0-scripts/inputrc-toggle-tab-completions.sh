@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-01
 #
 # Purpose: Generic script to toggle between two sets of configuration settings

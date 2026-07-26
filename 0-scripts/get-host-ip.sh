@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-05
 #
 # Essentially a "Swiss Army knife" for finding a computer's local IP address. It's complex because there isn't one single, universal

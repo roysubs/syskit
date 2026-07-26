@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-02
 # Refactored script to manage h-* help files
 # 1. Cleaner: Removes all stale h-* files from /usr/local/bin (legacy approach)

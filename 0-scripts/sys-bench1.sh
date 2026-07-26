@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-05
 
 # --- FIO_SAFETY_CHECK_START ---

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-04
 
 # Why SSH is Preferred Over HTTPS for Git Operations:

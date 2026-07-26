@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman, with Gemini "Robust Automation" Script 2025-09-15
 # Refactored for complete Idempotency and State Management.
 

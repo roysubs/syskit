@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ################################################################################
 # XFCE & DASHBOARD COMMAND CENTER (Debian 2026 Edition)

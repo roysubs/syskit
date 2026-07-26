@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # --- winbind-wins.sh ---
 # Description: Installs Samba/Winbind and configures Name Service Switch (NSS)

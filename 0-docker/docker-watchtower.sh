@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-05
 
 # Watchtower (automatic container updates) Docker automated deployment

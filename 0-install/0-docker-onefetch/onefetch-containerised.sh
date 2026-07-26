@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-02
 
 # Script to run onefetch inside a Docker container against a local repository.

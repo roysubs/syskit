@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # cleanup_ntfs.sh - Unmount all NTFS drives and remove their mount points
 
 # ── ANSI Colors ──────────────────────────────────────────────────────────────

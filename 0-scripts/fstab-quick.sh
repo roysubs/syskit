@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-04
 
 # fstab-reader.sh - Reads, formats, and explains entries in /etc/fstab

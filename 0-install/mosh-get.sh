@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-01
 
 # Use MOSH as an alternative to SSH access as backup in case SSH service crashes.

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-05
 
 (return 0 2>/dev/null) || { echo "This script should be run sourced (e.g., '. ${0##*/}' to change the default vi alias)"; exit 1; }

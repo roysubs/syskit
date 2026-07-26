@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-04
 
 echo "A modern FPS with parkour elements and a variety of game modes."

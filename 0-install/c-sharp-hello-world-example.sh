@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-02
 # Ensure the script is run as root or with sudo
 if [ "$EUID" -ne 0 ]; then

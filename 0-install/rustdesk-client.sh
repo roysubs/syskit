@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Gemini (based on template by Roy Wiseman) 2025-11
 #
 # RustDesk Client Installer for Debian (hp2)

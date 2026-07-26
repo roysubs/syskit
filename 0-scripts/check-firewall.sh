@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-01
 
 # check-firewall.sh — Enhanced firewall checker for home users

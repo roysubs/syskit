@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman (rewritten by Gemini 2025-09-12)
 
 # --- 🚦 Configuration & Setup ---

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-03
 
 # Script to download and install Lectrote Interactive Fiction player

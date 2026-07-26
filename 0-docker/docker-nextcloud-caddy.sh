@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman (template style), (Nextcloud+Caddy implementations)
 # Date: 2025-03
 #

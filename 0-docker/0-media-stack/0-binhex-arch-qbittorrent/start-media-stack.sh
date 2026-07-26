@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman, with Gemini Refinement 2025-09-13
 
 # --- Configuration and Colors ---

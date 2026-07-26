@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-01
 # «Арканоид» на bash. Евгений Степанищев http://bolknote.ru/ 2011
 # Bash Arcanoid. Copyright by Evgeny Stepanischev http://bolknote.ru/ 2011

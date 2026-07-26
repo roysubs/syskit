@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-03
 # jp2a --color "$FILE"
 # img2txt --gamma=0.6 --width=80 "$FILE"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # send-to.sh - Send any file to remote host and open with default application
 # Works especially well for sending files from Linux server to Windows desktop

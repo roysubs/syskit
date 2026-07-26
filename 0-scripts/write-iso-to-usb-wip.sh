@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-03
 
 # Takes an ISO (or other disk image) as $1 and a USB device (/dev/sdX) as $2.

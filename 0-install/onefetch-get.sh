@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-02
 #
 # Compiled version currently uses GLIBC 2.39 which we can't use without

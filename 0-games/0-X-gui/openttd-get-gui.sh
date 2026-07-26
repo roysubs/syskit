@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-03
 
 echo "A transport and business simulation game inspired by the classic Transport Tycoon Deluxe."

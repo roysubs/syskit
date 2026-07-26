@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # start-share.sh (v1)
 # Dynamically create Samba shares for directories

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman (Refactored by Gemini) 2025-01
 # Description: Fast directory size analyzer with dynamic column width and permission hints.
 # Change:

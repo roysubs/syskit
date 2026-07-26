@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-05
 # Wrapper script to invoke the add-paths, bashrc, and vimrc update scripts
 

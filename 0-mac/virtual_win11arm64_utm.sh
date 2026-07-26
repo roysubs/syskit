@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # ==============================================================================
 # M4 MAC MINI - WINDOWS 11 ARM64 INSTALLATION SCRIPT

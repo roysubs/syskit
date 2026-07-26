@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # mount_ntfs_fixed.sh - Discover, mount all NTFS partitions, and share via Samba
 # - Auto-elevates to sudo if not already root
 # - Without sudo: runs in diagnostic/read-only mode

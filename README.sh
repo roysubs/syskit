@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-02
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"       # Directory where this script is

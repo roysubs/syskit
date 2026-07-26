@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 VIMRC="$HOME/.vimrc"
 echo "Fixing Leader Key in $VIMRC..."
 

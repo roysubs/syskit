@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2026-01
 # Universal Application Package Manager Wrapper
 

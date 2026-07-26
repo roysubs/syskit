@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-04
 
 # consolidated-create-share-smb.sh: Enhanced script to create a Samba share step-by-step

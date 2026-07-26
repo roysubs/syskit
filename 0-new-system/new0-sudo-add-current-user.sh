@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-03
 
 # Add current user to sudo group (without requiring sudo), and update /etc/sudoers

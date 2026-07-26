@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-03
 
 echo "An open-source real-time strategy game focused on historical warfare and resource management."

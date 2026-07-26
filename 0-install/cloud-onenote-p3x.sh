@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # ---
 # Advanced P3X OneNote Installer/Manager for Debian-based Linux

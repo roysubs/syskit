@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ~/bin/gsummaryall.sh
 
 echo "📊 Git Summary for all repos in ~/projects"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Gemini (Final Simplified Version)
 #
 # Simple Nginx Web Server deployed for local network access only.

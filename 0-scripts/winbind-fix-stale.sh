@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # --- fix-yor-stale-ip.sh ---
 # Nuclear option to fix the stale IP issue for hostname "Yor"

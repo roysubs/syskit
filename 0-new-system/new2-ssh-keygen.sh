@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-02
 
 # Purpose: Assist users in generating and configuring SSH keys for secure remote access.

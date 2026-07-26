@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-03
 
 echo "Open-source FPS with a strong multiplayer community and a built-in level editor."

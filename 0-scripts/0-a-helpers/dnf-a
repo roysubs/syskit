@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # DNF User Interface (dnfui) Script
 # Provides utilities for dnf package management with history and detailed info.
 

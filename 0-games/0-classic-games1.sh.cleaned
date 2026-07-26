@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Define colors for output
 C_CATEGORY_TITLE="\033[1;34m" # Bold Blue

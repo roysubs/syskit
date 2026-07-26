@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-05
 
 # Find all files that have 'glow -p$' in them (i.e. glow -p at end of line)

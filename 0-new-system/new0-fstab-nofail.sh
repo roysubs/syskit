@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-01
 
 # Add 'nofail' to non-root filesystems in /etc/fstab to suppress emergency mode; safe for home environments.

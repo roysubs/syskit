@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # A definitive script to safely stop qBittorrent, set a fixed password,
 # correctly configure all necessary download paths on the host, and restart the container.
 

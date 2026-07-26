@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Zypper Tool Script
 # Provides utilities for zypper package management with concise history and detailed info.
 

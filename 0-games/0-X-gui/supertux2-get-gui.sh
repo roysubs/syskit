@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-05
 
 echo "A classic 2D platformer inspired by Super Mario, featuring Tux the penguin. It offers colorful graphics and smooth gameplay, making it a great choice for casual gaming."

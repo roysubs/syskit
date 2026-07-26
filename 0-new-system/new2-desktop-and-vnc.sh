@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman
 # Date: 2025-06-02
 # Description: Interactive script to install and configure TightVNC server

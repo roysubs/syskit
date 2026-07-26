@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Check if at least one argument (the video file) is provided
 if [ $# -lt 1 ]; then

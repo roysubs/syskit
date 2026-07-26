@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-01
 #
 # https://github.com/00-Evan/shattered-pixel-dungeon/releases

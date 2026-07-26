@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Pacman User Interface (pacui) Script
 # Provides utilities for pacman package management with history and detailed info.
 

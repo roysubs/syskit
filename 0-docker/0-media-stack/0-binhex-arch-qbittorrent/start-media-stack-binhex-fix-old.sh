@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # A script to forcefully set the correct download path inside the running container.
 
 # --- Configuration and Colors ---

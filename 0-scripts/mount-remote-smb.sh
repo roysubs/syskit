@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-04
 # Discover SAMBA/CIFS disk shares from a server
 # Input servername as argument

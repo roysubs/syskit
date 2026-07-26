@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-01
 
 # Tool to run a pip package inside a venv (requires pipx, python3-venv)

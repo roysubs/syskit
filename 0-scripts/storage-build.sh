@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-01
 # Revised by AI (Gemini) for error correction, enhancements, and extensive commenting.
 # Patched by AI (Gemini) 2025-05-22 to prompt for a unified mount/share base name.

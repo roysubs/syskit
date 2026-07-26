@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Apt Tool Script
 # Provides utilities for apt package management with concise history and detailed info.
 

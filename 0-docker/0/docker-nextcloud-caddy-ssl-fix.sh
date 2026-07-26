@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Quick SSL Certificate Fix for Nextcloud
 # This forces Caddy to retry certificate acquisition
 

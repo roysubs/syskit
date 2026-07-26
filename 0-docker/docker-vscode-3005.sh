@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-05
 
 # VS Code Server Docker automated deployment using linuxserver/openvscode-server

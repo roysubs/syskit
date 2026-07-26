@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Apk Tool Script
 # Provides utilities for apk package management with concise history (basic) and detailed info.
 

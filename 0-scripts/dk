@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Docker Tool Script ("dk")
 # Unified wrapper for commonly used Docker commands, with auto-prune, color output, and compatibility for both bash and zsh.
 

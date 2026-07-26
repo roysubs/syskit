@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-05
 
 # This script installs and configures the NVIDIA Container Toolkit on a Debian host.

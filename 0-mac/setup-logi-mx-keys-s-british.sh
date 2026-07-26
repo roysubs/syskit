@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # --- MX Keys S UK Layout Master Fixer (Final Version) ---
 APP_PATH="/Applications/Hammerspoon.app"

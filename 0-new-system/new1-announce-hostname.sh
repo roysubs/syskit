@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # host-announce.sh - Ensure this Linux host is discoverable by hostname
 

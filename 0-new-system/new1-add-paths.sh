@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-02
 
 # Add ~/syskit to PATH in both current session (if sourced) and in .bashrc

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # openSUSE Ultimate Remote Access Setup - V19
 # Designed to be idempotent and interactive.
 

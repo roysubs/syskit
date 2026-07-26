@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-03
 # vimdiff-helper.sh - A wrapper for vimdiff with helpful keybindings reference
 # Usage: vimdiff-helper.sh <file1> <file2>

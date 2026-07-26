@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # --- Configuration ---
 VM_NAME="Windows11_ARM"

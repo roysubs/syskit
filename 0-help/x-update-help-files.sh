@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-05
 
 # Script to invoke and run the script at ~/syskit/0-new-system/myhelp.sh

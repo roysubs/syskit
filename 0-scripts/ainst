@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # acheck: Identify the package manager, and use it to install a package, then verify the install
 

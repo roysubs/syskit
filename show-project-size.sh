@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-01
 #
 #du -ah --exclude=.git . | sort -rh | head -n 20

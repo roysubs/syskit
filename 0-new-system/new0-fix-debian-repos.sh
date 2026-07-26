@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-04
 
 # Temporary fix for Debian /etc/apt/sources.list (bookworm main => bookworm main contrib non-free non-free-firmware).

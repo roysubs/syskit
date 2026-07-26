@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-03
 
 # Look for EOF on a line by itself, delete that line and everything below, and replace it by the new footer

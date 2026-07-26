@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-04
 
 echo "A fun, kart-racing game similar to Mario Kart, with a variety of tracks and characters from open-source projects."

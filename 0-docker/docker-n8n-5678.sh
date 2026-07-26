@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman (template), Gemini (adaptation) 2025-10
 #
 # n8n Docker automated deployment script.

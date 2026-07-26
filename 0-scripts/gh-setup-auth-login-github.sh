@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman, with modifications by Google's Gemini
 # Version: 2.1
 # Date: 2025-06-09

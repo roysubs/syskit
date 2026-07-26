@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-01
 
 # A helpful wrapper for nmap, ss, lsof, ip, and other networking tools.

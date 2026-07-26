@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-05
 
 echo "A lightweight, fast-paced first-person shooter with both single-player and multiplayer modes."

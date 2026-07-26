@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-02
 
 # Check and update ~/.vimrc and ~/.config/nvim/init.vim line by line

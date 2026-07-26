@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Script to wipe qBittorrent password and retrieve the temporary one
 
 CONTAINER_NAME="qbittorrent"

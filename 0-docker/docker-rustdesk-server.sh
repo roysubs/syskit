@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman (template style), Gemini (RustDesk implementation) 2025-11
 #
 # RustDesk Server Docker automated deployment script.

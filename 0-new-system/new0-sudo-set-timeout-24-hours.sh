@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-01
 
 # sudo will only require a password every 24 hours (or for new sessions; fine for home systems).

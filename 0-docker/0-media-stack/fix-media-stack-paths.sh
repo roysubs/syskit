@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Script to fix qBittorrent paths/permissions WITHOUT touching the password.
 
 # --- Style & Color Configuration ---

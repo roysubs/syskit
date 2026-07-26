@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # git-divergent-branches - A handholding tool for resolving divergent branches
 # This script helps you understand what diverged and decide how to proceed

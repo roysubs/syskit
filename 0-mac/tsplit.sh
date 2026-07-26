@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # tsplit.sh - Opens a new Terminal window and splits screen 50/50 with the current one.
 # Can be run from command line: ./tsplit.sh

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Author: Roy Wiseman 2025-05
 
 # Send a question as a command-line argument and outputs the GPT's answer directly to the console.
