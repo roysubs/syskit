@@ -751,9 +751,15 @@ else
 fi
 
 echo -e "\n${INFO_COLOR}Script finished. Please verify all configurations and test access to any configured shares.${RESET_COLOR}"
-if [ -n "$mount_point" ] && ( [ -d "$mount_point" ] || [ -f "$mount_point" ] ); then # Check if mount_point was ever defined
-  echo "Remember to adjust share permissions (e.g., 'sudo chmod -R a+rwX \"$mount_point\"') and security settings according to your needs."
-  echo "This will probably be required to make the share writeable from remote connections."
+if [ -n "$mount_point" ] && [ -d "$mount_point" ]; then
+    echo ""
+    echo -e "${INFO_COLOR}💡 PERMISSIONS & SECURITY NOTE:${RESET_COLOR}"
+    echo -e "   Samba has two security layers: Samba Protocol (smb.conf) & Linux Filesystem (chmod/chown)."
+    echo -e "   If remote write access fails, grant Linux filesystem permissions to the mount directory:"
+    echo -e "     ${CMD_COLOR}sudo chmod -R a+rwX \"$mount_point\"${RESET_COLOR}"
+    echo -e "     (${BOLD}-R${NC}: Recursive, ${BOLD}a+${NC}: All users, ${BOLD}r${NC}: read, ${BOLD}w${NC}: write, ${BOLD}X${NC}: enter folders without executing files)"
+    echo -e "   On openSUSE, ensure firewalld allows Samba connections:"
+    echo -e "     ${CMD_COLOR}sudo firewall-cmd --permanent --add-service=samba && sudo firewall-cmd --reload${RESET_COLOR}"
 fi
 
 exit 0
