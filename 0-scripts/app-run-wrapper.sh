@@ -328,7 +328,7 @@ fi
 # Generate summary report
 # =====================================================
 
-print_header "Summary Report"
+# print_header "Summary Report"
 
 echo -e "┌───────────────────────────────────────────────────────────────────────────"
 echo -e "│ ${BOLD}${BLUE}FILESYSTEM MONITORING SUMMARY${RESET}"
@@ -377,7 +377,7 @@ fi
 # Final output and cleanup
 # =====================================================
 
-print_header "Monitoring Complete"
+# print_header "Monitoring Complete"
 
 # Clean up temporary files
 rm -rf "$TEMP_DIR"

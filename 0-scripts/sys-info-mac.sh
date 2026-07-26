@@ -61,7 +61,8 @@ get_system_info() {
         TOTAL_MEMORY=$(( $(sysctl -n hw.memsize) / 1024 / 1024 / 1024 ))
         
         # Boot time
-        BOOT_UP_TIME=$(sysctl -n kern.boottime | awk '{print $4}' | sed 's/,//' | xargs -I {} date -r {} "+%Y-%m-%d %H:%M:%S")
+        SEC_BOOT=$(sysctl -n kern.boottime 2>/dev/null | awk -F'sec = ' '{print $2}' | awk -F',' '{print $1}')
+        BOOT_UP_TIME=$(date -d "@$SEC_BOOT" "+%Y-%m-%d %H:%M:%S" 2>/dev/null || date -r "$SEC_BOOT" "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "Unknown")
         UPTIME=$(uptime | sed 's/.*up //' | sed 's/, [0-9]* user.*//')
         
         # Network info
