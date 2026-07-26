@@ -265,6 +265,14 @@ while IFS= read -r partition; do
     UUID=$(blkid -s UUID -o value "$partition" 2>/dev/null || true)
     LABEL=$(blkid -s LABEL -o value "$partition" 2>/dev/null || true)
     DEV_BASE=$(basename "$partition")
+    SIZE_BYTES=$(lsblk -bno SIZE "$partition" 2>/dev/null || echo 0)
+    PSIZE=$(lsblk -dno SIZE "$partition" 2>/dev/null || echo "")
+
+    # Skip small system/recovery partitions (< 1GB) or system reserved partitions
+    if [[ "$SIZE_BYTES" -lt 1073741824 ]] || [[ "$LABEL" =~ (System[_\ ]Reserved|Recovery|MSR|EFI) ]]; then
+        skip "$partition (${LABEL:-System Partition}, $PSIZE) is a system/boot partition — skipping"
+        continue
+    fi
 
     if grep -qs "^$partition " /proc/mounts; then
         MOUNT_POINT=$(grep "^$partition " /proc/mounts | awk '{print $2}' | head -1)
@@ -276,13 +284,23 @@ while IFS= read -r partition; do
         continue
     fi
 
+    DIR_NAME=""
     if [[ -n "$LABEL" ]]; then
         LABEL_CLEAN=$(echo "$LABEL" | tr ' ' '_' | tr -cd '[:alnum:]_-')
         DIR_NAME="${DEV_BASE}-${LABEL_CLEAN}"
-    elif [[ -n "$UUID" ]]; then
-        DIR_NAME="${DEV_BASE}-${UUID}"
     else
-        DIR_NAME="${DEV_BASE}"
+        DEFAULT_NAME="${DEV_BASE}-${PSIZE:-Data}"
+        if [[ -t 0 ]]; then
+            read -r -t 15 -p $'\n\e[1;33m[INPUT NEEDED]\e[0m Partition '"$partition ($PSIZE)"' has no volume label. Enter custom mount name [default: '"$DEFAULT_NAME"']: ' USER_CUSTOM_NAME || true
+            USER_CUSTOM_NAME=$(echo "${USER_CUSTOM_NAME:-}" | tr ' ' '_' | tr -cd '[:alnum:]_-')
+        else
+            USER_CUSTOM_NAME=""
+        fi
+        if [[ -n "$USER_CUSTOM_NAME" ]]; then
+            DIR_NAME="$USER_CUSTOM_NAME"
+        else
+            DIR_NAME="$DEFAULT_NAME"
+        fi
     fi
 
     MOUNT_POINT="${MOUNT_BASE}/${DIR_NAME}"
