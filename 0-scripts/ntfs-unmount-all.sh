@@ -110,6 +110,43 @@ for dir in /mnt/*/; do
 done
 
 echo ""
-echo "── Step 3: Current state ──"
+echo "── Step 3: Cleaning up stale Samba shares ──"
+SMB_CONF="/etc/samba/smb.conf"
+if [[ -f "$SMB_CONF" ]]; then
+    # Remove shares pointing to deleted /mnt/ directories
+    TMP_SMB=$(mktemp)
+    awk '
+        /^\[/ { in_section = 1; sec_name = $0; sec_body = ""; next }
+        in_section { sec_body = sec_body "\n" $0 }
+        !in_section { print }
+        END { }
+    ' "$SMB_CONF" > /dev/null 2>&1 || true
+
+    # Remove shares whose path no longer exists under /mnt/
+    python3 -c '
+import re, os
+smb_path = "/etc/samba/smb.conf"
+if os.path.exists(smb_path):
+    with open(smb_path, "r") as f:
+        content = f.read()
+    sections = re.split(r"\n(?=\[)", content)
+    new_sections = []
+    for sec in sections:
+        m = re.search(r"path\s*=\s*(/mnt/[^\n]+)", sec)
+        if m:
+            path = m.group(1).strip()
+            if not os.path.exists(path) or not os.path.ismount(path):
+                continue
+        new_sections.append(sec)
+    with open(smb_path, "w") as f:
+        f.write("\n".join(new_sections))
+' 2>/dev/null || true
+
+    echo "[ SMB  ] Reloading Samba service..."
+    systemctl restart smb 2>/dev/null || systemctl restart smbd 2>/dev/null || true
+fi
+
+echo ""
+echo "── Step 4: Current state ──"
 show_usage
 echo ""

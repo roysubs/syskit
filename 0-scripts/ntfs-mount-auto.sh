@@ -311,7 +311,7 @@ while IFS= read -r partition; do
     if [[ "$NTFS_DRIVER" == "ntfs3" ]]; then
         MOUNT_OPTS="rw,uid=$USER_ID,gid=$GROUP_ID,umask=000,iocharset=utf8,noatime,prealloc"
     else
-        MOUNT_OPTS="rw,uid=$USER_ID,gid=$GROUP_ID,umask=000,noatime"
+        MOUNT_OPTS="rw,uid=$USER_ID,gid=$GROUP_ID,umask=000,noatime,remove_hiberfile"
     fi
 
     if mount -t "$NTFS_DRIVER" -o "$MOUNT_OPTS" "$partition" "$MOUNT_POINT" 2>"$MOUNT_ERR"; then
