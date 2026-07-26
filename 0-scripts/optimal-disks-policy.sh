@@ -22,11 +22,28 @@ if [[ $EUID -ne 0 ]]; then
     fi
 fi
 
+pkg_install() {
+    local pkgs=("$@")
+    if command -v zypper &>/dev/null; then
+        zypper refresh && zypper install -y "${pkgs[@]}"
+    elif command -v apt-get &>/dev/null; then
+        apt-get update -qq && apt-get install -y "${pkgs[@]}"
+    elif command -v dnf &>/dev/null; then
+        dnf install -y "${pkgs[@]}"
+    elif command -v yum &>/dev/null; then
+        yum install -y "${pkgs[@]}"
+    elif command -v pacman &>/dev/null; then
+        pacman -Sy --noconfirm "${pkgs[@]}"
+    elif command -v apk &>/dev/null; then
+        apk add "${pkgs[@]}"
+    fi
+}
+
 # Ensure dependencies
 for cmd in hdparm smartctl lsblk; do
     if ! command -v $cmd &>/dev/null; then
         echo "Installing $cmd..."
-        apt-get update -qq && apt-get install -y smartmontools hdparm > /dev/null
+        pkg_install smartmontools hdparm util-linux > /dev/null
     fi
 done
 

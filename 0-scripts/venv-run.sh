@@ -35,6 +35,25 @@ print_error() {
     echo -e "${RED}✗${NC} $1"
 }
 
+pkg_install() {
+    local pkgs=("$@")
+    if command -v zypper &>/dev/null; then
+        sudo zypper refresh && sudo zypper install -y "${pkgs[@]}"
+    elif command -v apt-get &>/dev/null; then
+        sudo apt-get update && sudo apt-get install -y "${pkgs[@]}"
+    elif command -v dnf &>/dev/null; then
+        sudo dnf install -y "${pkgs[@]}"
+    elif command -v yum &>/dev/null; then
+        sudo yum install -y "${pkgs[@]}"
+    elif command -v pacman &>/dev/null; then
+        sudo pacman -Sy --noconfirm "${pkgs[@]}"
+    elif command -v apk &>/dev/null; then
+        sudo apk add "${pkgs[@]}"
+    elif command -v brew &>/dev/null; then
+        brew install "${pkgs[@]}"
+    fi
+}
+
 # Function to show detailed help about Debian's pip restrictions
 show_debian_help() {
     echo ""
@@ -295,7 +314,7 @@ if [ "$ALREADY_IN_VENV" = false ] && ! dpkg -l 2>/dev/null | grep -q "^ii.*pytho
     
     echo ""
     print_info "Installing python3-venv..."
-    sudo apt update && sudo apt install -y python3-venv
+    pkg_install python3-venv python3-full 2>/dev/null || pkg_install python3
     
     print_success "python3-venv installed successfully!"
     echo ""

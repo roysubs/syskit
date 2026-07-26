@@ -33,12 +33,29 @@ Options:
 EOF
 }
 
+pkg_install() {
+    local pkgs=("$@")
+    if command -v zypper &>/dev/null; then
+        sudo zypper refresh && sudo zypper install -y "${pkgs[@]}"
+    elif command -v apt-get &>/dev/null; then
+        sudo apt-get update && sudo apt-get install -y "${pkgs[@]}"
+    elif command -v dnf &>/dev/null; then
+        sudo dnf install -y "${pkgs[@]}"
+    elif command -v yum &>/dev/null; then
+        sudo yum install -y "${pkgs[@]}"
+    elif command -v pacman &>/dev/null; then
+        sudo pacman -Sy --noconfirm "${pkgs[@]}"
+    elif command -v apk &>/dev/null; then
+        sudo apk add "${pkgs[@]}"
+    fi
+}
+
 enable_wol() {
   echo "🔎 Checking Wake-on-LAN compatibility on interface $IFACE..."
 
   if ! command -v ethtool >/dev/null; then
     echo "📦 Installing ethtool..."
-    sudo apt-get install -y ethtool
+    pkg_install ethtool
   fi
 
   echo "📝 Running: ethtool $IFACE"
@@ -91,7 +108,7 @@ wake_now() {
   local target="$1"
   if ! command -v wakeonlan >/dev/null; then
     echo "📦 Installing 'wakeonlan' tool..."
-    sudo apt-get install -y wakeonlan
+    pkg_install wakeonlan
   fi
 
   echo "🌐 Resolving MAC of $target..."

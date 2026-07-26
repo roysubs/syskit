@@ -42,6 +42,23 @@ print_info() {
     echo -e "${GREEN}INFO: $1${NC}"
 }
 
+pkg_install() {
+    local pkgs=("$@")
+    if command -v zypper &>/dev/null; then
+        zypper refresh && zypper install -y "${pkgs[@]}"
+    elif command -v apt-get &>/dev/null; then
+        apt-get update && apt-get install -y "${pkgs[@]}"
+    elif command -v dnf &>/dev/null; then
+        dnf install -y "${pkgs[@]}"
+    elif command -v yum &>/dev/null; then
+        yum install -y "${pkgs[@]}"
+    elif command -v pacman &>/dev/null; then
+        pacman -Sy --noconfirm "${pkgs[@]}"
+    elif command -v apk &>/dev/null; then
+        apk add "${pkgs[@]}"
+    fi
+}
+
 print_warn() {
     echo -e "${YELLOW}WARN: $1${NC}"
 }
@@ -242,29 +259,13 @@ else
 fi
 
 
-# Step 1: Update package list
-print_step "Updating package list"
-echo "Test: Checking if package lists need an update (will run update)."
-run_command "apt-get update" || { print_error "Failed to update package lists."; exit 1; }
-
-# Step 2: Install Samba and client tools
+# Step 1 & 2: Install Samba server packages
 print_step "Installing Samba packages"
-INSTALLED_ALL_PKGS=true
-for pkg in $REQUIRED_PKGS; do
-    echo "Test: Checking if $pkg is installed."
-    if dpkg -s "$pkg" >/dev/null 2>&1 && dpkg -s "$pkg" | grep -q "Status: install ok installed"; then
-        print_info "$pkg is already installed."
-    else
-        print_info "$pkg is NOT installed."
-        INSTALLED_ALL_PKGS=false
-    fi
-done
-
-if [ "$INSTALLED_ALL_PKGS" = "false" ]; then
-    print_info "Attempting to install missing Samba packages: $REQUIRED_PKGS"
-    run_command "apt-get install -y $REQUIRED_PKGS" || { print_error "Failed to install Samba packages."; exit 1; }
+if command -v smbd &>/dev/null; then
+    print_info "Samba server components are already installed."
 else
-    print_info "All required Samba packages are already installed."
+    print_info "Attempting to install Samba server packages..."
+    pkg_install samba samba-common-bin samba-client 2>/dev/null || pkg_install samba
 fi
 
 # Step 3: Check if Samba service is running and enabled

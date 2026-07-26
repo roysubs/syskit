@@ -19,23 +19,45 @@ if [ ! -f "$VIDEO" ]; then
     exit 1
 fi
 
+pkg_install() {
+    local pkgs=("$@")
+    if command -v zypper &>/dev/null; then
+        sudo zypper refresh && sudo zypper install -y "${pkgs[@]}"
+    elif command -v apt-get &>/dev/null; then
+        sudo apt-get update && sudo apt-get install -y "${pkgs[@]}"
+    elif command -v dnf &>/dev/null; then
+        sudo dnf install -y "${pkgs[@]}"
+    elif command -v yum &>/dev/null; then
+        sudo yum install -y "${pkgs[@]}"
+    elif command -v pacman &>/dev/null; then
+        sudo pacman -Sy --noconfirm "${pkgs[@]}"
+    elif command -v apk &>/dev/null; then
+        sudo apk add "${pkgs[@]}"
+    elif command -v brew &>/dev/null; then
+        brew install "${pkgs[@]}"
+    else
+        echo "Error: Supported package manager not found." >&2
+        return 1
+    fi
+}
+
 # --- Ensure ffmpeg is installed ---
 if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1; then
     echo "📦 Installing ffmpeg..."
-    sudo apt update && sudo apt install -y ffmpeg
+    pkg_install ffmpeg
 fi
 
 # --- Ensure python3 and pip are installed ---
 if ! command -v python3 >/dev/null 2>&1; then
     echo "📦 Installing python3..."
-    sudo apt update && sudo apt install -y python3
+    pkg_install python3
 fi
 
 # --- Ensure pipx is installed ---
 if ! command -v pipx >/dev/null 2>&1; then
     echo "📦 Installing pipx..."
-    sudo apt update && sudo apt install -y pipx
-    python3 -m pipx ensurepath
+    pkg_install pipx
+    python3 -m pipx ensurepath 2>/dev/null || true
     export PATH="$HOME/.local/bin:$PATH"
 fi
 

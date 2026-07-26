@@ -58,36 +58,45 @@ is_command_available() {
     return 1
 }
 
+pkg_install() {
+    local pkgs=("$@")
+    if command -v zypper &>/dev/null; then
+        sudo zypper refresh && sudo zypper install -y "${pkgs[@]}"
+    elif command -v apt-get &>/dev/null; then
+        sudo apt-get update && sudo apt-get install -y "${pkgs[@]}"
+    elif command -v dnf &>/dev/null; then
+        sudo dnf install -y "${pkgs[@]}"
+    elif command -v yum &>/dev/null; then
+        sudo yum install -y "${pkgs[@]}"
+    elif command -v pacman &>/dev/null; then
+        sudo pacman -Sy --noconfirm "${pkgs[@]}"
+    elif command -v apk &>/dev/null; then
+        sudo apk add "${pkgs[@]}"
+    elif command -v brew &>/dev/null; then
+        brew install "${pkgs[@]}"
+    fi
+}
+
 install_dependency() {
     local package_name="$1"
     local command_name="$2"
 
     if ! is_command_available "$command_name"; then
-        local SUDO_CMD=""
-        if [[ $EUID -ne 0 ]]; then
-            if ! command -v "sudo" &>/dev/null; then
-                log "${BOLD}Warning: 'sudo' command not found, and script not run as root.${RESET}"
-                log "Installation of '$package_name' for '$command_name' will likely fail without sudo privileges."
-                # Fallthrough to ask, but apt-get will likely fail
-            fi
-            SUDO_CMD="sudo"
-        fi
-
         read -r -p "${BOLD}'$command_name' (from '$package_name') appears to be missing or not in PATH. Install '$package_name'? [Y/n] ${RESET}" yn
         if [[ $yn =~ ^[Yy]$ ]] || [[ -z $yn ]]; then
             log "Installing $package_name..."
-            if $SUDO_CMD apt-get update && $SUDO_CMD apt-get install -y "$package_name"; then
-                log "$package_name installed successfully (or was already present)."
-                # Re-check availability after install
-                if ! is_command_available "$command_name"; then
-                    log "${BOLD}Warning: $package_name installed, but command '$command_name' still not found in typical PATH locations. You might need to adjust your PATH or use 'sudo $command_name' explicitly.${RESET}"
-                fi
+            if pkg_install "$package_name"; then
+                log "$package_name installed successfully."
             else
                 log "${BOLD}Failed to install $package_name. Exiting.${RESET}"
                 exit 1
             fi
         else
             log "'$command_name' is required by this script. Exiting."
+            exit 1
+        fi
+    fi
+}
             exit 1
         fi
     fi

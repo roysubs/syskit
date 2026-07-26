@@ -46,23 +46,42 @@ if ! [[ "$EMAIL" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
   exit 1
 fi
 
+pkg_install() {
+    local pkgs=("$@")
+    if command -v zypper &>/dev/null; then
+        sudo zypper refresh && sudo zypper install -y "${pkgs[@]}"
+    elif command -v apt-get &>/dev/null; then
+        sudo apt-get update && sudo apt-get install -y "${pkgs[@]}"
+    elif command -v dnf &>/dev/null; then
+        sudo dnf install -y "${pkgs[@]}"
+    elif command -v yum &>/dev/null; then
+        sudo yum install -y "${pkgs[@]}"
+    elif command -v pacman &>/dev/null; then
+        sudo pacman -Sy --noconfirm "${pkgs[@]}"
+    elif command -v apk &>/dev/null; then
+        sudo apk add "${pkgs[@]}"
+    elif command -v brew &>/dev/null; then
+        brew install "${pkgs[@]}"
+    fi
+}
+
 # Install required tools
 echo "Ensuring required tools are installed..."
 if ! command -v zip &>/dev/null; then
   echo "Installing zip..."
-  sudo apt update && sudo apt install -y zip
+  pkg_install zip
 fi
 if ! command -v 7z &>/dev/null; then
   echo "Installing 7zip..."
-  sudo apt update && sudo apt install -y 7zip
+  pkg_install 7zip 7z p7zip 2>/dev/null || pkg_install 7zip
 fi
 if ! command -v expect &>/dev/null; then
-  echo "Installing expect for email..."
-  sudo apt update && sudo apt install -y expect
+  echo "Installing expect..."
+  pkg_install expect
 fi
 if ! command -v mutt &>/dev/null; then
   echo "Installing mutt for email..."
-  sudo apt update && sudo apt install -y mailutils mutt
+  pkg_install mailutils mutt 2>/dev/null || pkg_install mutt
 fi
 
 # Compress the folder

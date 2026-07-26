@@ -13,13 +13,28 @@ fi
 # If not running as root, auto-elevate and rerun script with sudo:
 if [ "$(id -u)" -ne 0 ]; then echo "Elevation required; rerunning as sudo..."; sudo "$0" "$@"; exit 0; fi
 
-# Only update if it's been more than 2 days since the last update (to avoid constant updates)
-if [ $(find /var/cache/apt/pkgcache.bin -mtime +2 -print) ]; then sudo apt update && sudo apt upgrade; fi
+pkg_install() {
+    local pkgs=("$@")
+    if command -v zypper &>/dev/null; then
+        sudo zypper refresh && sudo zypper install -y "${pkgs[@]}"
+    elif command -v apt-get &>/dev/null; then
+        sudo apt-get update && sudo apt-get install -y "${pkgs[@]}"
+    elif command -v dnf &>/dev/null; then
+        sudo dnf install -y "${pkgs[@]}"
+    elif command -v yum &>/dev/null; then
+        sudo yum install -y "${pkgs[@]}"
+    elif command -v pacman &>/dev/null; then
+        sudo pacman -Sy --noconfirm "${pkgs[@]}"
+    elif command -v apk &>/dev/null; then
+        sudo apk add "${pkgs[@]}"
+    fi
+}
 
-# Check if cifs-utils is installed
-if ! dpkg -l | grep -q cifs-utils; then echo "Installing cifs-utils..."; sudo apt install -y cifs-utils; fi
-# sudo yum install -y cifs-utils
-# sudo pacman -S --noconfirm cifs-utils
+# Check if cifs-utils (or mount.cifs) is installed
+if ! command -v mount.cifs &>/dev/null; then
+    echo "Installing cifs-utils..."
+    pkg_install cifs-utils
+fi
 
 # Parse arguments
 WIN_NAME_OR_IP=$1

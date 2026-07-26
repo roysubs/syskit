@@ -37,6 +37,23 @@ warn()    { echo -e "${YELLOW}[ WARN ] $*${NC}"; }
 fail()    { echo -e "${RED}[ FAIL ] $*${NC}"; }
 note()    { echo -e "${BOLD}[ NOTE ] $*${NC}"; }
 
+pkg_install() {
+    local pkgs=("$@")
+    if command -v zypper &>/dev/null; then
+        zypper refresh && zypper install -y "${pkgs[@]}"
+    elif command -v apt-get &>/dev/null; then
+        apt-get update && apt-get install -y "${pkgs[@]}"
+    elif command -v dnf &>/dev/null; then
+        dnf install -y "${pkgs[@]}"
+    elif command -v yum &>/dev/null; then
+        yum install -y "${pkgs[@]}"
+    elif command -v pacman &>/dev/null; then
+        pacman -Sy --noconfirm "${pkgs[@]}"
+    elif command -v apk &>/dev/null; then
+        apk add "${pkgs[@]}"
+    fi
+}
+
 SMB_CONF="/etc/samba/smb.conf"
 
 smb_share_exists() {
@@ -252,7 +269,7 @@ for pkg_check in "ntfs-3g:ntfs-3g" "smbd:samba" "smartctl:smartmontools" "duf:du
     pkg="${pkg_check##*:}"
     if ! command -v "$cmd" &>/dev/null; then
         info "$pkg not found. Attempting to install..."
-        apt-get install -y "$pkg" &>/dev/null
+        pkg_install "$pkg" &>/dev/null
     else
         ok "$pkg is installed"
     fi
@@ -280,8 +297,8 @@ else
         read -r -t 30 -p $'\n\e[1;33m[INPUT NEEDED]\e[0m Install kernel modules for ntfs3? [y/N] ' choice
         read -r choice
         if [[ "$choice" =~ ^[Yy]$ ]]; then
-            info "Attempting to install 'linux-image-amd64'..."
-            if apt-get install -y linux-image-amd64 &>/dev/null; then
+            info "Attempting to install kernel modules..."
+            if pkg_install linux-image-amd64 kernel-default &>/dev/null; then
                 ok "Update successful. Re-trying modprobe..."
                 modprobe ntfs3 &>/dev/null
                 if grep -qs "ntfs3" /proc/filesystems; then

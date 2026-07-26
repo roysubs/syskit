@@ -18,86 +18,32 @@ if [ $(find /var/cache/apt/pkgcache.bin -mtime +2 -print) ]; then sudo apt updat
 HOME_DIR="$HOME"
 scriptname=$(basename "$0" .sh)   # Get scriptname minus extension.
 
-# Install tools if not already installed
-PACKAGES=("smartmontools" "nvme-cli" "hdparm" "util-linux")
-install-if-missing() { if ! dpkg-query -W "$1" > /dev/null 2>&1; then sudo apt install -y $1; fi; }
-for package in "${PACKAGES[@]}"; do install-if-missing $package; done
-
-# If there are missing tools, install them
-if [ ${#missing_tools[@]} -gt 0 ]; then
-    echo "The following tools/packages are missing: ${missing_tools[@]}"
-    echo "Updating package lists and installing missing tools..."
-    sudo apt-get update
-    sudo apt-get install -y "${missing_tools[@]}"
-else
-    echo "Required tools are already installed..."
-fi
-
-
-####################
-# Define required packages
-REQUIRED_PACKAGES=("smartmontools" "nvme-cli" "hdparm" "util-linux")
-
-# --- Function to check and install packages on Debian-based systems ---
-install_debian_dependencies() {
-    local missing_packages=()
-    local pkg
-
-    echo "Checking for required packages using dpkg..."
-    for pkg in "${REQUIRED_PACKAGES[@]}"; do
-        if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "ok installed"; then
-            echo "Package '$pkg' is not installed."
-            missing_packages+=("$pkg")
-        else
-            echo "Package '$pkg' is already installed."
-        fi
-    done
-
-    if [ ${#missing_packages[@]} -gt 0 ]; then
-        echo "The following packages are missing: ${missing_packages[*]}"
-        echo "Updating package lists and installing missing packages using apt-get..."
-        sudo apt-get update
-        sudo apt-get install -y "${missing_packages[@]}"
-
-        echo "Verifying installations..."
-        local final_missing=()
-        for pkg in "${missing_packages[@]}"; do
-            if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "ok installed"; then
-                final_missing+=("$pkg")
-            fi
-        done
-
-        if [ ${#final_missing[@]} -gt 0 ]; then
-            echo "ERROR: The following packages could still not be installed: ${final_missing[*]}"
-            echo "Please try to install them manually and re-run the script."
-            exit 1
-        else
-            echo "All required packages were successfully installed."
-        fi
-    else
-        echo "All required packages are already installed."
+pkg_install() {
+    local pkgs=("$@")
+    if command -v zypper &>/dev/null; then
+        sudo zypper refresh && sudo zypper install -y "${pkgs[@]}"
+    elif command -v apt-get &>/dev/null; then
+        sudo apt-get update && sudo apt-get install -y "${pkgs[@]}"
+    elif command -v dnf &>/dev/null; then
+        sudo dnf install -y "${pkgs[@]}"
+    elif command -v yum &>/dev/null; then
+        sudo yum install -y "${pkgs[@]}"
+    elif command -v pacman &>/dev/null; then
+        sudo pacman -Sy --noconfirm "${pkgs[@]}"
+    elif command -v apk &>/dev/null; then
+        sudo apk add "${pkgs[@]}"
+    elif command -v brew &>/dev/null; then
+        brew install "${pkgs[@]}"
     fi
 }
 
-# --- Main dependency check logic ---
-
-# Check if dpkg-query and apt-get are available
-if command -v dpkg-query >/dev/null 2>&1 && command -v apt-get >/dev/null 2>&1; then
-    echo "Debian-based system detected. Proceeding with automated dependency check."
-    install_debian_dependencies
-else
-    echo "---------------------------------------------------------------------"
-    echo "WARNING: Cannot automatically check or install packages."
-    echo "         The 'dpkg-query' and/or 'apt-get' commands were not found."
-    echo "---------------------------------------------------------------------"
-    echo ""
-    echo "This script requires the following packages to be installed:"
-    for pkg in "${REQUIRED_PACKAGES[@]}"; do
-        echo "  - $pkg"
-    done
-    echo ""
-    echo "Please ensure these are installed using your system's package manager."
-    echo "If you are sure the dependencies are installed, you can proceed."
+for cmd in smartctl nvme hdparm lsblk; do
+    if ! command -v "$cmd" &>/dev/null; then
+        echo "Installing disk monitoring tools..."
+        pkg_install smartmontools nvme-cli hdparm util-linux 2>/dev/null || true
+        break
+    fi
+done
     echo ""
     read -n 1 -s -r -p "Press any key to continue, or Ctrl+C to abort..."
     echo # Move to a new line after key press

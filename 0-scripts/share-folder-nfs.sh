@@ -46,6 +46,23 @@ print_info() {
     echo -e "${GREEN}INFO: $1${NC}"
 }
 
+pkg_install() {
+    local pkgs=("$@")
+    if command -v zypper &>/dev/null; then
+        zypper refresh && zypper install -y "${pkgs[@]}"
+    elif command -v apt-get &>/dev/null; then
+        apt-get update && apt-get install -y "${pkgs[@]}"
+    elif command -v dnf &>/dev/null; then
+        dnf install -y "${pkgs[@]}"
+    elif command -v yum &>/dev/null; then
+        yum install -y "${pkgs[@]}"
+    elif command -v pacman &>/dev/null; then
+        pacman -Sy --noconfirm "${pkgs[@]}"
+    elif command -v apk &>/dev/null; then
+        apk add "${pkgs[@]}"
+    fi
+}
+
 print_warn() {
     echo -e "${YELLOW}WARN: $1${NC}"
 }
@@ -213,29 +230,13 @@ print_info "Absolute path to share: $SHARE_PATH_ABS"
 print_info "Client specification: $CLIENT_SPEC"
 
 
-# Step 1: Update package list
-print_step "Updating package list"
-echo "Test: Checking if package lists need an update (will run update)."
-run_command "apt-get update" || { print_error "Failed to update package lists."; exit 1; }
-
-# Step 2: Install NFS server packages
+# Step 1 & 2: Install NFS server packages
 print_step "Installing NFS packages"
-INSTALLED_ALL_PKGS=true
-for pkg in $REQUIRED_PKGS; do
-    echo "Test: Checking if $pkg is installed."
-    if dpkg -s "$pkg" >/dev/null 2>&1 && dpkg -s "$pkg" | grep -q "Status: install ok installed"; then
-        print_info "$pkg is already installed."
-    else
-        print_info "$pkg is NOT installed."
-        INSTALLED_ALL_PKGS=false
-    fi
-done
-
-if [ "$INSTALLED_ALL_PKGS" = "false" ]; then
-    print_info "Attempting to install missing NFS packages: $REQUIRED_PKGS"
-    run_command "apt-get install -y $REQUIRED_PKGS" || { print_error "Failed to install NFS packages."; exit 1; }
+if command -v exportfs &>/dev/null; then
+    print_info "NFS server components are already installed."
 else
-    print_info "All required NFS packages are already installed."
+    print_info "Attempting to install NFS server packages..."
+    pkg_install nfs-kernel-server nfs-kernel-server nfs-utils yast2-nfs-server 2>/dev/null || pkg_install nfs-utils
 fi
 
 # Step 3: Ensure NFS services are running and enabled

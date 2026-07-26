@@ -22,14 +22,28 @@ if [[ $EUID -ne 0 ]]; then
     fi
 fi
 
-# Ensure dependencies
-PKGS="cpufrequtils linux-cpupower powertop"
-for p in $PKGS; do
-    if ! dpkg -l | grep -q "^ii  $p"; then
-        echo "Installing $p..."
-        apt-get update -qq && apt-get install -y $p > /dev/null
+pkg_install() {
+    local pkgs=("$@")
+    if command -v zypper &>/dev/null; then
+        zypper refresh && zypper install -y "${pkgs[@]}"
+    elif command -v apt-get &>/dev/null; then
+        apt-get update -qq && apt-get install -y "${pkgs[@]}"
+    elif command -v dnf &>/dev/null; then
+        dnf install -y "${pkgs[@]}"
+    elif command -v yum &>/dev/null; then
+        yum install -y "${pkgs[@]}"
+    elif command -v pacman &>/dev/null; then
+        pacman -Sy --noconfirm "${pkgs[@]}"
+    elif command -v apk &>/dev/null; then
+        apk add "${pkgs[@]}"
     fi
-done
+}
+
+# Ensure dependencies
+if ! command -v cpupower &>/dev/null || ! command -v powertop &>/dev/null; then
+    echo "Installing CPU management tools..."
+    pkg_install cpufrequtils cpupower powertop 2>/dev/null || true
+fi
 
 # --- Functions ---
 
