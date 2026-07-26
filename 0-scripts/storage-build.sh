@@ -587,10 +587,12 @@ if [ "$should_add_to_fstab" = true ] && [ -n "$mount_point" ]; then
         echo -e "UUID for $new_partition is: ${SUCCESS_COLOR}$uuid${RESET_COLOR}"
         echo "Mounting $new_partition (UUID=$uuid) at $mount_point..."
         run_command mount UUID="$uuid" "$mount_point"
-        echo -e "${SUCCESS_COLOR}$new_partition successfully mounted at $mount_point.${RESET_COLOR}"
+        chmod a+rwX "$mount_point" 2>/dev/null || true
+        echo -e "${SUCCESS_COLOR}$new_partition successfully mounted at $mount_point (permissions set to a+rwX).${RESET_COLOR}"
         fstab_entry="UUID=$uuid $mount_point ${FS_TYPE:-btrfs} defaults,nofail 0 2"
         fstab_file="/etc/fstab"
         echo "Updating $fstab_file for mount point '$mount_point'..."
+        sudo sed -i "\|(${mount_point})|d" "$fstab_file"
         sudo sed -i "\|[[:space:]]${mount_point}[[:space:]]|d" "$fstab_file"
         sudo sed -i "\|UUID=${uuid}|d" "$fstab_file"
         echo "Adding fstab entry to $fstab_file: $fstab_entry"
