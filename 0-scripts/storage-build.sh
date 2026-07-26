@@ -590,18 +590,14 @@ if [ "$should_add_to_fstab" = true ] && [ -n "$mount_point" ]; then
         echo -e "${SUCCESS_COLOR}$new_partition successfully mounted at $mount_point.${RESET_COLOR}"
         fstab_entry="UUID=$uuid $mount_point ${FS_TYPE:-btrfs} defaults,nofail 0 2"
         fstab_file="/etc/fstab"
-        echo "Checking $fstab_file for existing active entries for UUID '$uuid' or mount point '$mount_point'..."
-        if grep -Eq "^[^#]*UUID=$uuid" "$fstab_file" || \
-           grep -Eq "^[^#]*[[:space:]]$mount_point[[:space:]]" "$fstab_file"; then
-            echo -e "${WARN_COLOR}WARNING: An active (non-commented) entry for UUID '$uuid' or mount point '$mount_point' appears to exist in $fstab_file. Not adding a duplicate.${RESET_COLOR}"
-            grep --color=always -E "(UUID=$uuid| $escaped_mount_point_for_grep )" "$fstab_file" || true
-        else
-            echo "Adding fstab entry to $fstab_file: $fstab_entry"
-            echo "# Entry for $new_partition ($mount_point) added by $(basename "$0") on $(date)" | sudo tee -a "$fstab_file" > /dev/null
-            if echo "$fstab_entry" | sudo tee -a "$fstab_file" > /dev/null; then
-                echo -e "${SUCCESS_COLOR}Entry successfully added to $fstab_file.${RESET_COLOR}"; FSTAB_MODIFIED=true;
-            else echo -e "${ERROR_COLOR}ERROR: Failed to append entry to $fstab_file.${RESET_COLOR}"; fi
-        fi
+        echo "Updating $fstab_file for mount point '$mount_point'..."
+        sudo sed -i "\|[[:space:]]${mount_point}[[:space:]]|d" "$fstab_file"
+        sudo sed -i "\|UUID=${uuid}|d" "$fstab_file"
+        echo "Adding fstab entry to $fstab_file: $fstab_entry"
+        echo "# Entry for $new_partition ($mount_point) added by $(basename "$0") on $(date)" | sudo tee -a "$fstab_file" > /dev/null
+        if echo "$fstab_entry" | sudo tee -a "$fstab_file" > /dev/null; then
+            echo -e "${SUCCESS_COLOR}Entry successfully added to $fstab_file.${RESET_COLOR}"; FSTAB_MODIFIED=true;
+        else echo -e "${ERROR_COLOR}ERROR: Failed to append entry to $fstab_file.${RESET_COLOR}"; fi
     fi
 else
     if [ -z "$USER_CONFIG_NAME" ]; then # This means they explicitly skipped naming in Phase 2.5
@@ -732,8 +728,7 @@ if [ -n "$new_partition" ]; then
 
     if [ "$should_add_to_fstab" = true ] && [ -n "$uuid" ] && [ -n "$mount_point" ]; then
         echo -e "\n${HEADER_COLOR}Relevant /etc/fstab entry (grep ... $fstab_file):${RESET_COLOR}"
-        escaped_mount_point_for_grep_final=$(echo "$mount_point" | sed 's#/#\\/#g')
-        grep --color=always -E "(UUID=$uuid| ${escaped_mount_point_for_grep_final} )" "$fstab_file" || true
+        grep --color=always "$mount_point" "$fstab_file" || true
     fi
 
     if [ "$should_setup_nfs" = true ] && [ -n "$mount_point" ] && command -v exportfs &>/dev/null; then
