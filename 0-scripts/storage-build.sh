@@ -588,12 +588,11 @@ if [ "$should_add_to_fstab" = true ] && [ -n "$mount_point" ]; then
         echo "Mounting $new_partition (UUID=$uuid) at $mount_point..."
         run_command mount UUID="$uuid" "$mount_point"
         echo -e "${SUCCESS_COLOR}$new_partition successfully mounted at $mount_point.${RESET_COLOR}"
-        fstab_entry="UUID=$uuid $mount_point ext4 defaults,nofail 0 2"
+        fstab_entry="UUID=$uuid $mount_point ${FS_TYPE:-btrfs} defaults,nofail 0 2"
         fstab_file="/etc/fstab"
         echo "Checking $fstab_file for existing active entries for UUID '$uuid' or mount point '$mount_point'..."
-        escaped_mount_point_for_grep=$(echo "$mount_point" | sed 's#/#\\/#g')
         if grep -Eq "^[^#]*UUID=$uuid" "$fstab_file" || \
-           grep -Eq "^[^#]*[[:space:]]$escaped_mount_point_for_grep[[:space:]]" "$fstab_file"; then
+           grep -Eq "^[^#]*[[:space:]]$mount_point[[:space:]]" "$fstab_file"; then
             echo -e "${WARN_COLOR}WARNING: An active (non-commented) entry for UUID '$uuid' or mount point '$mount_point' appears to exist in $fstab_file. Not adding a duplicate.${RESET_COLOR}"
             grep --color=always -E "(UUID=$uuid| $escaped_mount_point_for_grep )" "$fstab_file" || true
         else
@@ -633,7 +632,7 @@ fi
 
 # ----- NFS Share Setup -----
 should_setup_nfs="$AUTO_SETUP_NFS"
-if [ -n "$USER_CONFIG_NAME" ] && [ "$AUTO_SETUP_NFS" = false ] && [ "$PROMPT_USER" = true ]; then
+if [ -n "$USER_CONFIG_NAME" ] && [ "$AUTO_SETUP_NFS" = false ] && [ "$AUTO_SETUP_SAMBA" = false ] && [ "$PROMPT_USER" = true ]; then
     if ask_yes_no_question "Configure an NFS share for $mount_point?" "no"; then
         should_setup_nfs=true
     fi
@@ -642,14 +641,12 @@ fi
 if [ "$should_setup_nfs" = true ] && [ -n "$mount_point" ]; then # Check mount_point again in case fstab was skipped
     echo -e "\n${INFO_COLOR}Attempting to set up NFS Share for $mount_point...${RESET_COLOR}"
     exports_file="/etc/exports"
-    # NFS primarily uses the path for export. Conceptual name is $USER_CONFIG_NAME.
     nfs_share_options="*(rw,sync,no_subtree_check,all_squash,anonuid=$(id -u),anongid=$(id -g))"
     if command -v exportfs &>/dev/null; then
         echo "NFS server tools (exportfs command) found."
-        escaped_mount_point_for_grep_nfs=$(echo "$mount_point" | sed 's/[].[*^$(){}?+|/\\]/\\&/g')
-        if grep -q "^\s*${escaped_mount_point_for_grep_nfs}[[:space:]]" "$exports_file"; then
+        if grep -q "^\s*${mount_point}[[:space:]]" "$exports_file"; then
             echo -e "${WARN_COLOR}WARNING: An NFS share for '$mount_point' seems to already exist in $exports_file. Skipping addition.${RESET_COLOR}"
-            grep --color=always "^\s*${escaped_mount_point_for_grep_nfs}[[:space:]]" "$exports_file" || true
+            grep --color=always "^\s*${mount_point}[[:space:]]" "$exports_file" || true
         else
             nfs_share_entry="$mount_point $nfs_share_options"
             echo "Adding NFS share entry to $exports_file: $nfs_share_entry"
@@ -683,28 +680,30 @@ if [ "$should_setup_samba" = true ] && [ -n "$mount_point" ] && [ -n "$samba_sha
     echo -e "\n${INFO_COLOR}Attempting to set up Samba Share '[$samba_share_name]' for $mount_point...${RESET_COLOR}"
     smb_conf_file="/etc/samba/smb.conf"
     samba_share_config_block="\n[$samba_share_name]\n   path = $mount_point\n   browseable = yes\n   writable = yes\n   guest ok = yes\n   read only = no\n   create mask = 0664\n   directory mask = 0775\n   comment = Auto-configured share for $mount_point ($samba_share_name)\n"
-    if command -v smbd &>/dev/null; then
-        echo "Samba server tools (smbd command) found."
-        escaped_mount_point_path_samba=$(echo "$mount_point" | sed 's/[].[*^$(){}?+|/\\]/\\&/g')
-        escaped_samba_share_name=$(echo "$samba_share_name" | sed 's/[].[*^$(){}?+|/\\]/\\&/g') # Escape for grep
-        if grep -qE "(^\[${escaped_samba_share_name}\]|^\s*path\s*=\s*${escaped_mount_point_path_samba}\s*$)" "$smb_conf_file"; then
+    if command -v smbd &>/dev/null || [ -x /usr/sbin/smbd ]; then
+        echo "Samba server tools found."
+        if grep -qE "(^\[${samba_share_name}\]|^\s*path\s*=\s*${mount_point}\s*$)" "$smb_conf_file"; then
             echo -e "${WARN_COLOR}WARNING: A Samba share named '[$samba_share_name]' or for path '$mount_point' seems to exist in $smb_conf_file. Skipping.${RESET_COLOR}"
-            (grep --color=always -A7 -E "(^\[${escaped_samba_share_name}\]|^\s*path\s*=\s*${escaped_mount_point_path_samba}\s*$)" "$smb_conf_file" | head -n 8) || true
+            (grep --color=always -A7 -E "(^\[${samba_share_name}\]|^\s*path\s*=\s*${mount_point}\s*$)" "$smb_conf_file" | head -n 8) || true
         else
             echo "Adding Samba share configuration to $smb_conf_file for share name '[$samba_share_name]'..."
             if echo -e "$samba_share_config_block" | sudo tee -a "$smb_conf_file" > /dev/null; then
                 echo "Samba share configuration added. Validating with 'testparm -s'...";
-                if testparm -s; then
-                    echo "Samba configuration valid. Restarting Samba services (smbd and nmbd)..."
-                    run_command systemctl restart smbd; run_command systemctl restart nmbd;
-                    echo -e "${SUCCESS_COLOR}Samba share '[$samba_share_name]' for '$mount_point' should be active.${RESET_COLOR}"
+                if testparm -s &>/dev/null; then
+                    echo "Samba configuration valid. Restarting Samba services..."
+                    if systemctl restart smb 2>/dev/null || systemctl restart smbd 2>/dev/null || service smbd restart 2>/dev/null; then
+                        systemctl restart nmb 2>/dev/null || systemctl restart nmbd 2>/dev/null || true
+                        echo -e "${SUCCESS_COLOR}Samba share '[$samba_share_name]' for '$mount_point' is active.${RESET_COLOR}"
+                    else
+                        echo -e "${ERROR_COLOR}ERROR: Could not restart Samba service.${RESET_COLOR}"
+                    fi
                 else echo -e "${ERROR_COLOR}ERROR: 'testparm -s' reported issues. Review $smb_conf_file. Services NOT restarted.${RESET_COLOR}"; fi
             else echo -e "${ERROR_COLOR}ERROR: Failed to append Samba config to $smb_conf_file.${RESET_COLOR}"; fi
         fi
-        if ! (systemctl is-active --quiet smbd && systemctl is-active --quiet nmbd); then
+        if ! (systemctl is-active --quiet smb || systemctl is-active --quiet smbd); then
             echo -e "${WARN_COLOR}INFO: Samba services do not seem active/installed. If sharing fails, install samba and enable services.${RESET_COLOR}";
-        else echo "Samba services (smbd, nmbd) appear to be active."; fi
-    else echo -e "${WARN_COLOR}Samba server tools (smbd) not found. Skipping Samba share creation.${RESET_COLOR}"; fi
+        else echo "Samba service appears to be active."; fi
+    else echo -e "${WARN_COLOR}Samba server tools not found. Skipping Samba share creation.${RESET_COLOR}"; fi
 else
     if [ "$AUTO_SETUP_SAMBA" = false ]; then echo "Skipping Samba share configuration."; fi
 fi
