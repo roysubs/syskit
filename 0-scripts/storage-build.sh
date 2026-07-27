@@ -368,15 +368,16 @@ if [ -n "$existing_parts" ]; then
                 echo -e "${WARN_COLOR}Terminating active file processes & unmounting $device...${RESET_COLOR}"
                 for mp in $(lsblk -lno MOUNTPOINTS "$device" 2>/dev/null | grep -v '^$'); do
                     if command -v fuser &>/dev/null; then
-                        run_command fuser -k -9 -m "$mp" 2>/dev/null || true
+                        fuser -k -9 -m "$mp" &>/dev/null || true
                     fi
-                    run_command umount -f -l "$mp" 2>/dev/null || true
+                    if mountpoint -q "$mp" 2>/dev/null || mount | grep -q " $mp "; then
+                        run_command umount -f -l "$mp"
+                    fi
                 done
                 for part in $(lsblk -lno NAME "$device" 2>/dev/null | grep -v "^$(basename "$device")$"); do
-                    if command -v fuser &>/dev/null; then
-                        run_command fuser -k -9 -m "/dev/$part" 2>/dev/null || true
+                    if mount | grep -q "^/dev/$part "; then
+                        run_command umount -f -l "/dev/$part"
                     fi
-                    run_command umount -f -l "/dev/$part" 2>/dev/null || true
                 done
                 sync
                 echo -e "${INFO_COLOR}Wiping existing partitions and creating a new GPT partition table on $device...${RESET_COLOR}"
