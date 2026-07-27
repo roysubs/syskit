@@ -205,7 +205,7 @@ while [[ $# -gt 0 ]]; do
                     echo -e "${ERROR_COLOR}ERROR: Invalid percentage for --reserved: '$RESERVED_PERCENT_VAL'. Must be a positive number.${RESET_COLOR}"; show_usage; exit 1;
                 fi
                 local percent_float=$(awk "BEGIN {print $RESERVED_PERCENT_VAL}")
-                if (( $(echo "$percent_float < 0 || $percent_float > 50" | bc -l) )); then
+                if awk -v val="$RESERVED_PERCENT_VAL" 'BEGIN { if (val < 0 || val > 50) exit 0; else exit 1 }'; then
                     echo -e "${ERROR_COLOR}ERROR: Reserved percentage '$RESERVED_PERCENT_VAL' must be between 0 and 50.${RESET_COLOR}"; show_usage; exit 1;
                 fi
                 shift 2
@@ -236,6 +236,81 @@ echo -e "${INFO_COLOR}Starting Comprehensive Disk Setup Script...${RESET_COLOR}"
 if [ -z "$parsed_device" ]; then echo -e "${ERROR_COLOR}ERROR: Target block device not specified.${RESET_COLOR}"; show_usage; exit 1; fi
 device="$parsed_device"
 user_requested_size="$parsed_size"
+
+IS_MACOS=false
+if [[ "$(uname)" == "Darwin" ]]; then
+    IS_MACOS=true
+fi
+
+# ---------- macOS Native Execution Path ----------
+if [ "$IS_MACOS" = true ]; then
+    if [[ "$device" =~ ^disk[0-9]+ ]]; then device="/dev/$device"; fi
+    if ! diskutil info "$device" &>/dev/null; then
+        echo -e "${ERROR_COLOR}ERROR: Device '$device' is not a valid disk on macOS.${RESET_COLOR}"
+        echo "Available disks:"
+        diskutil list
+        exit 1
+    fi
+
+    echo -e "\n${HEADER_COLOR}Phase 1: Device Information and Preparation (macOS / diskutil)${RESET_COLOR}"
+    echo -e "Target device: ${DEVICE_COLOR}$device${RESET_COLOR}"
+    diskutil list "$device"
+
+    echo -e "\n${ERROR_COLOR}============================================================${RESET_COLOR}"
+    echo -e "${ERROR_COLOR}  ⚠️  DANGER WARNING: Erasing disk $device will erase ALL data!${RESET_COLOR}"
+    echo -e "${ERROR_COLOR}============================================================${RESET_COLOR}"
+    read -r -p "$(echo -e "${ERROR_COLOR}Type 'WIPE' to erase all data on $device: ${RESET_COLOR}")" confirm_wipe
+    if [ "$confirm_wipe" != "WIPE" ]; then
+        echo -e "${WARN_COLOR}Wipe confirmation failed. Operation cancelled.${RESET_COLOR}"
+        exit 1
+    fi
+
+    echo -e "\n${HEADER_COLOR}Phase 2.5: Define Volume Name${RESET_COLOR}"
+    read -r -p "$(echo -e "${PROMPT_COLOR}Enter a volume name for /Volumes/... and shares (default: 'mac_storage'): ${RESET_COLOR}")" mac_name_input
+    USER_CONFIG_NAME="${mac_name_input:-mac_storage}"
+
+    echo -e "\n${HEADER_COLOR}Phase 3: Formatting and System Integration (macOS)${RESET_COLOR}"
+    echo "Select Filesystem Type:"
+    echo "  1) APFS   (Apple File System — Recommended for macOS SSDs/HDDs)"
+    echo "  2) ExFAT  (Cross-platform Mac & Windows)"
+    echo "  3) JHFS+  (Mac OS Extended Journaled)"
+    echo "  4) FAT32  (MS-DOS FAT32)"
+    read -r -p "$(echo -e "${PROMPT_COLOR}Choose filesystem [1-4, default: 1 (APFS)]: ${RESET_COLOR}")" fs_choice
+
+    case "${fs_choice:-1}" in
+        1) MAC_FS="APFS" ;;
+        2) MAC_FS="ExFAT" ;;
+        3) MAC_FS="JHFS+" ;;
+        4) MAC_FS="FAT32" ;;
+        *) MAC_FS="APFS" ;;
+    esac
+
+    echo -e "${INFO_COLOR}Formatting $device as $MAC_FS with volume name '$USER_CONFIG_NAME'...${RESET_COLOR}"
+    run_command diskutil eraseDisk "$MAC_FS" "$USER_CONFIG_NAME" GPT "$device"
+    mount_point="/Volumes/$USER_CONFIG_NAME"
+
+    # ---- macOS Sharing Setup ----
+    echo -e "\n${HEADER_COLOR}Phase 4: Optional Network Sharing Setup (macOS)${RESET_COLOR}"
+    should_setup_samba="$AUTO_SETUP_SAMBA"
+    if [ "$AUTO_SETUP_SAMBA" = false ] && [ "$PROMPT_USER" = true ]; then
+        if ask_yes_no_question "Configure a native macOS SMB share for $mount_point?" "no"; then
+            should_setup_samba=true
+        fi
+    fi
+
+    if [ "$should_setup_samba" = true ]; then
+        echo -e "${INFO_COLOR}Configuring macOS SMB share for '$mount_point'...${RESET_COLOR}"
+        run_command sharing -a "$mount_point" -S "$USER_CONFIG_NAME" -s 001 -g 001
+        echo -e "${SUCCESS_COLOR}macOS SMB share '$USER_CONFIG_NAME' configured successfully.${RESET_COLOR}"
+        sharing -l
+    fi
+
+    echo -e "\n${HEADER_COLOR}========== All Steps Completed (macOS) ==========${RESET_COLOR}"
+    echo -e "Device processed: ${DEVICE_COLOR}$device${RESET_COLOR}"
+    echo -e "Mounted at: ${DEVICE_COLOR}$mount_point${RESET_COLOR}"
+    df -h "$mount_point"
+    exit 0
+fi
 
 if [ ! -b "$device" ]; then
     echo -e "${ERROR_COLOR}ERROR: Device '$device' is not a valid block device. Please verify.${RESET_COLOR}"
