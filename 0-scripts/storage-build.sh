@@ -613,9 +613,33 @@ if [ "$PROMPT_USER" = true ]; then
 fi
 
 echo "Preparing $new_partition for formatting..."
+if [ -n "$USER_CONFIG_NAME" ]; then
+    target_mp="/mnt/$USER_CONFIG_NAME"
+    sudo sed -i "\|(${target_mp})|d" /etc/fstab 2>/dev/null || true
+    sudo sed -i "\|[[:space:]]${target_mp}[[:space:]]|d" /etc/fstab 2>/dev/null || true
+    if command -v systemctl &>/dev/null; then
+        systemctl stop "mnt-${USER_CONFIG_NAME}.mount" 2>/dev/null || true
+        systemctl daemon-reload 2>/dev/null || true
+    fi
+fi
+
+if command -v btrfs &>/dev/null; then
+    btrfs device scan --forget "$new_partition" 2>/dev/null || true
+    btrfs device scan --forget 2>/dev/null || true
+fi
+
+if command -v dmsetup &>/dev/null; then
+    dmsetup remove_all --force 2>/dev/null || true
+fi
+
 if command -v fuser &>/dev/null; then
     fuser -k -9 "$new_partition" &>/dev/null || true
 fi
+
+if command -v blockdev &>/dev/null; then
+    blockdev --flushbufs "$new_partition" 2>/dev/null || true
+fi
+
 if command -v udevadm &>/dev/null; then
     udevadm settle 2>/dev/null || true
 fi
