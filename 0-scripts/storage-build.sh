@@ -623,6 +623,11 @@ if [ -n "$USER_CONFIG_NAME" ]; then
     fi
 fi
 
+if command -v restorecon &>/dev/null; then
+    restorecon -v "$new_partition" 2>/dev/null || true
+    restorecon -v "$device" 2>/dev/null || true
+fi
+
 if command -v btrfs &>/dev/null; then
     btrfs device scan --forget "$new_partition" 2>/dev/null || true
     btrfs device scan --forget 2>/dev/null || true
@@ -641,7 +646,8 @@ if command -v blockdev &>/dev/null; then
 fi
 
 if command -v udevadm &>/dev/null; then
-    udevadm settle 2>/dev/null || true
+    udevadm trigger --action=change "$new_partition" 2>/dev/null || true
+    udevadm settle --timeout=5 2>/dev/null || true
 fi
 sleep 1
 
@@ -659,15 +665,17 @@ for attempt in 1 2 3 4 5; do
         if mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L "${USER_CONFIG_NAME:-data}" "$new_partition"; then formatted=true; break; fi
     fi
 
-    echo -e "${WARN_COLOR}Device $new_partition busy (attempt $attempt/5). Inspecting holders...${RESET_COLOR}"
+    echo -e "${WARN_COLOR}Device $new_partition busy (attempt $attempt/5). Inspecting holders & kernel logs...${RESET_COLOR}"
+    if command -v dmesg &>/dev/null; then
+        echo "Recent kernel logs (dmesg):"
+        dmesg | tail -n 10 2>&1 || true
+    fi
+    if command -v restorecon &>/dev/null; then
+        restorecon -v "$new_partition" 2>/dev/null || true
+    fi
     if command -v fuser &>/dev/null; then
-        echo "Active processes on $new_partition (fuser):"
         fuser -v "$new_partition" 2>&1 || true
         fuser -k -9 "$new_partition" 2>/dev/null || true
-    fi
-    if command -v lsof &>/dev/null; then
-        echo "Active processes on $new_partition (lsof):"
-        lsof "$new_partition" 2>&1 || true
     fi
     if command -v dmsetup &>/dev/null; then
         dmsetup remove -f "$(basename "$new_partition")" 2>/dev/null || true
@@ -683,6 +691,7 @@ for attempt in 1 2 3 4 5; do
         btrfs device scan --forget "$new_partition" 2>/dev/null || true
     fi
     if command -v udevadm &>/dev/null; then
+        udevadm trigger --action=change "$new_partition" 2>/dev/null || true
         udevadm settle --timeout=5 2>/dev/null || true
     fi
     sleep 2
