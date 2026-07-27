@@ -709,6 +709,11 @@ if command -v udevadm &>/dev/null; then
 fi
 sleep 1
 
+echo "Stopping udev event processing to prevent blkid probe races during format..."
+if command -v udevadm &>/dev/null; then
+    udevadm control --stop-exec-queue 2>/dev/null || true
+fi
+
 echo "Formatting $new_partition as $FS_TYPE..."
 formatted=false
 for attempt in 1 2 3 4 5; do
@@ -748,12 +753,12 @@ for attempt in 1 2 3 4 5; do
     if command -v btrfs &>/dev/null; then
         btrfs device scan --forget "$new_partition" 2>/dev/null || true
     fi
-    if command -v udevadm &>/dev/null; then
-        udevadm trigger --action=change "$new_partition" 2>/dev/null || true
-        udevadm settle --timeout=5 2>/dev/null || true
-    fi
     sleep 2
 done
+
+if command -v udevadm &>/dev/null; then
+    udevadm control --start-exec-queue 2>/dev/null || true
+fi
 
 if [ "$formatted" = false ]; then
     echo -e "${ERROR_COLOR}ERROR: Failed to format $new_partition as $FS_TYPE after 5 attempts.${RESET_COLOR}"
