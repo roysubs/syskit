@@ -387,12 +387,33 @@ if [ -n "$existing_parts" ]; then
                     run_command wipefs -a -f "${device}"1 2>/dev/null || true
                     run_command wipefs -a -f "$device" 2>/dev/null || true
                 fi
+                if command -v partx &>/dev/null; then
+                    partx -d "$device" 2>/dev/null || true
+                fi
+                if command -v delpart &>/dev/null; then
+                    delpart "$device" 1 2>/dev/null || true
+                fi
                 if command -v blockdev &>/dev/null; then
                     blockdev --flushbufs "$device" 2>/dev/null || true
+                    blockdev --rereadpt "$device" 2>/dev/null || true
                 fi
                 sync
+
                 echo -e "${INFO_COLOR}Wiping existing partitions and creating a new GPT partition table on $device...${RESET_COLOR}"
-                run_command parted --script "$device" mklabel gpt
+                if command -v sgdisk &>/dev/null; then
+                    run_command sgdisk -Z "$device" 2>/dev/null || true
+                    run_command sgdisk -o "$device"
+                else
+                    echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}parted --script $device mklabel gpt${RESET_COLOR}"
+                    parted --script "$device" mklabel gpt 2>/dev/null || true
+                fi
+
+                echo "Notifying kernel of partition changes (partprobe & udevadm settle)..."
+                run_command partprobe "$device"
+                if command -v udevadm &>/dev/null; then
+                    run_command udevadm settle
+                fi
+                sleep 1
                 run_command parted --script -a optimal "$device" mkpart primary 2048s 100%
                 run_command partprobe "$device"
                 sleep 2
