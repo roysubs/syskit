@@ -415,10 +415,18 @@ if [ -n "$existing_parts" ]; then
                     echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}udevadm settle${RESET_COLOR}"
                     udevadm settle 2>/dev/null || true
                 fi
-                sleep 1
                 run_command parted --script -a optimal "$device" mkpart primary 2048s 100%
                 echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}partprobe $device${RESET_COLOR}"
                 partprobe "$device" 2>/dev/null || udevadm trigger 2>/dev/null || true
+                echo "Zeroing out stale superblock headers on new partition to prevent udev/btrfs locks..."
+                dd if=/dev/zero of="${device}1" bs=1M count=10 status=none conv=fsync 2>/dev/null || true
+                if command -v wipefs &>/dev/null; then
+                    wipefs -a -f "${device}1" 2>/dev/null || true
+                fi
+                if command -v btrfs &>/dev/null; then
+                    btrfs device scan --forget "${device}1" 2>/dev/null || true
+                    btrfs device scan --forget 2>/dev/null || true
+                fi
                 sleep 2
                 WIPED_DISK=true
                 ;;
@@ -621,6 +629,13 @@ if [ -n "$USER_CONFIG_NAME" ]; then
         systemctl stop "mnt-${USER_CONFIG_NAME}.mount" 2>/dev/null || true
         systemctl daemon-reload 2>/dev/null || true
     fi
+fi
+
+echo "Zeroing out any residual filesystem signatures on $new_partition..."
+dd if=/dev/zero of="$new_partition" bs=1M count=10 status=none conv=fsync 2>/dev/null || true
+
+if command -v wipefs &>/dev/null; then
+    wipefs -a -f "$new_partition" 2>/dev/null || true
 fi
 
 if command -v restorecon &>/dev/null; then
