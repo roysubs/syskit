@@ -409,13 +409,16 @@ if [ -n "$existing_parts" ]; then
                 fi
 
                 echo "Notifying kernel of partition changes (partprobe & udevadm settle)..."
-                run_command partprobe "$device"
+                echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}partprobe $device${RESET_COLOR}"
+                partprobe "$device" 2>/dev/null || udevadm trigger 2>/dev/null || true
                 if command -v udevadm &>/dev/null; then
-                    run_command udevadm settle
+                    echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}udevadm settle${RESET_COLOR}"
+                    udevadm settle 2>/dev/null || true
                 fi
                 sleep 1
                 run_command parted --script -a optimal "$device" mkpart primary 2048s 100%
-                run_command partprobe "$device"
+                echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}partprobe $device${RESET_COLOR}"
+                partprobe "$device" 2>/dev/null || udevadm trigger 2>/dev/null || true
                 sleep 2
                 WIPED_DISK=true
                 ;;
