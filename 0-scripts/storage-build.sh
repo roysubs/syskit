@@ -366,7 +366,13 @@ if [ -n "$existing_parts" ]; then
                     exit 1
                 fi
                 echo -e "${WARN_COLOR}Unmounting any active mounts on $device...${RESET_COLOR}"
-                umount "${device}"* 2>/dev/null || true
+                for mp in $(lsblk -lno MOUNTPOINTS "$device" 2>/dev/null | grep -v '^$'); do
+                    run_command umount -f -l "$mp" 2>/dev/null || true
+                done
+                for part in $(lsblk -lno NAME "$device" 2>/dev/null | grep -v "^$(basename "$device")$"); do
+                    run_command umount -f -l "/dev/$part" 2>/dev/null || true
+                done
+                sync
                 echo -e "${INFO_COLOR}Wiping existing partitions and creating a new GPT partition table on $device...${RESET_COLOR}"
                 run_command parted --script "$device" mklabel gpt
                 run_command parted --script -a optimal "$device" mkpart primary 2048s 100%
