@@ -646,27 +646,36 @@ fi
 sleep 1
 
 echo "Formatting $new_partition as $FS_TYPE..."
-if [ "$FS_TYPE" = "btrfs" ]; then
-    run_command mkfs.btrfs -f -L "${USER_CONFIG_NAME:-data}" "$new_partition" || {
-        echo "Retrying mkfs.btrfs after settling udev..."
-        if command -v udevadm &>/dev/null; then udevadm settle; fi
-        sleep 2
-        run_command mkfs.btrfs -f -L "${USER_CONFIG_NAME:-data}" "$new_partition"
-    }
-elif [ "$FS_TYPE" = "xfs" ]; then
-    run_command mkfs.xfs -f -L "${USER_CONFIG_NAME:-data}" "$new_partition" || {
-        echo "Retrying mkfs.xfs after settling udev..."
-        if command -v udevadm &>/dev/null; then udevadm settle; fi
-        sleep 2
-        run_command mkfs.xfs -f -L "${USER_CONFIG_NAME:-data}" "$new_partition"
-    }
-else
-    run_command mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L "${USER_CONFIG_NAME:-data}" "$new_partition" || {
-        echo "Retrying mkfs.ext4 after settling udev..."
-        if command -v udevadm &>/dev/null; then udevadm settle; fi
-        sleep 2
-        run_command mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L "${USER_CONFIG_NAME:-data}" "$new_partition"
-    }
+formatted=false
+for attempt in 1 2 3 4 5; do
+    if [ "$FS_TYPE" = "btrfs" ]; then
+        echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}mkfs.btrfs -f -L ${USER_CONFIG_NAME:-data} $new_partition${RESET_COLOR}"
+        if mkfs.btrfs -f -L "${USER_CONFIG_NAME:-data}" "$new_partition"; then formatted=true; break; fi
+    elif [ "$FS_TYPE" = "xfs" ]; then
+        echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}mkfs.xfs -f -L ${USER_CONFIG_NAME:-data} $new_partition${RESET_COLOR}"
+        if mkfs.xfs -f -L "${USER_CONFIG_NAME:-data}" "$new_partition"; then formatted=true; break; fi
+    else
+        echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L ${USER_CONFIG_NAME:-data} $new_partition${RESET_COLOR}"
+        if mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L "${USER_CONFIG_NAME:-data}" "$new_partition"; then formatted=true; break; fi
+    fi
+
+    echo -e "${WARN_COLOR}Device $new_partition busy (attempt $attempt/5). Checking active processes & settling udev...${RESET_COLOR}"
+    if command -v fuser &>/dev/null; then
+        fuser -v "$new_partition" 2>/dev/null || true
+        fuser -k -9 "$new_partition" 2>/dev/null || true
+    fi
+    if command -v btrfs &>/dev/null; then
+        btrfs device scan --forget "$new_partition" 2>/dev/null || true
+    fi
+    if command -v udevadm &>/dev/null; then
+        udevadm settle --timeout=5 2>/dev/null || true
+    fi
+    sleep 2
+done
+
+if [ "$formatted" = false ]; then
+    echo -e "${ERROR_COLOR}ERROR: Failed to format $new_partition as $FS_TYPE after 5 attempts.${RESET_COLOR}"
+    exit 1
 fi
 echo -e "${SUCCESS_COLOR}$new_partition successfully formatted as $FS_TYPE.${RESET_COLOR}"
 
