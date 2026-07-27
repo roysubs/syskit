@@ -648,6 +648,24 @@ if command -v btrfs &>/dev/null; then
     btrfs device scan --forget 2>/dev/null || true
 fi
 
+dev_base=$(basename "$device")
+part_base=$(basename "$new_partition")
+holders_dir="/sys/block/$dev_base/$part_base/holders"
+
+if [ -d "$holders_dir" ] && [ "$(ls -A "$holders_dir" 2>/dev/null)" ]; then
+    echo -e "${WARN_COLOR}Found active kernel device holders for $new_partition:${RESET_COLOR}"
+    ls -l "$holders_dir" 2>/dev/null || true
+    for h in "$holders_dir"/*; do
+        if [ -e "$h" ]; then
+            hname=$(basename "$h")
+            echo -e "${WARN_COLOR}Removing kernel holder: $hname${RESET_COLOR}"
+            if command -v dmsetup &>/dev/null; then
+                dmsetup remove -f "$hname" 2>/dev/null || true
+            fi
+        fi
+    done
+fi
+
 if command -v dmsetup &>/dev/null; then
     dmsetup remove_all --force 2>/dev/null || true
 fi
@@ -670,14 +688,14 @@ echo "Formatting $new_partition as $FS_TYPE..."
 formatted=false
 for attempt in 1 2 3 4 5; do
     if [ "$FS_TYPE" = "btrfs" ]; then
-        echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}mkfs.btrfs -f -L ${USER_CONFIG_NAME:-data} $new_partition${RESET_COLOR}"
-        if mkfs.btrfs -f -L "${USER_CONFIG_NAME:-data}" "$new_partition"; then formatted=true; break; fi
+        echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}mkfs.btrfs -f -f -L ${USER_CONFIG_NAME:-data} $new_partition${RESET_COLOR}"
+        if mkfs.btrfs -f -f -L "${USER_CONFIG_NAME:-data}" "$new_partition"; then formatted=true; break; fi
     elif [ "$FS_TYPE" = "xfs" ]; then
-        echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}mkfs.xfs -f -L ${USER_CONFIG_NAME:-data} $new_partition${RESET_COLOR}"
-        if mkfs.xfs -f -L "${USER_CONFIG_NAME:-data}" "$new_partition"; then formatted=true; break; fi
+        echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}mkfs.xfs -f -f -L ${USER_CONFIG_NAME:-data} $new_partition${RESET_COLOR}"
+        if mkfs.xfs -f -f -L "${USER_CONFIG_NAME:-data}" "$new_partition"; then formatted=true; break; fi
     else
-        echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L ${USER_CONFIG_NAME:-data} $new_partition${RESET_COLOR}"
-        if mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L "${USER_CONFIG_NAME:-data}" "$new_partition"; then formatted=true; break; fi
+        echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}mkfs.ext4 -F -F -E lazy_itable_init=1,lazy_journal_init=1 -L ${USER_CONFIG_NAME:-data} $new_partition${RESET_COLOR}"
+        if mkfs.ext4 -F -F -E lazy_itable_init=1,lazy_journal_init=1 -L "${USER_CONFIG_NAME:-data}" "$new_partition"; then formatted=true; break; fi
     fi
 
     echo -e "${WARN_COLOR}Device $new_partition busy (attempt $attempt/5). Inspecting holders & kernel logs...${RESET_COLOR}"
