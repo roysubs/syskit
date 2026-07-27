@@ -671,16 +671,28 @@ if command -v systemctl &>/dev/null; then
     systemctl stop udisks.service 2>/dev/null || true
 fi
 
-echo "Testing exclusive O_EXCL access to $new_partition..."
+echo "Testing device open modes (O_RDONLY, O_RDWR, O_EXCL) on $new_partition..."
 python3 -c '
-import os, sys
+import os, sys, glob
+
 path = sys.argv[1]
-try:
-    fd = os.open(path, os.O_RDWR | os.O_EXCL)
-    print(f"SUCCESS: {path} opened exclusively with O_EXCL!")
-    os.close(fd)
-except Exception as e:
-    print(f"FAILED to open {path} with O_EXCL: {e}")
+print(f"--- KERNEL DIAGNOSTIC FOR {path} ---")
+
+part_name = os.path.basename(path)
+disk_name = part_name.rstrip("0123456789")
+sys_path = f"/sys/block/{disk_name}/{part_name}"
+
+if os.path.exists(sys_path):
+    holders = glob.glob(f"{sys_path}/holders/*")
+    print(f"Sysfs holders: {holders}")
+
+for mode_name, mode in [("O_RDONLY", os.O_RDONLY), ("O_RDWR", os.O_RDWR), ("O_RDWR|O_EXCL", os.O_RDWR | os.O_EXCL)]:
+    try:
+        fd = os.open(path, mode)
+        print(f"  {mode_name}: SUCCESS")
+        os.close(fd)
+    except Exception as e:
+        print(f"  {mode_name}: FAILED - {e}")
 ' "$new_partition" || true
 
 if command -v fuser &>/dev/null; then
