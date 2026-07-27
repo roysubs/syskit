@@ -612,13 +612,37 @@ if [ "$PROMPT_USER" = true ]; then
     esac
 fi
 
+echo "Preparing $new_partition for formatting..."
+if command -v fuser &>/dev/null; then
+    fuser -k -9 "$new_partition" &>/dev/null || true
+fi
+if command -v udevadm &>/dev/null; then
+    udevadm settle 2>/dev/null || true
+fi
+sleep 1
+
 echo "Formatting $new_partition as $FS_TYPE..."
 if [ "$FS_TYPE" = "btrfs" ]; then
-    run_command mkfs.btrfs -f -L "${USER_CONFIG_NAME:-data}" "$new_partition"
+    run_command mkfs.btrfs -f -L "${USER_CONFIG_NAME:-data}" "$new_partition" || {
+        echo "Retrying mkfs.btrfs after settling udev..."
+        if command -v udevadm &>/dev/null; then udevadm settle; fi
+        sleep 2
+        run_command mkfs.btrfs -f -L "${USER_CONFIG_NAME:-data}" "$new_partition"
+    }
 elif [ "$FS_TYPE" = "xfs" ]; then
-    run_command mkfs.xfs -f -L "${USER_CONFIG_NAME:-data}" "$new_partition"
+    run_command mkfs.xfs -f -L "${USER_CONFIG_NAME:-data}" "$new_partition" || {
+        echo "Retrying mkfs.xfs after settling udev..."
+        if command -v udevadm &>/dev/null; then udevadm settle; fi
+        sleep 2
+        run_command mkfs.xfs -f -L "${USER_CONFIG_NAME:-data}" "$new_partition"
+    }
 else
-    run_command mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L "${USER_CONFIG_NAME:-data}" "$new_partition"
+    run_command mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L "${USER_CONFIG_NAME:-data}" "$new_partition" || {
+        echo "Retrying mkfs.ext4 after settling udev..."
+        if command -v udevadm &>/dev/null; then udevadm settle; fi
+        sleep 2
+        run_command mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L "${USER_CONFIG_NAME:-data}" "$new_partition"
+    }
 fi
 echo -e "${SUCCESS_COLOR}$new_partition successfully formatted as $FS_TYPE.${RESET_COLOR}"
 
