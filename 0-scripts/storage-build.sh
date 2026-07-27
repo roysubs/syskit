@@ -662,9 +662,9 @@ if [ "$should_add_to_fstab" = true ] && [ -n "$mount_point" ]; then
         echo -e "UUID for $new_partition is: ${SUCCESS_COLOR}$uuid${RESET_COLOR}"
         echo "Mounting $new_partition (UUID=$uuid) at $mount_point..."
         run_command mount UUID="$uuid" "$mount_point"
-        chmod -R 777 "$mount_point" 2>/dev/null || true
+        run_command chmod -R 777 "$mount_point"
         if command -v chcon &>/dev/null; then
-            chcon -R -t samba_share_t "$mount_point" 2>/dev/null || true
+            run_command chcon -R -t samba_share_t "$mount_point"
         fi
         echo -e "${SUCCESS_COLOR}$new_partition successfully mounted at $mount_point (permissions & SELinux context configured).${RESET_COLOR}"
         fstab_entry="UUID=$uuid $mount_point ${FS_TYPE:-btrfs} defaults,nofail 0 2"
