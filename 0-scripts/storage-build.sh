@@ -669,22 +669,61 @@ fi
 if command -v systemctl &>/dev/null; then
     systemctl stop udisks2.service 2>/dev/null || true
     systemctl stop udisks.service 2>/dev/null || true
+    # 'stop' alone is not enough: udisks2 is D-Bus activatable, so any client
+    # (GVFS/Nautilus volume monitor, GNOME Disks, etc.) touching org.freedesktop.UDisks2
+    # will cause systemd to respawn it instantly, and it re-probes new partitions
+    # the moment they appear. Mask it so D-Bus activation is refused too.
+    systemctl mask udisks2.service 2>/dev/null || true
 fi
+pkill -9 -f udisksd 2>/dev/null || true
 
-echo "Testing device open modes (O_RDONLY, O_RDWR, O_EXCL) on $new_partition..."
+echo "Identifying real holders of $new_partition (scanning /proc/*/fd by device number)..."
 python3 -c '
-import os, sys, glob
+import os, sys, glob, stat
 
 path = sys.argv[1]
 print(f"--- KERNEL DIAGNOSTIC FOR {path} ---")
 
+st = os.stat(path)
+target_rdev = st.st_rdev
+whole_disk_rdev = os.makedev(os.major(target_rdev), 0)
+
 part_name = os.path.basename(path)
 disk_name = part_name.rstrip("0123456789")
 sys_path = f"/sys/block/{disk_name}/{part_name}"
-
 if os.path.exists(sys_path):
     holders = glob.glob(f"{sys_path}/holders/*")
     print(f"Sysfs holders: {holders}")
+
+found_any = False
+for pid_dir in glob.glob("/proc/[0-9]*"):
+    pid = os.path.basename(pid_dir)
+    fd_dir = f"{pid_dir}/fd"
+    try:
+        fds = os.listdir(fd_dir)
+    except (FileNotFoundError, PermissionError):
+        continue
+    for fd in fds:
+        try:
+            fst = os.stat(f"{fd_dir}/{fd}")
+        except (FileNotFoundError, PermissionError):
+            continue
+        if not stat.S_ISBLK(fst.st_mode):
+            continue
+        if fst.st_rdev == target_rdev or fst.st_rdev == whole_disk_rdev:
+            try:
+                comm = open(f"{pid_dir}/comm").read().strip()
+            except Exception:
+                comm = "?"
+            try:
+                cmdline = open(f"{pid_dir}/cmdline", "rb").read().replace(b"\x00", b" ").decode(errors="replace").strip()
+            except Exception:
+                cmdline = "?"
+            which = "partition" if fst.st_rdev == target_rdev else "whole-disk"
+            print(f"  HOLDER: pid={pid} comm={comm} ({which}) cmdline={cmdline}")
+            found_any = True
+if not found_any:
+    print("  No process has an open fd on this device or its whole disk.")
 
 for mode_name, mode in [("O_RDONLY", os.O_RDONLY), ("O_RDWR", os.O_RDWR), ("O_RDWR|O_EXCL", os.O_RDWR | os.O_EXCL)]:
     try:
@@ -758,6 +797,10 @@ done
 
 if command -v udevadm &>/dev/null; then
     udevadm control --start-exec-queue 2>/dev/null || true
+fi
+if command -v systemctl &>/dev/null; then
+    systemctl unmask udisks2.service 2>/dev/null || true
+    systemctl start udisks2.service 2>/dev/null || true
 fi
 
 if [ "$formatted" = false ]; then
