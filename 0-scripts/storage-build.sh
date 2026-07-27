@@ -666,9 +666,22 @@ if [ -d "$holders_dir" ] && [ "$(ls -A "$holders_dir" 2>/dev/null)" ]; then
     done
 fi
 
-if command -v dmsetup &>/dev/null; then
-    dmsetup remove_all --force 2>/dev/null || true
+if command -v systemctl &>/dev/null; then
+    systemctl stop udisks2.service 2>/dev/null || true
+    systemctl stop udisks.service 2>/dev/null || true
 fi
+
+echo "Testing exclusive O_EXCL access to $new_partition..."
+python3 -c '
+import os, sys
+path = sys.argv[1]
+try:
+    fd = os.open(path, os.O_RDWR | os.O_EXCL)
+    print(f"SUCCESS: {path} opened exclusively with O_EXCL!")
+    os.close(fd)
+except Exception as e:
+    print(f"FAILED to open {path} with O_EXCL: {e}")
+' "$new_partition" || true
 
 if command -v fuser &>/dev/null; then
     fuser -k -9 "$new_partition" &>/dev/null || true
