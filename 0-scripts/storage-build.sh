@@ -365,11 +365,17 @@ if [ -n "$existing_parts" ]; then
                     echo -e "${WARN_COLOR}Wipe confirmation failed. Operation cancelled.${RESET_COLOR}"
                     exit 1
                 fi
-                echo -e "${WARN_COLOR}Unmounting any active mounts on $device...${RESET_COLOR}"
+                echo -e "${WARN_COLOR}Terminating active file processes & unmounting $device...${RESET_COLOR}"
                 for mp in $(lsblk -lno MOUNTPOINTS "$device" 2>/dev/null | grep -v '^$'); do
+                    if command -v fuser &>/dev/null; then
+                        run_command fuser -k -9 -m "$mp" 2>/dev/null || true
+                    fi
                     run_command umount -f -l "$mp" 2>/dev/null || true
                 done
                 for part in $(lsblk -lno NAME "$device" 2>/dev/null | grep -v "^$(basename "$device")$"); do
+                    if command -v fuser &>/dev/null; then
+                        run_command fuser -k -9 -m "/dev/$part" 2>/dev/null || true
+                    fi
                     run_command umount -f -l "/dev/$part" 2>/dev/null || true
                 done
                 sync
