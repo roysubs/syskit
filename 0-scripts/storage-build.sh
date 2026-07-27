@@ -366,6 +366,7 @@ if [ -n "$existing_parts" ]; then
                     exit 1
                 fi
                 echo -e "${WARN_COLOR}Terminating active file processes & unmounting $device...${RESET_COLOR}"
+                swapoff "${device}"* 2>/dev/null || true
                 for mp in $(lsblk -lno MOUNTPOINTS "$device" 2>/dev/null | grep -v '^$'); do
                     if command -v fuser &>/dev/null; then
                         fuser -k -9 -m "$mp" &>/dev/null || true
@@ -375,10 +376,20 @@ if [ -n "$existing_parts" ]; then
                     fi
                 done
                 for part in $(lsblk -lno NAME "$device" 2>/dev/null | grep -v "^$(basename "$device")$"); do
+                    if command -v fuser &>/dev/null; then
+                        fuser -k -9 "/dev/$part" &>/dev/null || true
+                    fi
                     if mount | grep -q "^/dev/$part "; then
                         run_command umount -f -l "/dev/$part"
                     fi
                 done
+                if command -v wipefs &>/dev/null; then
+                    run_command wipefs -a -f "${device}"1 2>/dev/null || true
+                    run_command wipefs -a -f "$device" 2>/dev/null || true
+                fi
+                if command -v blockdev &>/dev/null; then
+                    blockdev --flushbufs "$device" 2>/dev/null || true
+                fi
                 sync
                 echo -e "${INFO_COLOR}Wiping existing partitions and creating a new GPT partition table on $device...${RESET_COLOR}"
                 run_command parted --script "$device" mklabel gpt
