@@ -659,10 +659,25 @@ for attempt in 1 2 3 4 5; do
         if mkfs.ext4 -F -E lazy_itable_init=1,lazy_journal_init=1 -L "${USER_CONFIG_NAME:-data}" "$new_partition"; then formatted=true; break; fi
     fi
 
-    echo -e "${WARN_COLOR}Device $new_partition busy (attempt $attempt/5). Checking active processes & settling udev...${RESET_COLOR}"
+    echo -e "${WARN_COLOR}Device $new_partition busy (attempt $attempt/5). Inspecting holders...${RESET_COLOR}"
     if command -v fuser &>/dev/null; then
-        fuser -v "$new_partition" 2>/dev/null || true
+        echo "Active processes on $new_partition (fuser):"
+        fuser -v "$new_partition" 2>&1 || true
         fuser -k -9 "$new_partition" 2>/dev/null || true
+    fi
+    if command -v lsof &>/dev/null; then
+        echo "Active processes on $new_partition (lsof):"
+        lsof "$new_partition" 2>&1 || true
+    fi
+    if command -v dmsetup &>/dev/null; then
+        dmsetup remove -f "$(basename "$new_partition")" 2>/dev/null || true
+        dmsetup remove_all --force 2>/dev/null || true
+    fi
+    if command -v kpartx &>/dev/null; then
+        kpartx -d "$device" 2>/dev/null || true
+    fi
+    if command -v wipefs &>/dev/null; then
+        wipefs -a -f "$new_partition" 2>/dev/null || true
     fi
     if command -v btrfs &>/dev/null; then
         btrfs device scan --forget "$new_partition" 2>/dev/null || true
