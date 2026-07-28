@@ -803,31 +803,56 @@ for attempt in 1 2 3 4 5; do
         btrfs device scan --forget "$new_partition" 2>/dev/null || true
     fi
 
-    if [ "$attempt" -eq 2 ]; then
-        echo -e "${WARN_COLOR}No userspace holder was found on a previous check; forcing a kernel-level partition table re-read (blockdev --rereadpt) in case the kernel's own bdev state is stale...${RESET_COLOR}"
-        if command -v blockdev &>/dev/null; then
-            blockdev --flushbufs "$device" 2>/dev/null || true
-            blockdev --rereadpt "$device" 2>/dev/null || true
-        fi
+    if [ "$attempt" -eq 2 ] && command -v blockdev &>/dev/null; then
+        echo "Forcing a kernel-level partition table re-read (blockdev --rereadpt)..."
+        blockdev --flushbufs "$device" 2>/dev/null || true
+        blockdev --rereadpt "$device" 2>/dev/null || true
         if command -v udevadm &>/dev/null; then
             udevadm settle --timeout=5 2>/dev/null || true
         fi
-    elif [ "$attempt" -ge 3 ]; then
-        scsi_delete_path="/sys/block/$(basename "$device")/device/delete"
-        if [ -f "$scsi_delete_path" ]; then
-            scsi_host=$(readlink -f "/sys/block/$(basename "$device")/device" | grep -oE 'host[0-9]+' | tail -n 1)
-            echo -e "${WARN_COLOR}Still busy with no identifiable holder; forcing a full SCSI-level device delete + rescan on $device (host: ${scsi_host:-unknown}) to clear any stuck kernel bdev claim...${RESET_COLOR}"
-            echo 1 > "$scsi_delete_path" 2>/dev/null || true
-            sleep 2
-            if [ -n "$scsi_host" ] && [ -w "/sys/class/scsi_host/$scsi_host/scan" ]; then
-                echo "- - -" > "/sys/class/scsi_host/$scsi_host/scan" 2>/dev/null || true
-            fi
-            sleep 2
-            if command -v udevadm &>/dev/null; then
-                udevadm settle --timeout=10 2>/dev/null || true
-            fi
-        fi
     fi
+
+    echo "Checking every visible mount table for an active mount of this device (matched by device number, not path text)..."
+    python3 -c '
+import os, sys, glob, stat
+
+def rdev_of(path):
+    try:
+        st = os.stat(path)
+        return st.st_rdev if stat.S_ISBLK(st.st_mode) else None
+    except (FileNotFoundError, PermissionError, NotADirectoryError):
+        return None
+
+part_path, disk_path = sys.argv[1], sys.argv[2]
+target_rdev = rdev_of(part_path)
+whole_disk_rdev = rdev_of(disk_path)
+
+seen = set()
+hits = []
+for mounts_file in glob.glob("/proc/[0-9]*/mounts"):
+    try:
+        content = open(mounts_file).read()
+    except (FileNotFoundError, PermissionError):
+        continue
+    if content in seen:
+        continue
+    seen.add(content)
+    for line in content.splitlines():
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        src, mnt = parts[0], parts[1]
+        rdev = rdev_of(src)
+        if rdev is not None and rdev in (target_rdev, whole_disk_rdev):
+            hits.append((mounts_file, src, mnt))
+
+if hits:
+    for mf, src, mnt in hits:
+        print(f"  ACTIVE MOUNT FOUND ({mf}): source={src} -> mountpoint={mnt}")
+else:
+    print("  No active mount of this device found in any visible mount namespace.")
+' "$new_partition" "$device" || true
+
     sleep 2
 done
 
