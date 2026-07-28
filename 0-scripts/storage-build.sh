@@ -725,14 +725,17 @@ for pid_dir in glob.glob("/proc/[0-9]*"):
 if not found_any:
     print("  No process has an open fd on this device or its whole disk.")
 
-for mode_name, mode in [("O_RDONLY", os.O_RDONLY), ("O_RDWR", os.O_RDWR), ("O_RDWR|O_EXCL", os.O_RDWR | os.O_EXCL)]:
-    try:
-        fd = os.open(path, mode)
-        print(f"  {mode_name}: SUCCESS")
-        os.close(fd)
-    except Exception as e:
-        print(f"  {mode_name}: FAILED - {e}")
-' "$new_partition" || true
+whole_disk_path = sys.argv[2]
+for label, test_path in [(f"partition {path}", path), (f"whole disk {whole_disk_path}", whole_disk_path)]:
+    print(f"Open-mode test on {label}:")
+    for mode_name, mode in [("O_RDONLY", os.O_RDONLY), ("O_RDWR", os.O_RDWR), ("O_RDWR|O_EXCL", os.O_RDWR | os.O_EXCL)]:
+        try:
+            fd = os.open(test_path, mode)
+            print(f"  {mode_name}: SUCCESS")
+            os.close(fd)
+        except Exception as e:
+            print(f"  {mode_name}: FAILED - {e}")
+' "$new_partition" "$device" || true
 
 if command -v fuser &>/dev/null; then
     fuser -k -9 "$new_partition" &>/dev/null || true
@@ -769,8 +772,15 @@ for attempt in 1 2 3 4 5; do
 
     echo -e "${WARN_COLOR}Device $new_partition busy (attempt $attempt/5). Inspecting holders & kernel logs...${RESET_COLOR}"
     if command -v dmesg &>/dev/null; then
-        echo "Recent kernel logs (dmesg):"
-        dmesg | tail -n 10 2>&1 || true
+        dev_base_for_grep=$(basename "$device")
+        part_base_for_grep=$(basename "$new_partition")
+        relevant_dmesg=$(dmesg | grep -iE "(^|[^a-z0-9])(${dev_base_for_grep}|${part_base_for_grep})([^a-z0-9]|$)" | tail -n 10)
+        if [ -n "$relevant_dmesg" ]; then
+            echo "Recent kernel logs mentioning $dev_base_for_grep/$part_base_for_grep:"
+            echo "$relevant_dmesg"
+        else
+            echo "No kernel log messages mention $dev_base_for_grep or $part_base_for_grep (busy condition is not being logged)."
+        fi
     fi
     if command -v restorecon &>/dev/null; then
         restorecon -v "$new_partition" 2>/dev/null || true
@@ -791,6 +801,32 @@ for attempt in 1 2 3 4 5; do
     fi
     if command -v btrfs &>/dev/null; then
         btrfs device scan --forget "$new_partition" 2>/dev/null || true
+    fi
+
+    if [ "$attempt" -eq 2 ]; then
+        echo -e "${WARN_COLOR}No userspace holder was found on a previous check; forcing a kernel-level partition table re-read (blockdev --rereadpt) in case the kernel's own bdev state is stale...${RESET_COLOR}"
+        if command -v blockdev &>/dev/null; then
+            blockdev --flushbufs "$device" 2>/dev/null || true
+            blockdev --rereadpt "$device" 2>/dev/null || true
+        fi
+        if command -v udevadm &>/dev/null; then
+            udevadm settle --timeout=5 2>/dev/null || true
+        fi
+    elif [ "$attempt" -ge 3 ]; then
+        scsi_delete_path="/sys/block/$(basename "$device")/device/delete"
+        if [ -f "$scsi_delete_path" ]; then
+            scsi_host=$(readlink -f "/sys/block/$(basename "$device")/device" | grep -oE 'host[0-9]+' | tail -n 1)
+            echo -e "${WARN_COLOR}Still busy with no identifiable holder; forcing a full SCSI-level device delete + rescan on $device (host: ${scsi_host:-unknown}) to clear any stuck kernel bdev claim...${RESET_COLOR}"
+            echo 1 > "$scsi_delete_path" 2>/dev/null || true
+            sleep 2
+            if [ -n "$scsi_host" ] && [ -w "/sys/class/scsi_host/$scsi_host/scan" ]; then
+                echo "- - -" > "/sys/class/scsi_host/$scsi_host/scan" 2>/dev/null || true
+            fi
+            sleep 2
+            if command -v udevadm &>/dev/null; then
+                udevadm settle --timeout=10 2>/dev/null || true
+            fi
+        fi
     fi
     sleep 2
 done
