@@ -793,8 +793,18 @@ for attempt in 1 2 3 4 5; do
         fuser -k -9 "$new_partition" 2>/dev/null || true
     fi
     if command -v dmsetup &>/dev/null; then
-        dmsetup remove -f "$(basename "$new_partition")" 2>/dev/null || true
-        dmsetup remove_all --force 2>/dev/null || true
+        # Scoped to holders sysfs actually reports for THIS partition/disk only —
+        # never a blanket 'remove_all', which would tear down unrelated LVM/LUKS
+        # volumes elsewhere on the system.
+        for holders_scope in "/sys/block/$(basename "$device")/$(basename "$new_partition")/holders" \
+                              "/sys/block/$(basename "$device")/holders"; do
+            if [ -d "$holders_scope" ]; then
+                for h in "$holders_scope"/*; do
+                    [ -e "$h" ] || continue
+                    dmsetup remove -f "$(basename "$h")" 2>/dev/null || true
+                done
+            fi
+        done
     fi
     if command -v kpartx &>/dev/null; then
         kpartx -d "$device" 2>/dev/null || true
