@@ -384,8 +384,10 @@ if [ -n "$existing_parts" ]; then
                     fi
                 done
                 if command -v wipefs &>/dev/null; then
-                    run_command wipefs -a -f "${device}"1 2>/dev/null || true
-                    run_command wipefs -a -f "$device" 2>/dev/null || true
+                    echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}wipefs -a -f ${device}1${RESET_COLOR}"
+                    wipefs -a -f "${device}"1 || true
+                    echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}wipefs -a -f $device${RESET_COLOR}"
+                    wipefs -a -f "$device" || true
                 fi
                 if command -v partx &>/dev/null; then
                     partx -d "$device" 2>/dev/null || true
@@ -401,7 +403,8 @@ if [ -n "$existing_parts" ]; then
 
                 echo -e "${INFO_COLOR}Wiping existing partitions and creating a new GPT partition table on $device...${RESET_COLOR}"
                 if command -v sgdisk &>/dev/null; then
-                    run_command sgdisk -Z "$device" 2>/dev/null || true
+                    echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}sgdisk -Z $device${RESET_COLOR}"
+                    sgdisk -Z "$device" || true
                     run_command sgdisk -o "$device"
                 else
                     echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}parted --script $device mklabel gpt${RESET_COLOR}"
