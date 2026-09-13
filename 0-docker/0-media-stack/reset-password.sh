@@ -1,10 +1,7 @@
-<<<<<<< Updated upstream
 #!/usr/bin/env bash
+if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 # Script to wipe qBittorrent password and retrieve the temporary one
 
-=======
-#!/bin/bash
->>>>>>> Stashed changes
 CONTAINER_NAME="qbittorrent"
 CONFIG_FILE="$HOME/.config/media-stack/qbittorrent/qBittorrent/config/qBittorrent.conf"
 

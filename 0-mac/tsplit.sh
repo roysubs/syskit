@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 
 # tsplit.sh - Opens a new Terminal window and splits screen 50/50 with the current one.
 # Can be run from command line: ./tsplit.sh

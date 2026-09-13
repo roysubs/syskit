@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 # Resets qBittorrent's WebUI password to a known value by writing a PBKDF2
 # hash directly into the config file. Works around a known bug in
 # binhex/arch-qbittorrentvpn where the auto-generated temp password is

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 
 # host-announce.sh - Ensure this Linux host is discoverable by hostname
 

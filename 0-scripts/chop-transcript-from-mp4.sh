@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 # mp4-transcribe.sh
 # Usage: ./mp4-transcribe.sh video.mp4
 # Requirements: none pre-installed; installs on demand (ffmpeg, pip, whisper)
