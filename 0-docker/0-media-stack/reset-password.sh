@@ -1,37 +1,48 @@
+<<<<<<< Updated upstream
 #!/usr/bin/env bash
 # Script to wipe qBittorrent password and retrieve the temporary one
 
+=======
+#!/bin/bash
+>>>>>>> Stashed changes
 CONTAINER_NAME="qbittorrent"
 CONFIG_FILE="$HOME/.config/media-stack/qbittorrent/qBittorrent/config/qBittorrent.conf"
 
 echo "--- Resetting qBittorrent Password ---"
 
-# 1. Stop the container to safely edit the file
 echo "1. Stopping container..."
 docker compose stop "$CONTAINER_NAME"
 
-# 2. Wipe the password lines (both legacy and new formats)
 echo "2. Wiping old password settings from config..."
-# Removes lines starting with WebUI\Password= or WebUI\Password_PBKDF2=
-sed -i '/^WebUI\\Password/d' "$CONFIG_FILE"
+if [ ! -w "$CONFIG_FILE" ]; then
+    echo "⚠️  No write permission on $CONFIG_FILE — trying with sudo"
+    sudo sed -i '/^WebUI\\Password/d' "$CONFIG_FILE"
+else
+    sed -i '/^WebUI\\Password/d' "$CONFIG_FILE"
+fi
 
-# 3. Start the container
+# Verify it actually got removed
+if grep -q "^WebUI\\\\Password" "$CONFIG_FILE"; then
+    echo "❌ Password line still present — the edit failed. Aborting."
+    exit 1
+fi
+
 echo "3. Starting container..."
 docker compose start "$CONTAINER_NAME"
 
-# 4. Wait for the logs to generate the password
-echo "4. Waiting 10 seconds for qBittorrent to generate a temporary password..."
-sleep 10
+echo "4. Waiting for qBittorrent to generate a temporary password..."
+PASSWORD=""
+for i in {1..15}; do
+    sleep 2
+    PASSWORD=$(docker logs "$CONTAINER_NAME" 2>&1 | grep -iA 1 "temporary password" | tail -n 1)
+    [ -n "$PASSWORD" ] && break
+done
 
-# 5. Extract the password from the logs
 echo -e "\n--- 🔑 YOUR TEMPORARY PASSWORD ---"
-# We look for the specific line in the logs
-docker logs "$CONTAINER_NAME" 2>&1 | grep -A 1 "temporary password" | tail -n 1
+if [ -n "$PASSWORD" ]; then
+    echo "$PASSWORD"
+else
+    echo "❌ Not found in logs. Dumping recent logs for manual inspection:"
+    docker logs "$CONTAINER_NAME" 2>&1 | tail -n 40
+fi
 echo -e "----------------------------------\n"
-
-echo "👉 ACTION REQUIRED:"
-echo "1. Go to http://localhost:8080"
-echo "2. Login with Username: admin"
-echo "3. Password: (Use the random code shown above)"
-echo "4. Go to Tools > Options > Web UI and change the password to 'password' immediately."
-echo "   (Since your config file is now fixed on the host, this change will stick forever!)"

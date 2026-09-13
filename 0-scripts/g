@@ -102,6 +102,7 @@ if [ $# -eq 0 ]; then
     echo "  set-git <ssh_url>     Change current repo's 'origin' remote URL to the provided SSH URL."
     echo "  ps|push               Push: Update to the current branch's upstream (git push)"
     echo "  pl|pull               Pull: Update latest changes from the remote to local"
+    echo "  unstuck               Recover from a diverged branch (local commit(s) + push rejected, 'g pl' won't fast-forward)"
     echo "  cl|clone <url> [dir]  Clone a full project from a git repository and report stats"
     echo "  cl1 <url> [dir]       Clone, but with max depth 1 only, and report stats"
     echo "  d|diff                Diff: Show unstaged changes (git diff)"
@@ -137,7 +138,7 @@ case "$option" in
             cd "$INVOCATION_DIR" || { echo_red "❌ Error: Could not return to invocation directory."; exit 1; }
         fi
         ;;
-    a|A|c|s|ss|acp|ps|push|pl|pull|d|diff|ds|lshort|ldiffs|lfiles|b|branch|ch|co|checkout|nb|rpo|f|m|rs|rh|stash|stpush|stpop|clear|set-git|t)
+    a|A|c|s|ss|acp|ps|push|pl|pull|d|diff|ds|lshort|ldiffs|lfiles|b|branch|ch|co|checkout|nb|rpo|f|m|rs|rh|stash|stpush|stpop|clear|set-git|t|unstuck)
         TARGET_PROJECT_ROOT="$(git -C "$INVOCATION_DIR" rev-parse --show-toplevel 2>/dev/null)"
         if [ -n "$TARGET_PROJECT_ROOT" ] && [ -d "$TARGET_PROJECT_ROOT" ]; then
             cd "$TARGET_PROJECT_ROOT" || { echo_red "❌ Error: Could not change to project root."; exit 1; }
@@ -195,7 +196,26 @@ case "$option" in
         done
         COMMIT_STR="${COMMIT_MSG_PARTS[*]:-Various}"
         if [[ ${#COMMIT_MSG_PARTS[@]} -eq 0 ]]; then echo_yellow "ℹ️ No commit message provided. Using default: \"$COMMIT_STR\""; fi
-        
+
+        # --- Pre-flight: make sure we're not about to commit on top of a stale local branch ---
+        ACP_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null)
+        if [ -n "$ACP_BRANCH" ] && git remote get-url origin &>/dev/null; then
+            echo_blue "🔄 Checking origin/$ACP_BRANCH for new commits before committing..."
+            if git fetch origin "$ACP_BRANCH" --quiet 2>/dev/null && git show-ref --verify --quiet "refs/remotes/origin/$ACP_BRANCH"; then
+                LOCAL_REV=$(git rev-parse "$ACP_BRANCH")
+                REMOTE_REV=$(git rev-parse "origin/$ACP_BRANCH")
+                if [ "$LOCAL_REV" != "$REMOTE_REV" ]; then
+                    BASE_REV=$(git merge-base "$ACP_BRANCH" "origin/$ACP_BRANCH")
+                    if [ "$LOCAL_REV" = "$BASE_REV" ]; then
+                        echo_red "❌ origin/$ACP_BRANCH has commits you don't have locally yet — committing now would just fail to push."
+                        echo_yellow "   Run 'g pl' to pull those changes first, then re-run 'g acp'."
+                        echo_yellow "   (Your uncommitted local changes are untouched and safe — this only stopped the commit/push.)"
+                        exit 1
+                    fi
+                fi
+            fi
+        fi
+
         echo "====="
         display_and_run git status --short
         echo "====="
@@ -248,6 +268,14 @@ case "$option" in
                 read -rp "✅ Ready to push to origin/$CURRENT_BRANCH — press ENTER to confirm... "
                 display_and_run git push origin "$CURRENT_BRANCH"
             fi
+            PUSH_STATUS=$?
+            if [ $PUSH_STATUS -ne 0 ]; then
+                echo_red "❌ Push failed — your commit is safe locally, it just hasn't reached origin/$CURRENT_BRANCH."
+                echo_yellow "🔧 To fix: run 'g unstuck' — it walks through undoing this commit, pulling, and reapplying it, step by step."
+                echo_yellow "   (Or manually: 'g pl' to pull/merge, then 'g ps' to push again.)"
+                exit 1
+            fi
+            echo_green "✅ Pushed to origin/$CURRENT_BRANCH."
         fi
         ;;
     ps|push) display_and_run git push ;;
@@ -272,7 +300,15 @@ case "$option" in
             echo "   Incoming Summary ($DIFF_COUNT file(s) changed on server):"
             display_and_run "git diff --name-status $LOCAL_BRANCH...$REMOTE_BRANCH"
             echo "   --------------------------------------------------"
-            
+
+            AHEAD_COUNT=$(git log --oneline "$REMOTE_BRANCH..$LOCAL_BRANCH" | wc -l | tr -d ' ')
+            if [[ "$AHEAD_COUNT" -gt 0 ]]; then
+                echo_red "⚠️  Your branch has diverged: you have $AHEAD_COUNT local commit(s) that $REMOTE_BRANCH does not have."
+                echo_yellow "   A fast-forward pull WILL fail below. If you want to keep your local commit(s) as-is on top,"
+                echo_yellow "   cancel here (n) and run 'git pull' (no --ff-only) or 'git rebase origin/$LOCAL_BRANCH' instead."
+                echo_yellow "   To un-commit and inspect your changes first, see 'g t' for the reset/stash recipe."
+            fi
+
             echo "   y = Show detailed line-by-line changes (uses 'git diff')"
             echo "   n = Keep the current summary and proceed to pull"
             echo "   --------------------------------------------------"
@@ -284,10 +320,74 @@ case "$option" in
             echo "   n = Cancel the pull"
             echo "   --------------------------------------------------"
             read -rp "❓ Pull (fast-forward only)? (Y/n): " confirm_pull
-            [[ ! "$confirm_pull" =~ ^[Nn]$ ]] && display_and_run "git pull --ff-only origin $LOCAL_BRANCH"
+            if [[ ! "$confirm_pull" =~ ^[Nn]$ ]]; then
+                display_and_run "git pull --ff-only origin $LOCAL_BRANCH"
+                if [ $? -ne 0 ]; then
+                    echo_red "❌ Fast-forward pull failed — $LOCAL_BRANCH and $REMOTE_BRANCH have diverged (both moved forward independently)."
+                    echo_yellow "   Run 'g unstuck' — it automates undoing your local commit(s), pulling, and reapplying them, and tells you"
+                    echo_yellow "   exactly what to do if a file conflicts."
+                    exit 1
+                fi
+            fi
         else
             echo_yellow "ℹ️ No remote tracking branch found; attempting standard pull..."
             display_and_run "git pull"
+        fi
+        ;;
+    unstuck)
+        UB_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null)
+        if [ -z "$UB_BRANCH" ]; then echo_red "❌ Not on a branch (detached HEAD?). Can't auto-recover."; exit 1; fi
+        if ! git remote get-url origin &>/dev/null; then echo_red "❌ No 'origin' remote configured."; exit 1; fi
+
+        echo_blue "🧭 Diverged-branch recovery helper for '$UB_BRANCH'"
+        display_and_run "git fetch origin $UB_BRANCH"
+        if ! git show-ref --verify --quiet "refs/remotes/origin/$UB_BRANCH"; then
+            echo_red "❌ No origin/$UB_BRANCH to compare against."; exit 1
+        fi
+
+        UB_AHEAD=$(git log --oneline "origin/$UB_BRANCH..$UB_BRANCH" | wc -l | tr -d ' ')
+        UB_BEHIND=$(git log --oneline "$UB_BRANCH..origin/$UB_BRANCH" | wc -l | tr -d ' ')
+
+        if [ "$UB_AHEAD" -eq 0 ]; then
+            echo_green "✅ You have no local-only commits on '$UB_BRANCH' — a plain 'g pl' will work fine. Nothing to unstick."
+            exit 0
+        fi
+
+        echo_yellow "You have $UB_AHEAD local commit(s) that origin/$UB_BRANCH doesn't have, and it has $UB_BEHIND you don't:"
+        display_and_run "git log --oneline origin/$UB_BRANCH..$UB_BRANCH"
+        echo
+        echo "This will, step by step:"
+        echo "  1. Undo your $UB_AHEAD local commit(s) — 'git reset --soft' turns them back into staged changes (nothing is deleted)."
+        echo "  2. Shelve those staged/untracked changes so the tree is clean — 'git stash -u'."
+        echo "  3. Fast-forward pull from origin/$UB_BRANCH."
+        echo "  4. Re-apply your shelved changes — 'git stash pop'."
+        echo "If a file was changed on both sides, step 4 will report a conflict for you to resolve by hand — that part can't be automated safely."
+        read -rp "Proceed? (y/N): " ub_confirm
+        [[ ! "$ub_confirm" =~ ^[Yy]$ ]] && { echo_blue "Cancelled. Nothing changed."; exit 0; }
+
+        display_and_run "git reset --soft HEAD~$UB_AHEAD"
+        display_and_run "git stash -u -m 'g unstuck: wip before pull'"
+        display_and_run "git pull --ff-only origin $UB_BRANCH"
+        if [ $? -ne 0 ]; then
+            echo_red "❌ Fast-forward pull still failed unexpectedly. Your changes are safe — see 'git stash list' — get help before doing anything destructive."
+            exit 1
+        fi
+        display_and_run "git stash pop"
+
+        UB_CONFLICTS=$(git diff --name-only --diff-filter=U)
+        if [ -n "$UB_CONFLICTS" ]; then
+            echo_red "⚠️  Conflict(s) — git could not automatically combine your changes with the pulled version in:"
+            echo "$UB_CONFLICTS" | sed 's/^/     - /'
+            echo_yellow "For each file above:"
+            echo_yellow "  1. Open it and find the conflict markers: <<<<<<< Updated upstream ... ======= ... >>>>>>> Stashed changes"
+            echo_yellow "     (top section = what was just pulled; bottom section = your change)"
+            echo_yellow "  2. Edit it to keep whichever lines are correct, then DELETE the marker lines themselves."
+            echo_yellow "  3. git add <file>"
+            echo_yellow "  4. Once every conflicted file is added: git stash drop   (clears the leftover stash entry)"
+            echo_yellow "  5. Then: g acp"
+        else
+            echo_green "✅ No conflicts — your changes are back in place, staged and ready."
+            echo_yellow "   Review with 'g ss', then commit & push with 'g acp'."
         fi
         ;;
     d|diff) display_and_run git diff ;;
@@ -331,7 +431,11 @@ case "$option" in
         echo "  - Undo last commit (keep changes): g rs HEAD~1"
         echo "  - Undo last commit (DISCARD changes): g rh HEAD~1"
         echo "  - Detached HEAD: 'g ch <branchname>' to fix."
-        echo "  - Push rejected: Pull first with 'g pl'."
+        echo "  - Push rejected, and 'g pl' fails to fast-forward ('diverging branches'):"
+        echo "      Your branch and origin have DIVERGED (you have local commit(s) origin doesn't have,"
+        echo "      AND origin has commits you don't have). Run: g unstuck"
+        echo "      It undoes your local commit(s) (keeping them staged, nothing is lost), pulls cleanly, then"
+        echo "      reapplies your changes — and tells you exactly what to do if a file conflicts."
         ;;
     *) echo_red "❌ Invalid option."; exit 1 ;;
 esac
