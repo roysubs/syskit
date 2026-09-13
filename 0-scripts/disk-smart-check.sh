@@ -6,6 +6,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Optimized for: macOS (M1/M2/M3/M4), openSUSE, Debian/Mint, Arch, RHEL
 # ==============================================================================
 
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 set -uo pipefail
 DATE=$(date +%Y%m%d)
 OUT_DIR="/tmp/disks"
@@ -52,7 +61,7 @@ install_deps() {
         if command -v zypper &>/dev/null; then
             sudo zypper --non-interactive install --auto-agree-with-licenses -y smartmontools
         elif command -v apt-get &>/dev/null; then
-            sudo apt-get update && sudo apt-get install -y smartmontools
+            pkg_install smartmontools
         elif command -v dnf &>/dev/null; then
             sudo dnf install -y smartmontools
         elif command -v pacman &>/dev/null; then

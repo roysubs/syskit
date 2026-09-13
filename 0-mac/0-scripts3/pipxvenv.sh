@@ -5,9 +5,18 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Tool to run a pip package inside a venv (requires pipx, python3-venv)
 
 # Check if pipx is installed, if not, notify user and install it
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 if ! command -v pipx &>/dev/null; then
     echo "pipx is not installed. Installing pipx..."
-    sudo apt update && sudo apt install -y pipx
+    pkg_install pipx
     pipx ensurepath
 fi
 

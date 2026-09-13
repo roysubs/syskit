@@ -2,6 +2,15 @@
 if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 # Author: Roy Wiseman 2025-05
 
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 set -e   # Exit immediately if a command exits with a non-zero status
 set -x   # Show each command before execution
 
@@ -22,7 +31,7 @@ else
     # Ensure curl is installed
     if ! command -V curl >/dev/null 2>&1; then
       echo "curl not found. Installing curl..."
-      apt install -y curl
+      pkg_install curl
     fi
     curl -fsSL https://tailscale.com/install.sh | sh
     apt update   # Update package list again to include Tailscale repository

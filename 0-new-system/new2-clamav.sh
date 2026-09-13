@@ -3,6 +3,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-05
 
 # Function to print in green text
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 print_step() {
     echo -e "\033[1;32m$1\033[0m"
 }
@@ -11,7 +20,7 @@ print_step() {
 print_step "Step 1: Installing ClamAV and chkrootkit..."
 if ! command -v clamscan &>/dev/null; then
     echo "Installing ClamAV and necessary services..."
-    sudo apt update && sudo apt install -y clamav clamav-daemon
+    pkg_install clamav clamav-daemon
     sudo apt install chkrootkit
 sudo chkrootkit
 else

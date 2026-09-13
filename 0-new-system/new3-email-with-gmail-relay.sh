@@ -5,6 +5,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Install and configure postfix and a gmail SMTP relay
 
 # Define colors for better readability
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
@@ -18,7 +27,7 @@ echo -e "${GREEN}Step 1: Updating system packages...${NC}"
 sudo apt update && sudo apt upgrade -y
 
 echo -e "${GREEN}Step 2: Installing Postfix and required dependencies...${NC}"
-sudo apt install -y postfix mailutils libsasl2-2 libsasl2-modules
+pkg_install postfix mailutils libsasl2-2 libsasl2-modules
 
 # Configure Postfix
 echo -e "${GREEN}Step 3: Configuring Postfix for Gmail relay...${NC}"

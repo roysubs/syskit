@@ -6,6 +6,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Git Tool Script
 # Provides utilities for common Git operations and troubleshooting.
 
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 if ! command -v git &>/dev/null; then
     read -p "git not found. Install (y/N)? " -n 1 -r REPLY && echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -17,7 +26,7 @@ if ! command -v git &>/dev/null; then
                 exit 1
             fi
         else
-            sudo apt update && sudo apt install -y git
+            pkg_install git
         fi
     else
         echo "git not installed. Exiting."; exit 1;
@@ -37,6 +46,23 @@ echo_yellow() { echo -e "\033[1;33m$@\033[0m"; }
 display_and_run() {
     echo -e "\033[1;34m$@\033[0m" # Echo the command
     eval "$@" # Execute the command
+}
+
+# Print a link to the remote's web history for a branch, so the user can
+# independently confirm a push actually landed (works for SSH incl. custom
+# Host aliases, and HTTPS remotes; supports github.com and gitlab.com).
+show_commit_confirm_url() {
+    local branch="$1"
+    local remote_url owner_repo
+    remote_url=$(git config --get remote.origin.url 2>/dev/null)
+    [ -z "$remote_url" ] && return
+    owner_repo=$(echo "$remote_url" | sed -E 's#^git@[^:]+:##; s#^https?://[^/]+/##; s#\.git$##')
+    [ -z "$owner_repo" ] && return
+    if echo "$remote_url" | grep -qi gitlab; then
+        echo_blue "🔎 Confirm on GitLab: https://gitlab.com/${owner_repo}/-/commits/${branch}"
+    else
+        echo_blue "🔎 Confirm on GitHub: https://github.com/${owner_repo}/commits/${branch}"
+    fi
 }
 
 print_git_status_legend() {
@@ -272,14 +298,22 @@ case "$option" in
             PUSH_STATUS=$?
             if [ $PUSH_STATUS -ne 0 ]; then
                 echo_red "❌ Push failed — your commit is safe locally, it just hasn't reached origin/$CURRENT_BRANCH."
-                echo_yellow "🔧 To fix: run 'g unstuck' — it walks through undoing this commit, pulling, and reapplying it, step by step."
-                echo_yellow "   (Or manually: 'g pl' to pull/merge, then 'g ps' to push again.)"
+                echo_yellow "🔧 Check the error above against these two common causes:"
+                echo_yellow "   1. Diverged history ('fetch first', 'rejected', 'non-fast-forward') → run 'g unstuck'"
+                echo_yellow "   2. Permission/auth error ('Permission denied', 'denied to <user>') → this machine is authenticating"
+                echo_yellow "      as the wrong GitHub identity. Run 'ssh -T git@github.com' to see which account it is, then either"
+                echo_yellow "      give that account access to this repo, or set up a dedicated key (see git-setup-github-for-ssh.sh)."
                 exit 1
             fi
             echo_green "✅ Pushed to origin/$CURRENT_BRANCH."
+            show_commit_confirm_url "$CURRENT_BRANCH"
         fi
         ;;
-    ps|push) display_and_run git push ;;
+    ps|push)
+        PS_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null)
+        display_and_run git push
+        [ $? -eq 0 ] && show_commit_confirm_url "$PS_BRANCH"
+        ;;
     pl|pull)
         echo_blue "📡 Safe-Pull Workflow:"
         echo "   1. Fetching latest remote changes (without merging)..."
@@ -324,9 +358,9 @@ case "$option" in
             if [[ ! "$confirm_pull" =~ ^[Nn]$ ]]; then
                 display_and_run "git pull --ff-only origin $LOCAL_BRANCH"
                 if [ $? -ne 0 ]; then
-                    echo_red "❌ Fast-forward pull failed — $LOCAL_BRANCH and $REMOTE_BRANCH have diverged (both moved forward independently)."
-                    echo_yellow "   Run 'g unstuck' — it automates undoing your local commit(s), pulling, and reapplying them, and tells you"
-                    echo_yellow "   exactly what to do if a file conflicts."
+                    echo_red "❌ Fast-forward pull failed — either $LOCAL_BRANCH has diverged from $REMOTE_BRANCH, or you have"
+                    echo_red "   uncommitted changes to a file that also changed remotely (see git's message above for which)."
+                    echo_yellow "   Run 'g unstuck' — it handles both cases: local commits, uncommitted changes, or both."
                     exit 1
                 fi
             fi
@@ -348,31 +382,61 @@ case "$option" in
 
         UB_AHEAD=$(git log --oneline "origin/$UB_BRANCH..$UB_BRANCH" | wc -l | tr -d ' ')
         UB_BEHIND=$(git log --oneline "$UB_BRANCH..origin/$UB_BRANCH" | wc -l | tr -d ' ')
+        UB_DIRTY=$(git status --porcelain)
 
-        if [ "$UB_AHEAD" -eq 0 ]; then
-            echo_green "✅ You have no local-only commits on '$UB_BRANCH' — a plain 'g pl' will work fine. Nothing to unstick."
+        if [ "$UB_AHEAD" -eq 0 ] && [ -z "$UB_DIRTY" ]; then
+            echo_green "✅ No local-only commits and no uncommitted changes on '$UB_BRANCH' — a plain 'g pl' will work fine. Nothing to unstick."
             exit 0
         fi
 
-        echo_yellow "You have $UB_AHEAD local commit(s) that origin/$UB_BRANCH doesn't have, and it has $UB_BEHIND you don't:"
-        display_and_run "git log --oneline origin/$UB_BRANCH..$UB_BRANCH"
+        echo_yellow "Current situation on '$UB_BRANCH':"
+        if [ "$UB_AHEAD" -gt 0 ]; then
+            echo_yellow "  - $UB_AHEAD local commit(s) that origin/$UB_BRANCH doesn't have (and it has $UB_BEHIND you don't):"
+            display_and_run "git log --oneline origin/$UB_BRANCH..$UB_BRANCH"
+        fi
+        if [ -n "$UB_DIRTY" ]; then
+            echo_yellow "  - Uncommitted changes in your working tree/index (this alone is enough to block a pull):"
+            display_and_run "git status --short"
+        fi
         echo
         echo "This will, step by step:"
-        echo "  1. Undo your $UB_AHEAD local commit(s) — 'git reset --soft' turns them back into staged changes (nothing is deleted)."
-        echo "  2. Shelve those staged/untracked changes so the tree is clean — 'git stash -u'."
-        echo "  3. Fast-forward pull from origin/$UB_BRANCH."
-        echo "  4. Re-apply your shelved changes — 'git stash pop'."
-        echo "If a file was changed on both sides, step 4 will report a conflict for you to resolve by hand — that part can't be automated safely."
+        UB_STEP=1
+        if [ "$UB_AHEAD" -gt 0 ]; then
+            echo "  $UB_STEP. Undo your $UB_AHEAD local commit(s) — 'git reset --soft' turns them back into staged changes (nothing is deleted)."
+            UB_STEP=$((UB_STEP + 1))
+        fi
+        echo "  $UB_STEP. Shelve all staged/unstaged/untracked changes so the tree is clean — 'git stash -u'."
+        UB_STEP=$((UB_STEP + 1))
+        echo "  $UB_STEP. Fast-forward pull from origin/$UB_BRANCH."
+        UB_STEP=$((UB_STEP + 1))
+        echo "  $UB_STEP. Re-apply your shelved changes — 'git stash pop'."
+        echo "If a file was changed on both sides, that last step will report a conflict for you to resolve by hand — that part can't be automated safely."
         read -rp "Proceed? (y/N): " ub_confirm
         [[ ! "$ub_confirm" =~ ^[Yy]$ ]] && { echo_blue "Cancelled. Nothing changed."; exit 0; }
 
-        display_and_run "git reset --soft HEAD~$UB_AHEAD"
-        display_and_run "git stash -u -m 'g unstuck: wip before pull'"
+        [ "$UB_AHEAD" -gt 0 ] && display_and_run "git reset --soft HEAD~$UB_AHEAD"
+
+        # Re-check: reset --soft (if run) turns commits back into staged changes, so this
+        # may now be dirty even if it wasn't originally checked that way.
+        UB_STASHED=0
+        if [ -n "$(git status --porcelain)" ]; then
+            display_and_run "git stash -u -m 'g unstuck: wip before pull'"
+            UB_STASHED=1
+        fi
+
         display_and_run "git pull --ff-only origin $UB_BRANCH"
         if [ $? -ne 0 ]; then
-            echo_red "❌ Fast-forward pull still failed unexpectedly. Your changes are safe — see 'git stash list' — get help before doing anything destructive."
+            echo_red "❌ Fast-forward pull still failed unexpectedly."
+            [ "$UB_STASHED" -eq 1 ] && echo_red "   Your changes are safe — see 'git stash list'."
+            echo_red "   Get help before doing anything destructive."
             exit 1
         fi
+
+        if [ "$UB_STASHED" -eq 0 ]; then
+            echo_green "✅ Pulled cleanly. Nothing needed to be shelved."
+            exit 0
+        fi
+
         display_and_run "git stash pop"
 
         UB_CONFLICTS=$(git diff --name-only --diff-filter=U)
@@ -383,6 +447,7 @@ case "$option" in
             echo_yellow "  1. Open it and find the conflict markers: <<<<<<< Updated upstream ... ======= ... >>>>>>> Stashed changes"
             echo_yellow "     (top section = what was just pulled; bottom section = your change)"
             echo_yellow "  2. Edit it to keep whichever lines are correct, then DELETE the marker lines themselves."
+            echo_yellow "     (Tip: 'diff-quick.sh <file>' will walk through the markers for you.)"
             echo_yellow "  3. git add <file>"
             echo_yellow "  4. Once every conflicted file is added: git stash drop   (clears the leftover stash entry)"
             echo_yellow "  5. Then: g acp"

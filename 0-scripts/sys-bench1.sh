@@ -98,10 +98,6 @@ install_dependency() {
         fi
     fi
 }
-            exit 1
-        fi
-    fi
-}
 
 # Install dependencies using the new function
 install_dependency "coreutils" "nproc"

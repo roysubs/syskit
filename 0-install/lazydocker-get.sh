@@ -9,8 +9,16 @@ if command -v lazydocker >/dev/null 2>&1; then
 fi
 echo "LazyDocker not found. Proceeding with installation..."
 
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 # Update package list and install prerequisites
-sudo apt update && sudo apt install -y wget git unzip
+pkg_install wget git unzip
 
 # Start tracking time and disk usage after initial steps
 start_time=$(date +%s)
@@ -42,5 +50,5 @@ echo "--------------------------------------------"
 echo "Total time taken: $((total_time / 60)) minutes and $((total_time % 60)) seconds"
 echo "Total disk space used by installations: $used_space MB"
 
-echo "More info: https://www.youtube.com/watch?v=IUAk1pjXDWM
+echo "More info: https://www.youtube.com/watch?v=IUAk1pjXDWM"
 

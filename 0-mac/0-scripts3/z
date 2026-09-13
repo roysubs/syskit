@@ -488,18 +488,3 @@ case "$COMMAND" in
 esac
 
 exit 0
-```
-
-**Key improvements in this version:**
-
-* **`run_command` Display:** The logic for displaying the command has been refined to better quote arguments with spaces or special characters, aiming for a more accurate representation of the executed command. It also tries to handle the `7z -oPath` or `-o"Path With Space"` display correctly.
-* **`show_examples` (hh):** Now clearly distinguishes between "Native" tool syntax and the "`${SCRIPT_NAME}` eqv." (equivalent) for each example.
-* **Extension Handling for `a, add, an`:**
-    * It now checks against a list of `KNOWN_ARCHIVE_EXTENSIONS`.
-    * If the user provides an archive name without a known extension (e.g., `zz a myarchive file.txt`), it appends the default extension for the *currently active archiver* (e.g., `.7z` or `.zip`).
-    * If the user provides an archive name *with* a known extension (e.g., `zz a myarchive.zip file.txt`), it respects that name. If this extension is different from what the default archiver would use (e.g., default is 7z, user gives .zip), it issues a warning but proceeds with the user's specified name.
-* **Tar Extension Correction:** The `atgz`, `atbz`, `atxz` commands now use a more straightforward method to ensure the correct final extension (e.g., `myarchive.tar.gz`).
-* **Case Insensitivity:** Many file extension checks (e.g., for `.gz`, `.zip`, `.tar.gz`) are now case-insensitive (`${variable,,}`).
-* **Zstandard (.zst) basic support:** Added `.zst` and `.tar.zst` to known extensions and a basic single-file extraction case for `.zst` files using `unzstd` or `zstd -d`.
-
-This version should align much better with your vision of the tool as both a convenient wrapper and an educational aid for the underlying command-line utilities. Test it o

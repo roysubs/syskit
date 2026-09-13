@@ -5,6 +5,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # This script helps set up and verify X forwarding within WSL2 using WSLg.
 # It assumes you have a recent version of Windows 10/11 with WSL2 and WSLg installed.
 
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 echo "Starting WSLg X forwarding setup and verification..."
 
 # --- Step 1: Update package lists ---
@@ -20,7 +29,7 @@ fi
 # --- Step 2: Install necessary X11 applications (if not already installed) ---
 # x11-apps includes xclock, xeyes, etc., useful for testing X forwarding.
 echo "Installing x11-apps package (if needed)..."
-sudo apt install -y x11-apps
+pkg_install x11-apps
 if [ $? -eq 0 ]; then
     echo "x11-apps installed or already present."
 else

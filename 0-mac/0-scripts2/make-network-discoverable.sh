@@ -3,6 +3,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-02
 # make-network-discoverable.sh — Make Linux system discoverable on local network (especially by Windows)
 
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 set -euo pipefail
 
 ### User Prompt
@@ -25,7 +34,7 @@ fi
 ### Install Avahi
 echo "📦 Installing avahi-daemon (mDNS responder)..."
 sudo apt-get update -qq
-sudo apt-get install -y avahi-daemon avahi-utils libnss-mdns
+pkg_install avahi-daemon avahi-utils libnss-mdns
 
 echo "✅ Avahi installed"
 
@@ -38,7 +47,7 @@ sudo systemctl restart avahi-daemon
 read -rp "📁 Install Samba for file sharing and NetBIOS discovery? [y/N]: " samba_opt
 if [[ "$samba_opt" =~ ^[Yy]$ ]]; then
   echo "📦 Installing Samba..."
-  sudo apt-get install -y samba smbclient
+  pkg_install samba smbclient
   sudo systemctl enable smbd
   sudo systemctl restart smbd
 fi

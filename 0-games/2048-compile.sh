@@ -3,6 +3,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-01
 
 # --- Configuration ---
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 SOURCE_URL="https://raw.githubusercontent.com/mevdschee/2048.c/master/2048.c"
 SOURCE_FILE="2048.c"
 EXECUTABLE_NAME="2048"
@@ -20,7 +29,7 @@ check_and_install_dependency() {
 
         if command -v apt &> /dev/null; then
             # Debian/Ubuntu based
-            sudo apt update && sudo apt install -y "$package_name"
+            pkg_install "$package_name"
         elif command -v yum &> /dev/null; then
             # RHEL/CentOS based
             sudo yum install -y "$package_name"

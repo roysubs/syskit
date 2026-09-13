@@ -3,6 +3,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-01
 
 # Define colors for output
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 C_CATEGORY_TITLE="\033[1;34m" # Bold Blue
 C_RESET="\033[0m"
 
@@ -138,7 +147,7 @@ install_apt_packages() {
     echo "Attempting to update package lists..."
     sudo apt-get update
     echo "Attempting to install packages: $*"
-    sudo apt-get install -y "$@"
+    pkg_install "$@"
 }
 
 # Install a specific game by its display name

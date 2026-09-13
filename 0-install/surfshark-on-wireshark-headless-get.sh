@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 # Author: Roy Wiseman 2025-02
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 set -euo pipefail
 
 # =============== CONFIGURATION ================
@@ -19,7 +28,7 @@ mkdir -p "$CONFIG_DIR" "$HOME/.local/bin"
 # Install WireGuard and curl if needed
 echo "🔧 Installing dependencies..."
 sudo apt-get update -qq
-sudo apt-get install -y wireguard curl unzip
+pkg_install wireguard curl unzip
 
 # Prompt for credentials if not already saved
 CRED_FILE="$CONFIG_DIR/credentials"

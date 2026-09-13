@@ -9,6 +9,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 
 # --- Configuration ---
 # Ensure an email argument is provided for user guidance
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 if [[ -z "$1" ]]; then
     echo "Usage: $0 your-email@example.com"
     echo "Please provide the Microsoft account email you intend to use."
@@ -34,7 +43,7 @@ fi
 # ADDED: libdbus-1-dev for desktop notification support
 echo "Installing build dependencies..."
 sudo apt-get update
-sudo apt-get install -y build-essential libcurl4-openssl-dev libsqlite3-dev libnotify-dev git ldc libphobos2-ldc-dev libdbus-1-dev
+pkg_install build-essential libcurl4-openssl-dev libsqlite3-dev libnotify-dev git ldc libphobos2-ldc-dev libdbus-1-dev
 
 # --- Build and Install from Source ---
 echo "Downloading the latest source code..."

@@ -2,6 +2,15 @@
 if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 
 # Define colors for output
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 C_CATEGORY_TITLE="\033[1;34m" # Bold Blue
 C_RESET="\033[0m"
 
@@ -137,7 +146,7 @@ install_apt_packages() {
     echo "Attempting to update package lists..."
     sudo apt-get update
     echo "Attempting to install packages: $*"
-    sudo apt-get install -y "$@"
+    pkg_install "$@"
 }
 
 # Install a specific game by its display name
@@ -285,13 +294,13 @@ run_game() {
     
     for entry in "${games[@]}"; do
         IFS='|' read -r name _ _ apt <<< "$entry"
-        if [[ "$name" == "$game_to_run" ]]; {
+        if [[ "$name" == "$game_to_run" ]]; then
             game_found_in_list=true
             apt_package_for_game="$apt"
             # If a 5th field for command existed, we'd use it here.
             # The case statement above handles current known exceptions.
             break
-        }
+        fi
     done
 
     if ! $game_found_in_list; then

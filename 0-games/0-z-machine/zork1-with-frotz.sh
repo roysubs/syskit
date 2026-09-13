@@ -3,6 +3,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-05
 
 # Function to install Frotz
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 install_frotz() {
   if ! command -v "frotz" &> /dev/null; then
     echo "Installing Frotz (Z-machine interpreter)..."
@@ -15,7 +24,7 @@ install_frotz() {
         echo "Cache file not found, running update anyway..."
         sudo apt update && sudo apt upgrade -y
     fi
-    sudo apt install -y frotz
+    pkg_install frotz
   fi
 }
 

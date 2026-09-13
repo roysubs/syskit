@@ -1,0 +1,202 @@
+pkg_install() sweep — reference list
+Updated: 2026-09-13
+Purpose: track which scripts use pkg_install() (apt/zypper/dnf) and which need manual attention.
+
+======================================================================
+GROUP 1 — Converted to pkg_install() (65 files)
+All have the refresh-aware version: apt runs 'update -qq' first (DEBIAN_FRONTEND=noninteractive
+on both steps), zypper runs 'refresh' first, dnf installs directly (auto-refreshes its own cache).
+======================================================================
+0-docker/docker-distros-windows.sh
+0-docker/docker-nginx-test-8888.sh
+0-games/0-X-gui/infra-arcana-get.sh
+0-games/0-X-gui/steam-gui-setup.sh
+0-games/0-classic-games.sh
+0-games/0-classic-games1.sh
+0-games/0-classic-games1.sh.cleaned
+0-games/0-z-machine/zork1-with-frotz.sh
+0-games/2048-compile.sh
+0-games/cavez-of-phear-get.sh
+0-games/fangband-get.sh
+0-help/mdcat-get.sh
+0-install/bastillion-web-ssh.sh
+0-install/cloud-dropbox-get.sh
+0-install/cloud-googledrive-get.sh
+0-install/cloud-onedrive-get.sh
+0-install/cloud-onenote-p3x.sh
+0-install/lazydocker-get.sh
+0-install/lazygit-get.sh
+0-install/mdcat-get.sh
+0-install/ollama-get.sh
+0-install/prompt-zsh-and-powerlevel10k.sh
+0-install/surfshark-get.sh
+0-install/surfshark-on-wireshark-headless-get.sh
+0-install/switch-desktop-environment.sh
+0-install/xterms.sh
+0-install/zerotier-set-cron-get.sh
+0-mac/0-scripts1/g-old
+0-mac/0-scripts1/make-network-discoverable.sh
+0-mac/0-scripts1/pipxvenv.sh
+0-mac/0-scripts2/g
+0-mac/0-scripts2/make-network-discoverable.sh
+0-mac/0-scripts2/pipxvenv.sh
+0-mac/0-scripts2/t
+0-mac/0-scripts3/g
+0-mac/0-scripts3/make-network-discoverable.sh
+0-mac/0-scripts3/pipxvenv.sh
+0-mac/0-scripts3/t
+0-new-system/new1-announce-hostname.sh
+0-new-system/new2-clamav.sh
+0-new-system/new2-dev-package-managers.sh
+0-new-system/new2-tailscale.sh
+0-new-system/new3-email-with-gmail-relay.sh
+0-scripts/chop-transcript-from-mp4.sh
+0-scripts/convert-image-to-ascii-art.sh
+0-scripts/disk-smart-check.sh
+0-scripts/enable-wake-on-lan.sh
+0-scripts/g
+0-scripts/mount-remote-win-share.sh
+0-scripts/network-discovery-setup.sh
+0-scripts/ntfs-mount-auto.sh
+0-scripts/optimal-cpu-policy.sh
+0-scripts/optimal-disks-policy.sh
+0-scripts/share-folder-nfs.sh
+0-scripts/share-folder-samba.sh
+0-scripts/sys-info-basic.sh
+0-scripts/sys-info-mac.sh
+0-scripts/t
+0-scripts/use-vim-as-default.sh
+0-scripts/venv-run.sh
+0-scripts/x-forwarding-verbose.sh
+0-scripts/x-forwarding-wslg.sh
+0-scripts/x-forwarding.sh
+0-web-apps/glances-61208.sh
+0-web-apps/qbittorrent-nox.sh
+
+======================================================================
+GROUP 2 — Genuinely apt-specific, left as apt/Debian-only by design (32 files)
+Repo/PPA/GPG-key setup, raw .deb downloads, dpkg -i — not worth unifying across distros.
+======================================================================
+0-docker/0-monitoring-stack/setup-docker-deb-variants.sh  ::  writes/edits sources.list(.d)
+0-docker/setup-nvidia-container-toolkit.sh  ::  writes/edits sources.list(.d)
+0-help/x-glow-template.sh  ::  writes/edits sources.list(.d)
+0-install/anydesk-get.sh  ::  writes/edits sources.list(.d)
+0-install/browser-brave-rebuild-refresh.sh  ::  writes/edits sources.list(.d)
+0-install/c-sharp-dotnet-sdk-8.0.sh  ::  dpkg -i (raw .deb install)
+0-install/clean-browser-brave-old.sh  ::  writes/edits sources.list(.d)
+0-install/clean-browser-brave.sh  ::  writes/edits sources.list(.d)
+0-install/edge.sh  ::  writes/edits sources.list(.d)
+0-install/glow-get.sh  ::  writes/edits sources.list(.d)
+0-install/rustdesk-client.sh  ::  dpkg -i (raw .deb install)
+0-install/signal-gui-get.sh  ::  writes/edits sources.list(.d)
+0-install/visual-studio-code-get.sh  ::  writes/edits sources.list(.d)
+0-mac/0-scripts2/0-a-helpers/apt-a  ::  writes/edits sources.list(.d)
+0-mac/0-scripts3/0-a-helpers/apt-a  ::  writes/edits sources.list(.d)
+0-new-system/new0-debian-original-setup-tasks.sh  ::  writes/edits sources.list(.d)
+0-new-system/new0-fix-debian-repos.sh  ::  writes/edits sources.list(.d)
+0-new-system/new3-ansible.sh  ::  add-apt-repository
+0-new-system/new3-powershell-pwsh-debian.sh  ::  writes/edits sources.list(.d)
+0-new-system/new3-powershell-pwsh-ubuntu-mint.sh  ::  dpkg -i (raw .deb install)
+0-scripts/0-toys/fig-cow-etc.sh  ::  add-apt-repository
+0-scripts/0-toys/fig-cow-etc1.sh  ::  dpkg -i (raw .deb install)
+0-scripts/0-toys/figcowponytoilet.sh  ::  dpkg -i (raw .deb install)
+0-scripts/repo-tool.sh  ::  add-apt-repository
+0-scripts/sys-bench.sh  ::  downloads a raw .deb file
+0-scripts/sys-bench1.sh  ::  downloads a raw .deb file
+0-scripts/sys-info-lin-mac.sh  ::  writes/edits sources.list(.d)
+0-scripts/sys-info.sh  ::  writes/edits sources.list(.d)
+0-scripts/use-nvim-as-default.sh  ::  add-apt-repository
+0-web-apps/navidrome-music-4533.sh  ::  dpkg -i (raw .deb install)
+0-web-apps/vscode-8088.sh  ::  add-apt-repository
+0-web-apps/webmin-10000.sh  ::  writes/edits sources.list(.d)
+
+======================================================================
+GROUP 3 — Builds an apt command as a STRING, not a direct call (3 files)
+e.g. INSTALL_CMD="sudo apt-get update && sudo apt-get install -y curl" used/eval'd elsewhere.
+Needs a human read of how the variable is used before converting.
+======================================================================
+0-docker/setup-docker.sh
+0-scripts/0-toys/figbanner-quick.sh
+0-scripts/x-forwarding-check.sh
+
+======================================================================
+GROUP 4 — Install wrapped in control flow / variables / helper functions (63 files)
+Needs a human glance at the surrounding logic before converting.
+Note: 0-scripts/sys-disk-reports.sh and 0-scripts/sys-bench1.sh already have their OWN
+hand-rolled apt/zypper/dnf/yum/pacman/apk/brew pkg_install() - broader than ours, left as-is.
+======================================================================
+0-docker/0-media-stack/0-binhex-arch-qbittorrent/start-media-stack.sh  ::  non-trivial install line: if ! command -v yq &> /dev/null; then echo -e "${RED}❌ 'yq' not found. Please install yq (e.g., sudo apt install yq).${NC}"; exit 1; fi
+0-docker/0-media-stack/start-media-stack.sh  ::  non-trivial install line: if ! command -v yq &> /dev/null; then echo -e "${RED}❌ 'yq' not found. Please install yq (e.g., sudo apt install yq).${NC}"; exit 1; fi
+0-games/0-X-gui/0ad-get-gui.sh  ::  non-trivial install line: sudo apt install 0ad
+0-games/0-X-gui/ASCIIpOrtal.sh  ::  non-trivial install line: sudo apt install -y \
+0-games/0-X-gui/AssaultCube-get-gui.sh  ::  non-trivial install line: sudo apt install assaultcube
+0-games/0-X-gui/asciisector-x-gui.sh  ::  non-trivial install line: if apt install -y libsdl2-mixer-2.0-0; then
+0-games/0-X-gui/flightgear-get-gui.sh  ::  non-trivial install line: sudo apt install flightgear
+0-games/0-X-gui/freecol-get-gui.sh  ::  non-trivial install line: sudo apt install freecol
+0-games/0-X-gui/infra-arcana.sh  ::  non-trivial install line: sudo apt install -y \
+0-games/0-X-gui/openttd-get-gui.sh  ::  non-trivial install line: sudo apt install openttd
+0-games/0-X-gui/redeclipse-get-gui.sh  ::  non-trivial install line: sudo apt install redeclipse
+0-games/0-X-gui/sauerbraten-get-gui.sh  ::  non-trivial install line: sudo apt install sauerbraten
+0-games/0-X-gui/scorched3d-get-gui.sh  ::  non-trivial install line: sudo apt install scorched3d
+0-games/0-X-gui/shattered-pixel-dungeon-x-gui.sh  ::  non-trivial install line: sudo apt install libglfw3 libglfw3-dev libxrandr-dev libxi-dev libxxf86vm-dev
+0-games/0-X-gui/slashem-get.sh  ::  non-trivial install line: sudo apt install slashem       # for console
+0-games/0-X-gui/supertux2-get-gui.sh  ::  non-trivial install line: sudo apt install supertux
+0-games/0-X-gui/supertuxkart-get-gui.sh  ::  non-trivial install line: sudo apt install supertuxkart
+0-games/0-X-gui/wesnoth-get-gui.sh  ::  non-trivial install line: sudo apt install wesnoth
+0-games/0-X-gui/xonotic-get-gui.sh  ::  non-trivial install line: sudo apt install xonotic
+0-games/0-z-machine/gargoyle-get-z-machine-debian.sh  ::  non-trivial install line: $SUDO_CMD apt install -y -qq "${DEPENDENCIES[@]}"
+0-games/0-z-machine/gargoyle-get-z-machine-wsl.sh  ::  non-trivial install line: $SUDO_CMD apt install -y -qq "${DEPENDENCIES[@]}"
+0-games/0-z-machine/lectrote-get.sh  ::  non-trivial install line: $SUDO_CMD apt install -y -qq wget unzip
+0-games/adom-console-get.sh  ::  non-trivial install line: sudo apt install libncurses5 -y
+0-games/asciiquarium.sh  ::  non-trivial install line: sudo apt install libcurses-perl
+0-games/cataclysm-dark-days-ahead.sh  ::  non-trivial install line: sudo apt install cataclysm-dda-curses
+0-games/dwarf-fortress-0.47.05-fix.sh  ::  non-trivial install line: sudo apt-get install -y "${REQUIRED_PACKAGES[@]}"
+0-games/fitd-tower-defence.sh  ::  non-trivial install line: print_command "sudo apt-get install -y cmake catch2 libncurses5-dev doxygen git build-essential"
+0-games/tome-gcu-mux.sh  ::  non-trivial install line: command -v tome-gcu >/dev/null 2>&1 || sudo apt install -y tome-gcu
+0-games/zangband-mux.sh  ::  non-trivial install line: command -v zangband >/dev/null 2>&1 || sudo apt install -y zangband
+0-install/gitsecrets-get.sh  ::  non-trivial install line: command -v make >/dev/null 2>&1 || { echo "❌ Error: 'make' is not installed. Please install make (e.g., sudo apt-get install make) and try again." >&2; exit 1; }
+0-install/kvm-get.sh  ::  non-trivial install line: ech_cmd apt install -y cpu-checker
+0-install/mosh-get.sh  ::  non-trivial install line: install-if-missing() { if ! dpkg-query -W "$1" > /dev/null 2>&1; then sudo apt install -y $1; fi; }
+0-install/unimatrix-cmatrix-bb-hollywood.sh  ::  non-trivial install line: sudo apt install cmatrix bb hollywood -y
+0-install/xfce-server.sh  ::  non-trivial install line: apt-get install -y "${packages_needed[@]}"
+0-install/zerotier-get.sh  ::  non-trivial install line: print_green "Running: sudo apt install -y zerotier-one"
+0-mac/0-new-system-test/new1-vimrc.sh  ::  non-trivial install line: if ! sudo apt update || ! sudo apt install -y "$pkg_name"; then
+0-mac/0-scripts2/d  ::  non-trivial install line: [[ $REPLY =~ ^[Yy]$ ]] && (sudo apt install -y $CMD) || { echo "$CMD not installed. Exiting."; exit 1; }
+0-mac/0-scripts2/size  ::  non-trivial install line: [[ $REPLY =~ ^[Yy]$ ]] && (sudo apt install -y $CMD) || { echo "$CMD not installed. Exiting."; exit 1; }
+0-mac/0-scripts3/d  ::  non-trivial install line: [[ $REPLY =~ ^[Yy]$ ]] && (sudo apt install -y $CMD) || { echo "$CMD not installed. Exiting."; exit 1; }
+0-mac/0-scripts3/size  ::  non-trivial install line: [[ $REPLY =~ ^[Yy]$ ]] && (sudo apt install -y $CMD) || { echo "$CMD not installed. Exiting."; exit 1; }
+0-new-system/new0-apt-update-upgrade-autoremove.sh  ::  non-trivial install line: displayandrun sudo apt install ca-certificates -y
+0-new-system/new0-openssh-server-setup.sh  ::  non-trivial install line: run_command apt-get install -y openssh-server openssh-client # Already uses run_command
+0-new-system/new0-sync-clock-to-Amsterdam.sh  ::  non-trivial install line: sudo apt install systemd-timesyncd
+0-new-system/new0-sync-clock-to-London.sh  ::  non-trivial install line: sudo apt install systemd-timesyncd
+0-new-system/new1-vimrc.sh  ::  non-trivial install line: if ! sudo apt update || ! sudo apt install -y "$pkg_name"; then
+0-new-system/new1-vimrc1.sh  ::  non-trivial install line: if ! sudo apt update || ! sudo apt install -y "$pkg_name"; then
+0-new-system/new2-desktop-and-vnc.sh  ::  non-trivial install line: print_cmd "sudo DEBIAN_FRONTEND=noninteractive apt install -y $PACKAGES_TO_INSTALL"
+0-new-system/new2-x11-forwarding.sh  ::  non-trivial install line: if ! sudo apt install -y "${missing_packages[@]}"; then
+0-new-system/new2-xrdp.sh  ::  non-trivial install line: if ! sudo apt install -y xrdp; then
+0-scripts/0-wip/chop-video-and-youtube.sh  ::  non-trivial install line: if sudo apt-get install -y ffmpeg; then msg_ok "$cmd installed."; else msg_error "Failed to install $cmd."; exit 1; fi
+0-scripts/0-wip/chop-youtube.sh  ::  non-trivial install line: if sudo apt-get install -y ffmpeg; then msg_ok "$cmd installed."; else msg_error "Failed to install $cmd."; exit 1; fi
+0-scripts/0-wip/chop-youtube2.sh  ::  non-trivial install line: if sudo apt-get install -y ffmpeg; then msg_ok "ffmpeg installed."; else msg_error "Failed to install ffmpeg."; exit 1; fi
+0-scripts/0-wip/size-v1  ::  non-trivial install line: [[ $REPLY =~ ^[Yy]$ ]] && (sudo apt install -y $CMD) || { echo "$CMD not installed. Exiting."; exit 1; }
+0-scripts/chop-video.sh  ::  non-trivial install line: if sudo apt-get install -y ffmpeg; then msg_ok "$cmd installed."; else msg_error "Failed to install $cmd."; exit 1; fi
+0-scripts/ds  ::  non-trivial install line: [[ $REPLY =~ ^[Yy]$ ]] && (sudo apt install -y $CMD) || { echo "$CMD not installed. Exiting."; exit 1; }
+0-scripts/gh-list-project-on-github.sh  ::  non-trivial install line: sudo apt install gh
+0-scripts/git-list-myprojects.sh  ::  non-trivial install line: sudo apt install gh
+0-scripts/power-save-generic.sh  ::  non-trivial install line: PKG_INSTALL="apt-get install -y"
+0-scripts/send-to  ::  non-trivial install line: print_color $YELLOW "  sudo apt-get install samba"
+0-scripts/share-folder-samba-new.sh  ::  non-trivial install line: log_command_intent "sudo apt-get install -y samba samba-common-bin acl"
+0-web-apps/cockpit-9090.sh  ::  non-trivial install line: sudo apt install cockpit
+0-web-apps/my-system-info-8081.sh  ::  non-trivial install line: install-if-missing() { if ! dpkg-query -l "$1" >/dev/null; then sudo apt install -y $1; fi; }
+xfce-get.sh  ::  non-trivial install line: sudo apt install -y --no-install-recommends $TO_INSTALL
+
+======================================================================
+FIXED — pre-existing syntax errors found while verifying this sweep, unrelated to pkg_install, now repaired
+======================================================================
+0-games/0-classic-games1.sh.cleaned  ::  line 297 used 'if ...; {' instead of 'if ...; then' -- invalid mix of if/brace syntax
+0-install/lazydocker-get.sh  ::  line 45, unterminated echo string -- also now converted to pkg_install()
+0-mac/0-scripts2/z  ::  leftover AI-chat markdown commentary pasted after the script's real end (exit 0) -- trimmed
+0-mac/0-scripts3/z  ::  same as above (identical duplicate file) -- trimmed
+0-scripts/0-toys/figcowponytoilet.sh  ::  two overlapping drafts of the ponysay-install logic were concatenated -- merged into one coherent block
+0-scripts/compress-and-email.sh  ::  line 30, unterminated echo string
+0-scripts/sys-bench1.sh  ::  lines 101-104, duplicate leftover tail of install_dependency() after its real closing brace -- removed
+0-scripts/sys-disk-reports.sh  ::  line 52, orphaned 'fi' with no matching 'if' -- removed

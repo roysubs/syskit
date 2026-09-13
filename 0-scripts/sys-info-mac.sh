@@ -4,6 +4,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Cross-platform system information script (macOS & Linux)
 
 # Detect OS
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 if [[ "$OSTYPE" == "darwin"* ]]; then
     OS_TYPE="macos"
 elif [[ -f /etc/os-release ]]; then
@@ -27,7 +36,7 @@ install_tools() {
         # Check for dmidecode
         if ! command -v dmidecode &>/dev/null; then
             read -p "'dmidecode' is not available. Install it? [y/N] " yn
-            [[ $yn =~ ^[Yy]$ ]] && sudo apt-get update && sudo apt-get install -y dmidecode || exit 1
+            [[ $yn =~ ^[Yy]$ ]] && pkg_install dmidecode || exit 1
         fi
         
         # Check for lspci

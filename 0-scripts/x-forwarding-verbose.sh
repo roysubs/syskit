@@ -3,6 +3,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-01
 
 # Define colors for output
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
@@ -66,7 +75,7 @@ echo "'xauth' is a utility that manages X authentication cookies, which are esse
 echo "We'll install them if they are not already present."
 echo -e "Command to be run: ${GREEN}sudo apt install -y openssh-server xauth${NC}"
 read -p "Press Enter to run this command..."
-sudo apt install -y openssh-server xauth
+pkg_install openssh-server xauth
 if [ $? -eq 0 ]; then
     echo -e "${YELLOW}openssh-server and xauth installed or already present.${NC}"
 else

@@ -15,7 +15,7 @@ pkg_install() {
     if command -v zypper &>/dev/null; then
         zypper --non-interactive install --auto-agree-with-licenses -y "$package_name"
     elif command -v apt-get &>/dev/null; then
-        apt-get update && apt-get install -y "$package_name"
+        pkg_install "$package_name"
     elif command -v dnf &>/dev/null; then
         dnf install -y "$package_name"
     elif command -v pacman &>/dev/null; then

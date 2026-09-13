@@ -27,7 +27,7 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 
 # Validate inputs
 if [[ -z "$1" || -z "$2" ]]; then
-  echo "Purpose: Compress a folder, display details, and then email it.
+  echo "Purpose: Compress a folder, display details, and then email it."
   echo "Usage: ${0##*/}  <folderpath>  <email>"
   exit 1
 fi

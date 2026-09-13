@@ -49,7 +49,6 @@ done
     read -n 1 -s -r -p "Press any key to continue, or Ctrl+C to abort..."
     echo # Move to a new line after key press
     echo "Continuing based on user confirmation..."
-fi
 
 echo ""
 echo "Dependency check/awareness section complete."

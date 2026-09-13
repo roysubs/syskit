@@ -9,6 +9,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # 3. Install with proper directory structure
 # 4. Create working launchers
 
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 set -e  # Exit on error
 echo "=== Infra Arcana Installation Script ==="
 
@@ -38,7 +47,7 @@ install_dependencies() {
     if command -v apt-get &> /dev/null; then
         echo "Debian/Ubuntu detected"
         sudo apt-get update
-        sudo apt-get install -y $DEBIAN_DEPS
+        pkg_install $DEBIAN_DEPS
     elif command -v dnf &> /dev/null; then
         echo "Fedora detected"
         sudo dnf install -y $FEDORA_DEPS

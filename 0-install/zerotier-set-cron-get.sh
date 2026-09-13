@@ -2,6 +2,15 @@
 if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 # Author: Roy Wiseman 2025-03
 
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 echo "
 This script will check/enable/start ZeroTier, then join a ZeroTier network,
 and verify the network status. Then, a monitoring script will be setup in
@@ -16,7 +25,7 @@ read -p "Please enter your ZeroTier network ID (e.g., 9f77fc393eeda812): " netwo
 echo -e "\033[1;32mStep 2: Installing ZeroTier...\033[0m"
 if ! command -v zerotier-cli &> /dev/null; then
     echo "Installing ZeroTier package with: sudo apt install -y zerotier-one"
-    sudo apt install -y zerotier-one
+    pkg_install zerotier-one
 else
     echo "ZeroTier is already installed"
 fi

@@ -7,6 +7,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # It assumes you will be connecting from another machine (the client)
 # that has an X server running and an SSH client.
 
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 echo "Starting Debian X forwarding server setup..."
 
 # --- Step 1: Update package lists ---
@@ -21,7 +30,7 @@ fi
 
 # --- Step 2: Install necessary packages (openssh-server and xauth) ---
 echo "Installing openssh-server and xauth (if needed)..."
-sudo apt install -y openssh-server xauth
+pkg_install openssh-server xauth
 if [ $? -eq 0 ]; then
     echo "openssh-server and xauth installed or already present."
 else

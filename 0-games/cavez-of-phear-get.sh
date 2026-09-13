@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 # Author: Roy Wiseman 2025-01
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 set -e
 
 # Only update if it's been more than 2 days since the last update (to avoid constant updates)
@@ -15,7 +24,7 @@ fi
 
 if ! command -v phear &> /dev/null; then
     echo "Installing Cavez of Phear from apt..."
-    sudo apt install -y cavezofphear
+    pkg_install cavezofphear
 fi
 
 # Define the actual binary and target symlink names

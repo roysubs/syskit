@@ -3,10 +3,19 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-02
 
 # Check if qBittorrent-nox is installed
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 if ! command -v qbittorrent-nox &> /dev/null; then
     echo "qBittorrent-nox is not installed. Installing..."
     sudo apt update
-    sudo apt install -y qbittorrent-nox
+    pkg_install qbittorrent-nox
 else
     echo "qBittorrent-nox is already installed."
 fi

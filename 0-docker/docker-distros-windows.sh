@@ -8,6 +8,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 
 # ---[ Prerequisites Check ]----------------------
 # Check if Docker is installed and running
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 if ! command -v docker &> /dev/null; then
     echo -e "${RED}❌ Docker not found. Installing...${NC}"
     if curl -fsSL https://get.docker.com | sh; then
@@ -52,7 +61,7 @@ fi
 
 if ! command -v kvm-ok &> /dev/null; then
     echo -e "${YELLOW}kvm-ok command not found. Attempting to install cpu-checker...${NC}"
-    sudo apt update >/dev/null 2>&1 && sudo apt install -y cpu-checker >/dev/null 2>&1
+    pkg_install cpu-checker
     if ! command -v kvm-ok &> /dev/null; then
         echo -e "${RED}✖ Failed to install cpu-checker. Please install it manually and run 'kvm-ok' to verify KVM setup.${NC}"
         # We can proceed but with a warning, as the device might still work.

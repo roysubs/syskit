@@ -3,9 +3,18 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-04
 
 # Update package lists and install dependencies
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 echo "Updating package lists and installing dependencies..."
 sudo apt update
-sudo apt install -y lib32gcc1 lib32stdc++6 wget
+pkg_install lib32gcc1 lib32stdc++6 wget
 
 # Create a directory for SteamCMD
 echo "Creating directory for SteamCMD..."

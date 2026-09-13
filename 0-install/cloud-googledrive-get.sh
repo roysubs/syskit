@@ -3,6 +3,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-02
 
 # Ensure email argument is provided
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 if [[ -z "$1" ]]; then
     echo "Usage: $0 your-email@gmail.com"
     exit 1
@@ -16,7 +25,7 @@ CONFIG_NAME="gdrive"
 if ! command -v rclone &>/dev/null; then
     echo "Installing rclone..."
     sudo apt update
-    sudo apt install -y rclone
+    pkg_install rclone
 fi
 
 # Configure rclone

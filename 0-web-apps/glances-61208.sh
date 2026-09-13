@@ -3,6 +3,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-04
 
 # Variables
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 PORT=61208      # You can change this port number as needed
 # USER=glances  # User for running Glances service
 # GROUP=glances # Group for running Glances service
@@ -13,7 +22,7 @@ GROUP=users     # Group for running Glances service, use basic 'users'
 if ! command -v pipx &> /dev/null; then
     echo "Installing pipx..."
     sudo apt update
-    sudo apt install -y pipx
+    pkg_install pipx
     python3 -m pip install --user pipx
     sudo ln -s ~/.local/bin/pipx /usr/local/bin/pipx  # Ensure pipx is available globally
 fi

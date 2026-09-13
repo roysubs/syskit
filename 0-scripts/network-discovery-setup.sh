@@ -3,6 +3,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-02
 # Improved version with critical fixes
 # Preserves configs and doesn't reinstall unnecessarily
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 set -euo pipefail
 
 # Color codes
@@ -98,7 +107,7 @@ if dpkg -l 2>/dev/null | grep -q "^ii  avahi-daemon"; then
 else
   echo "📦 Installing avahi-daemon (mDNS responder)..."
   sudo apt-get update -qq
-  sudo apt-get install -y avahi-daemon avahi-utils libnss-mdns
+  pkg_install avahi-daemon avahi-utils libnss-mdns
   echo "✅ Avahi installed"
 fi
 
@@ -177,7 +186,7 @@ else
   read -rp "📁 Install Samba for file sharing and NetBIOS discovery? [Y/n]: " samba_opt
   if [[ ! "$samba_opt" =~ ^[Nn]$ ]]; then
     echo "📦 Installing Samba..."
-    sudo apt-get install -y samba smbclient
+    pkg_install samba smbclient
     samba_installed=true
     echo "✅ Samba installed"
   fi
@@ -380,11 +389,11 @@ else
   # Ensure git and python3 are available
   if ! command -v git &> /dev/null; then
     echo "Installing git..."
-    sudo apt-get install -y git
+    pkg_install git
   fi
   if ! command -v python3 &> /dev/null; then
     echo "Installing python3..."
-    sudo apt-get install -y python3
+    pkg_install python3
   fi
   
   # FIXED: Add error handling for git clone

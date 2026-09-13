@@ -6,6 +6,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Unified wrapper for commonly used tmux commands with colorful output and aliases.
 
 # --- Script Colors & Helper Functions ---
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 BLUE='\033[1;34m'
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -95,7 +104,7 @@ check_tmux_installed() {
         case "$response" in
             [yY]|[yY][eE][sS])
                 echo "Installing tmux..."
-                if command -v apt >/dev/null 2>&1; then      sudo apt update && sudo apt install -y tmux
+                if command -v apt >/dev/null 2>&1; then      pkg_install tmux
                 elif command -v yum >/dev/null 2>&1; then    sudo yum install -y tmux
                 elif command -v dnf >/dev/null 2>&1; then    sudo dnf install -y tmux
                 elif command -v pacman >/dev/null 2>&1; then sudo pacman -S tmux

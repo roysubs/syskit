@@ -3,6 +3,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-01
 
 # Game entries: name|Category|Description|apt package
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 games=(
     "rogue|Roguelike|Classic dungeon crawling game.|bsdgames-nonfree"
     "angband|Roguelike|Single-player, text-based, dungeon simulation game.|angband"
@@ -60,7 +69,7 @@ usage() {
 # Install a specific apt package
 install_game() {
     echo "Installing packages: $*"
-    sudo apt-get install -y "$@"
+    pkg_install "$@"
 }
 
 # Install all unique packages for all games

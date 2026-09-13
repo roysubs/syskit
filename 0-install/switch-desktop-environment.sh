@@ -3,6 +3,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-05
 
 # Ensure script is run as sudo
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 if [[ $EUID -ne 0 ]]; then
   echo "Please run this script using sudo."
   exit 1
@@ -103,63 +112,63 @@ SESSION_CMD=""
 # Map desktop environments to their session commands and installation commands
 case $DESKTOP_ENV in
   GNOME)
-    sudo apt install -y task-gnome-desktop dbus-x11
+    pkg_install task-gnome-desktop dbus-x11
     SESSION_CMD="/usr/bin/gnome-session"
     ;;
   XFCE)
-    sudo apt install -y task-xfce-desktop dbus-x11
+    pkg_install task-xfce-desktop dbus-x11
     SESSION_CMD="/usr/bin/startxfce4"
     ;;
   LXQt)
-    sudo apt install -y task-lxqt-desktop dbus-x11
+    pkg_install task-lxqt-desktop dbus-x11
     SESSION_CMD="/usr/bin/startlxqt"
     ;;
   LXDE)
-    sudo apt install -y task-lxde-desktop dbus-x11
+    pkg_install task-lxde-desktop dbus-x11
     SESSION_CMD="/usr/bin/startlxde"
     ;;
   MATE)
-    sudo apt install -y task-mate-desktop dbus-x11
+    pkg_install task-mate-desktop dbus-x11
     SESSION_CMD="/usr/bin/mate-session"
     ;;
   Budgie)
-    sudo apt install -y budgie-desktop dbus-x11
+    pkg_install budgie-desktop dbus-x11
     SESSION_CMD="/usr/bin/budgie-session"
     ;;
   KDE)
-    sudo apt install -y task-kde-desktop dbus-x11
+    pkg_install task-kde-desktop dbus-x11
     SESSION_CMD="/usr/bin/startplasma-x11"
     ;;
   Cinnamon)
-    sudo apt install -y task-cinnamon-desktop dbus-x11
+    pkg_install task-cinnamon-desktop dbus-x11
     SESSION_CMD="/usr/bin/cinnamon-session"
     ;;
   Pantheon)
-    sudo apt install -y pantheon
+    pkg_install pantheon
     SESSION_CMD="/usr/bin/pantheon-session"
     ;;
   Deepin)
-    sudo apt install -y dde
+    pkg_install dde
     SESSION_CMD="/usr/bin/startdde"
     ;;
   Openbox)
-    sudo apt install -y openbox
+    pkg_install openbox
     SESSION_CMD="/usr/bin/openbox-session"
     ;;
   i3)
-    sudo apt install -y i3
+    pkg_install i3
     SESSION_CMD="/usr/bin/i3"
     ;;
   Fluxbox)
-    sudo apt install -y fluxbox
+    pkg_install fluxbox
     SESSION_CMD="/usr/bin/startfluxbox"
     ;;
   Enlightenment)
-    sudo apt install -y enlightenment
+    pkg_install enlightenment
     SESSION_CMD="/usr/bin/enlightenment_start"
     ;;
   Sugar)
-    sudo apt install -y sucrose
+    pkg_install sucrose
     SESSION_CMD="/usr/bin/sugar"
     ;;
   *)

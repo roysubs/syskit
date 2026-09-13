@@ -145,11 +145,46 @@ pkg_install() {
                             sudo dpkg -i "$PONYSAY_DEB_FILE"
                             DPKG_EXIT_CODE=$?
                             set -e
+
                             if [ $DPKG_EXIT_CODE -eq 0 ]; then
-                                echo "ponysay installed successfully."
+                                echo "ponysay installed successfully (via .deb)."
                                 INSTALLED_TOOLS+=("$tool")
-                                rm -f "$PONYSAY_DEB_FILE"
+                                temp_missing=()
+                                for mtool in "${MISSING_TOOLS[@]}"; do
+                                    if [ "$mtool" != "$tool" ]; then
+                                        temp_missing+=("$mtool")
+                                    fi
+                                done
+                                MISSING_TOOLS=("${temp_missing[@]}")
+                                rm "$PONYSAY_DEB_FILE"
+                            else
+                                echo -e "${RED}Error: Failed to install ponysay using dpkg (exit code $DPKG_EXIT_CODE). Attempting to fix broken dependencies...${NC}"
+                                set +e
+                                if sudo apt --fix-broken install -y; then
+                                    echo "Dependencies fixed. Trying ponysay installation again..."
+                                    if sudo dpkg -i "$PONYSAY_DEB_FILE"; then
+                                        echo "ponysay installed successfully (via .deb) after fixing dependencies."
+                                        INSTALLED_TOOLS+=("$tool")
+                                        temp_missing=()
+                                        for mtool in "${MISSING_TOOLS[@]}"; do
+                                            if [ "$mtool" != "$tool" ]; then
+                                                temp_missing+=("$mtool")
+                                            fi
+                                        done
+                                        MISSING_TOOLS=("${temp_missing[@]}")
+                                        rm "$PONYSAY_DEB_FILE"
+                                    else
+                                        echo -e "${RED}Error: Failed to install ponysay even after fixing dependencies. Please try installing it manually.${NC}"
+                                        # Don't remove the deb file if installation failed again
+                                    fi
+                                else
+                                    echo -e "${RED}Error: Failed to fix broken dependencies. Please try installing ponysay manually.${NC}"
+                                    # Don't remove the deb file if installation failed
+                                fi
+                                set -e
                             fi
+                        else
+                            echo -e "${RED}Error: Failed to download ponysay from $PONYSAY_DEB_URL. Please check the URL or your network connection.${NC}"
                         fi
                     elif command -v pip3 &>/dev/null; then
                         echo "Installing ponysay via pip3..."
@@ -157,49 +192,6 @@ pkg_install() {
                             echo "ponysay installed successfully via pip3."
                             INSTALLED_TOOLS+=("$tool")
                         fi
-                    fi
-                        DPKG_EXIT_CODE=$?
-                        set -e
-
-                        if [ $DPKG_EXIT_CODE -eq 0 ]; then
-                            echo "ponysay installed successfully (via .deb)."
-                             INSTALLED_TOOLS+=("$tool")
-                             temp_missing=()
-                             for mtool in "${MISSING_TOOLS[@]}"; do
-                                 if [ "$mtool" != "$tool" ]; then
-                                     temp_missing+=("$mtool")
-                                 fi
-                             done
-                             MISSING_TOOLS=("${temp_missing[@]}")
-                             rm "$PONYSAY_DEB_FILE"
-                        else
-                            echo -e "${RED}Error: Failed to install ponysay using dpkg (exit code $DPKG_EXIT_CODE). Attempting to fix broken dependencies...${NC}"
-                             set +e
-                            if sudo apt --fix-broken install -y; then
-                                echo "Dependencies fixed. Trying ponysay installation again..."
-                                if sudo dpkg -i "$PONYSAY_DEB_FILE"; then
-                                     echo "ponysay installed successfully (via .deb) after fixing dependencies."
-                                     INSTALLED_TOOLS+=("$tool")
-                                     temp_missing=()
-                                     for mtool in "${MISSING_TOOLS[@]}"; do
-                                         if [ "$mtool" != "$tool" ]; then
-                                             temp_missing+=("$mtool")
-                                         fi
-                                     done
-                                     MISSING_TOOLS=("${temp_missing[@]}")
-                                     rm "$PONYSAY_DEB_FILE"
-                                else
-                                     echo -e "${RED}Error: Failed to install ponysay even after fixing dependencies. Please try installing it manually.${NC}"
-                                     # Don't remove the deb file if installation failed again
-                                fi
-                            else
-                                echo -e "${RED}Error: Failed to fix broken dependencies. Please try installing ponysay manually.${NC}"
-                                # Don't remove the deb file if installation failed
-                            fi
-                            set -e
-                        fi
-                    else
-                        echo -e "${RED}Error: Failed to download ponysay from $PONYSAY_DEB_URL. Please check the URL or your network connection.${NC}"
                     fi
                     ;;
                 *)

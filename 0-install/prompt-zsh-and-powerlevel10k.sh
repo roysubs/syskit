@@ -3,6 +3,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-03
 
 # Set Zsh as default shell
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 echo "Setting Zsh as default shell..."
 chsh -s $(which zsh)
 
@@ -17,7 +26,7 @@ echo 'source ~/.powerlevel10k/powerlevel10k.zsh-theme' >> ~/.zshrc
 # Install necessary fonts (Nerd Fonts)
 echo "Installing necessary fonts (Nerd Fonts)..."
 sudo apt update
-sudo apt install -y fonts-font-awesome fonts-powerline
+pkg_install fonts-font-awesome fonts-powerline
 
 # Install Nerd Fonts (additional fonts if required)
 echo "Installing Nerd Fonts..."

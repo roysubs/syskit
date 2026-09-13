@@ -25,7 +25,7 @@ pkg_install() {
     if command -v zypper &>/dev/null; then
         sudo zypper --non-interactive install --auto-agree-with-licenses -y "${pkgs[@]}"
     elif command -v apt-get &>/dev/null; then
-        sudo apt-get update && sudo apt-get install -y "${pkgs[@]}"
+        pkg_install "${pkgs[@]}"
     elif command -v dnf &>/dev/null; then
         sudo dnf install -y "${pkgs[@]}"
     elif command -v yum &>/dev/null; then

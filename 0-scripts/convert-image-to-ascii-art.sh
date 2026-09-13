@@ -5,6 +5,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # img2txt --gamma=0.6 --width=80 "$FILE"
 
 # Check if a file argument is provided
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 if [[ -z "$1" ]]; then
     echo "Convert an image file to ASCII art (uses jp2a, or img2txt from caca-utils)"
     echo "Usage: ${0##*/} <image_file>"
@@ -22,7 +31,7 @@ fi
 # Install required packages if not already installed
 if ! command -v jp2a &>/dev/null; then
     echo "Installing jp2a..."
-    sudo apt update && sudo apt install -y jp2a
+    pkg_install jp2a
 fi
 
 if ! command -v img2txt &>/dev/null; then

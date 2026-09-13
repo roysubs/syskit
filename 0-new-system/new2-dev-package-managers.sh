@@ -2,6 +2,15 @@
 if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 # Author: Roy Wiseman 2025-02
 
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 set -e
 echo "This script will step through the installation of various package managers."
 echo "- yarn (JS)"
@@ -42,7 +51,7 @@ confirm() {
 echo -e "\033[1;33m\n### 💻 Node.js & npm\033[0m"
 if confirm "Node.js and npm"; then
     curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-    sudo apt install -y nodejs
+    pkg_install nodejs
 fi
 
 # yarn (JS)
@@ -147,7 +156,7 @@ fi
 # Composer (PHP)
 echo -e "\033[1;33m\n### 📝 Composer (PHP)\033[0m"
 if confirm "Composer (PHP)"; then
-    sudo apt install -y curl php-cli php-mbstring unzip
+    pkg_install curl php-cli php-mbstring unzip
     curl -sS https://getcomposer.org/installer | php
     sudo mv composer.phar /usr/local/bin/composer
 fi
@@ -155,19 +164,19 @@ fi
 # Maven (Java)
 echo -e "\033[1;33m\n### ☕ Maven (Java)\033[0m"
 if confirm "Maven (Java)"; then
-    sudo apt install -y maven
+    pkg_install maven
 fi
 
 # Gradle (Java)
 echo -e "\033[1;33m\n### ⚙️ Gradle (Java)\033[0m"
 if confirm "Gradle (Java)"; then
-    sudo apt install -y gradle
+    pkg_install gradle
 fi
 
 # CPAN (Perl)
 echo -e "\033[1;33m\n### 🦠 CPAN (Perl)\033[0m"
 if confirm "CPAN (Perl)"; then
-    sudo apt install -y perl
+    pkg_install perl
 fi
 
 # Homebrew (Linuxbrew)
@@ -188,13 +197,13 @@ fi
 # cabal (Haskell)
 echo -e "\033[1;33m\n### ⚡ cabal (Haskell)\033[0m"
 if confirm "cabal (Haskell)"; then
-    sudo apt install -y cabal-install
+    pkg_install cabal-install
 fi
 
 # Go (Golang)
 echo -e "\033[1;33m\n### 🐹 Go (Golang)\033[0m"
 if confirm "Go (Golang)"; then
-    sudo apt install -y golang
+    pkg_install golang
 fi
 
 echo -e "\033[1;32m✅ All selected tools installed.\033[0m"

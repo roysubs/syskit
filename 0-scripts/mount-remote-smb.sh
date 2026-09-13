@@ -247,15 +247,18 @@ while IFS= read -r SHARE_NAME; do
 
     echo "--> Processing share: '${SHARE_NAME}' (Local path target: '${MOUNT_POINT}')"
 
-    # --- Check if Local Mount Point Exists ---
-    if [ -d "$MOUNT_POINT" ]; then
-        echo "--> Skipping '${SHARE_NAME}': Mount point directory '${MOUNT_POINT}' already exists."
+    # --- Check if Already Mounted ---
+    # (Checking directory existence alone is wrong: a leftover empty directory from a
+    # previous session - e.g. after a reboot or network drop - would look identical to
+    # an active mount, silently blocking every remount attempt forever.)
+    if mountpoint -q "$MOUNT_POINT" 2>/dev/null; then
+        echo "--> Skipping '${SHARE_NAME}': '${MOUNT_POINT}' is already mounted."
         SKIPPED_SHARES+=("${SHARE_NAME}") # Add original name to skipped list
         continue # Skip to the next share
     fi
 
-    # --- Create Mount Point Directory ---
-    echo "--> Creating mount point directory: ${MOUNT_POINT}"
+    # --- Create Mount Point Directory (idempotent - fine if it already exists) ---
+    echo "--> Ensuring mount point directory exists: ${MOUNT_POINT}"
     sudo mkdir -p "$MOUNT_POINT"
     # Check if directory creation was successful
     if [ $? -ne 0 ]; then
@@ -291,7 +294,7 @@ echo "Summary of Operations:"
 echo "---------------------------------"
 
 if [ ${#SKIPPED_SHARES[@]} -gt 0 ]; then
-    echo -e "${RED}Skipped Shares (Mount point directory existed):${NC}"
+    echo -e "${RED}Skipped Shares (already mounted):${NC}"
     for s in "${SKIPPED_SHARES[@]}"; do echo " - $s"; done
     echo "---------------------------------"
 fi

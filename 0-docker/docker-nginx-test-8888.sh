@@ -6,6 +6,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # ────────────────────────────────────────────────
 
 # Check if Docker is installed and running
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 if ! command -v docker &> /dev/null; then
     echo -e "${RED}❌ Docker not found. Installing...${NC}"
     if curl -fsSL https://get.docker.com | sh; then
@@ -33,7 +42,7 @@ PORT="8888"  # Changed from 8080 to 8888 to avoid conflicts
 echo "Checking if Docker is installed..."
 if ! command -v docker &> /dev/null; then
     echo "Docker not found. Installing..."
-    sudo apt update && sudo apt install -y docker.io
+    pkg_install docker.io
     sudo systemctl enable --now docker
 else
     echo "Docker is already installed."

@@ -2,6 +2,15 @@
 if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 
 # Define terminal applications with their descriptions
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 declare -A terminals
 terminals=(
     ["tilix"]="Tilix: Excellent tiling capabilities (split your terminal into multiple panes horizontally and vertically), drag-and-drop support, session saving, input synchronization across multiple terminals, and a \"Quake-mode\" drop-down. It's GTK-based, so it integrates well with GNOME and other GTK-based desktops."
@@ -82,7 +91,7 @@ for pkg in "${!terminals[@]}"; do
     read -p "Do you want to install $pkg? (y/N): " choice
     if [[ "$choice" =~ ^[Yy]$ ]]; then
         echo "Installing $pkg..."
-        sudo apt install -y "$pkg"
+        pkg_install "$pkg"
         if [ $? -eq 0 ]; then
             echo "Successfully installed $pkg."
         else

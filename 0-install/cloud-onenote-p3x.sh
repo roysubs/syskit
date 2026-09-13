@@ -16,6 +16,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # ---
 
 # --- Configuration ---
+
+pkg_install() {
+    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 APP_NAME="p3x-onenote"
 APP_USER_DATA_DIR="$HOME/snap/$APP_NAME"
 NOSNAP_PREF="/etc/apt/preferences.d/nosnap.pref"
@@ -94,7 +103,7 @@ install_onenote() {
                 echo "🔄 Updating package lists to apply changes..."
                 sudo apt-get update
                 echo "🔧 Installing snapd..."
-                sudo apt-get install -y snapd
+                pkg_install snapd
             else
                 echo "🛑 Installation aborted by user. Cannot proceed without removing the block."
                 exit 1
@@ -104,7 +113,7 @@ install_onenote() {
             if confirm "Do you want to install snapd now?"; then
                 echo "🔧 Installing snapd..."
                 sudo apt-get update
-                sudo apt-get install -y snapd
+                pkg_install snapd
             else
                 echo "🛑 Installation aborted by user."
                 exit 1
