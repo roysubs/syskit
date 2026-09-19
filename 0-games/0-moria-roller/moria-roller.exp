@@ -35,19 +35,18 @@ if {$target_score == 0} {
     exit 1
 }
 
-# Set up the log file
-set script_name [file tail [info script]]
-set log_file [file rootname $script_name].log
-set log_path [file join [pwd] $log_file]
+# Store log files in ~/.moria-roller to keep syskit clean
+set home_dir $env(HOME)
+set log_dir [file join $home_dir ".moria-roller"]
+catch {file mkdir $log_dir}
+set log_path [file join $log_dir "moria-roller.log"]
 
-# Get a timestamp in standard format
 proc timestamp {} {
     set now [clock seconds]
     set millis [expr {[clock milliseconds] % 1000}]
     return [format "%s_%03d" [clock format $now -format "%Y-%m-%d_%H-%M-%S"] $millis]
 }
 
-# Function to log messages safely
 proc log_message {log_path message} {
     catch {
         set fp [open $log_path "a"]
@@ -87,8 +86,8 @@ proc extract_concise_info {pane_output attempt} {
 # Verify tmux session exists
 if {[catch {exec tmux has-session -t $session_name} err]} {
     send_user "Error: tmux session '$session_name' not found!\n"
-    send_user "Please start Moria in tmux first:\n"
-    send_user "  1) tmux new -s $session_name\n"
+    send_user "Please start Moria in tmux first, or use './moria-roller.sh --new':\n"
+    send_user "  1) tmux new -s $session_name moria\n"
     send_user "  2) Run Moria and reach the stat rolling screen\n"
     send_user "  3) Detach with Ctrl-b d\n"
     send_user "  4) Run: ./moria-roller.exp $target_stat $target_val\n"

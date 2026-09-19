@@ -18,6 +18,9 @@ import time
 import datetime
 import json
 import sys
+import os
+
+SAVE_DIR = os.path.expanduser("~/.automata-game-of-life")
 
 PATTERNS = {
     1: ("Wire Loop", [[0, 0], [0, 1], [1, 1], [1, 0]]),
@@ -25,14 +28,20 @@ PATTERNS = {
 }
 
 def save_state(grid):
+    os.makedirs(SAVE_DIR, exist_ok=True)
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    filename = f"wireworld-{timestamp}.sav"
+    filename = os.path.join(SAVE_DIR, f"wireworld-{timestamp}.sav")
     with open(filename, "w") as f:
         json.dump({f"{k[0]},{k[1]}": v for k, v in grid.items()}, f)
     return filename
 
 def load_state(filename):
-    with open(filename, "r") as f:
+    target = filename
+    if not os.path.exists(target):
+        candidate = os.path.join(SAVE_DIR, os.path.basename(filename))
+        if os.path.exists(candidate):
+            target = candidate
+    with open(target, "r") as f:
         return {tuple(map(int, k.split(','))): v for k, v in json.load(f).items()}
 
 def get_neighbors(y, x, height, width):

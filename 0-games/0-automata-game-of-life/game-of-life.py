@@ -50,18 +50,27 @@ PATTERNS = {
 COLOR_MODES = ["age", "neighbors", "rainbow", "mono"]
 
 
+SAVE_DIR = os.path.expanduser("~/.automata-game-of-life")
+
+
 def save_state(grid, prefix="life"):
-    """Saves the current live cell coordinates to a timestamped JSON file."""
+    """Saves the current live cell coordinates to a timestamped JSON file in ~/.automata-game-of-life/."""
+    os.makedirs(SAVE_DIR, exist_ok=True)
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    filename = f"{prefix}-{timestamp}.sav"
+    filename = os.path.join(SAVE_DIR, f"{prefix}-{timestamp}.sav")
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(list(grid), f)
     return filename
 
 
 def load_state(filename):
-    """Loads live cell coordinates from a JSON file."""
-    with open(filename, "r", encoding="utf-8") as f:
+    """Loads live cell coordinates from a JSON file (searches current directory and ~/.automata-game-of-life/)."""
+    target = filename
+    if not os.path.exists(target):
+        candidate = os.path.join(SAVE_DIR, os.path.basename(filename))
+        if os.path.exists(candidate):
+            target = candidate
+    with open(target, "r", encoding="utf-8") as f:
         data = json.load(f)
     return {tuple(coord) for coord in data}
 
@@ -357,7 +366,7 @@ def parse_args():
 Controls:
   Arrow Keys      Move editing cursor
   SPACE           Toggle cell at cursor (in edit mode) or pause simulation (when running)
-  s               Start simulation (automatically saves initial state to life-*.sav)
+  s               Start simulation (automatically saves initial state to ~/.automata-game-of-life/life-*.sav)
   p               Toggle Pause / Resume
   c               Cycle color modes: AGE -> NEIGHBORS -> RAINBOW -> MONO
   + / -           Speed up / slow down simulation
@@ -365,12 +374,12 @@ Controls:
                     1: Block      2: Blinker    3: Toad       4: Glider   5: LWSS
                     6: MWSS       7: HWSS       8: Pulsar     9: Pentadecathlon
                     0: Gosper Glider Gun
-  w               Manually save current state to manual-*.sav
+  w               Manually save current state to ~/.automata-game-of-life/manual-*.sav
   r               Clear board / reset
   q / ESC         Quit
 
 State Files:
-  - An initial state is automatically saved to a JSON file (life-YYYYMMDD-HHMMSS.sav)
+  - An initial state is automatically saved to a JSON file (~/.automata-game-of-life/life-YYYYMMDD-HHMMSS.sav)
     every time you start simulation from edit mode.
   - To resume or view a saved state, pass the file path:
       python game-of-life.py life-20260919-120000.sav

@@ -75,13 +75,23 @@ def update_grid(grid):
                 new_grid[row][col] = 1 if neighbors == 3 else 0
     return new_grid
 
+SAVE_DIR = os.path.expanduser("~/.automata-game-of-life")
+
 def save_grid(grid, filename):
-    with open(filename, 'w') as f:
+    os.makedirs(SAVE_DIR, exist_ok=True)
+    filepath = os.path.join(SAVE_DIR, os.path.basename(filename))
+    with open(filepath, 'w') as f:
         for row in grid:
             f.write(''.join(map(str, row)) + '\n')
+    return filepath
 
 def load_grid(filename):
-    with open(filename, 'r') as f:
+    target = filename
+    if not os.path.exists(target):
+        candidate = os.path.join(SAVE_DIR, os.path.basename(filename))
+        if os.path.exists(candidate):
+            target = candidate
+    with open(target, 'r') as f:
         grid = [list(map(int, line.strip())) for line in f]
     return grid
 

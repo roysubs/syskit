@@ -19,6 +19,9 @@ import time
 import datetime
 import json
 import sys
+import os
+
+SAVE_DIR = os.path.expanduser("~/.automata-game-of-life")
 
 # Cell States
 EMPTY = ' '
@@ -36,9 +39,10 @@ PATTERNS = {
 }
 
 def save_state(grid):
-    """Saves the current non-empty grid state to a JSON file."""
+    """Saves the current non-empty grid state to a JSON file in ~/.automata-game-of-life/."""
+    os.makedirs(SAVE_DIR, exist_ok=True)
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    filename = f"wireworld-{timestamp}.sav"
+    filename = os.path.join(SAVE_DIR, f"wireworld-{timestamp}.sav")
     # Only save non-empty cells
     state_to_save = {f"{k[0]},{k[1]}": v for k, v in grid.items() if v != EMPTY}
     with open(filename, "w") as f:

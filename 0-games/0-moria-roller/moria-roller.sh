@@ -10,8 +10,16 @@ STAT="INT"
 TARGET="18/20"
 DELAY="0.06"
 MAX_ROLLS=0
-LOG_FILE="moria-roller.log"
 LOCK_IN=1
+AUTO_START=0
+NEW_RACE=""
+NEW_CLASS=""
+NEW_SEX=""
+
+# Ensure log directory is in ~/.moria-roller to keep syskit repo clean
+LOG_DIR="${HOME}/.moria-roller"
+mkdir -p "$LOG_DIR"
+LOG_FILE="${LOG_DIR}/moria-roller.log"
 
 show_help() {
     cat << 'EOF'
@@ -26,32 +34,66 @@ Arguments:
                       Examples: 17, 18, 18/20, 18/50, 18/75, 18/100
 
 Options:
+  --new [RACE] [CLASS] [SEX]
+                      Automatically create a new tmux session and start Moria!
+                      Steps 1, 2, and 3 are completely automated.
+                      Example: ./moria-roller.sh --new troll warrior male STR 18/50
+                      If arguments omitted, prompts interactively.
   -s, --session NAME  tmux session name (default: moria_session)
   -d, --delay SECS    Delay between rolls in seconds (default: 0.06)
   -m, --max ROLLS     Maximum attempts before stopping (default: 0 = unlimited)
-  -l, --log FILE      Custom log file (default: moria-roller.log)
+  -l, --log FILE      Custom log file (default: ~/.moria-roller/moria-roller.log)
   --no-lock           Do not send ESC to lock in characteristics on match
   -h, --help          Show this help message and exit
 
-Workflow:
-  1. Start a tmux session:
-       tmux new -s moria_session
-  2. Inside tmux, start Moria, select race and class, and proceed to the
-     dice rolling screen: "Hit space to re-roll or ESC to accept characteristics:"
-  3. Detach from tmux using: Ctrl-b d
-  4. Run this script:
-       ./moria-roller.sh INT 18/30
-  5. When finished, re-attach to your character:
-       tmux attach -t moria_session
+Moria Stat Rolling Mechanics Note:
+  In Moria, race and class modifiers apply to your base roll!
+  - Mages have a -5 STR penalty (Elf Mage has -6 STR), so starting STR is
+    capped at ~12-14. An Elf Mage will NEVER roll STR 18/XX!
+  - To roll STR 18/XX, choose a race/class with STR bonuses:
+      Half-Troll Warrior (+5 STR) -> Can roll up to 18/70+ STR!
+      Dwarf Warrior      (+4 STR) -> Easily rolls 18/50+ STR!
+  - To roll INT 18/XX, choose Elf Mage or Gnome Mage (+5 INT).
 
 Examples:
-  ./moria-roller.sh                   # Target INT >= 18/20
-  ./moria-roller.sh STR               # Target STR >= 18/20
-  ./moria-roller.sh STR 18/50         # Target STR >= 18/50
-  ./moria-roller.sh DEX 18            # Target DEX >= 18
-  ./moria-roller.sh CON 18/100        # Target CON == 18/100 (Maximum!)
-  ./moria-roller.sh -d 0.03 INT 18/50 # Fast rolling mode (30ms delay)
+  ./moria-roller.sh INT 18/50                       # Roll in existing session
+  ./moria-roller.sh --new troll warrior male STR 18/50 # Full 1-step automation!
+  ./moria-roller.sh --new elf mage male INT 18/60   # Full 1-step automation for Mage!
 EOF
+}
+
+resolve_race_key() {
+    case "$(echo "$1" | tr '[:upper:]' '[:lower:]')" in
+        1|human|h)               echo "a" ;;
+        2|half-elf|halfelf|he)   echo "b" ;;
+        3|elf|e)                 echo "c" ;;
+        4|halfling|hf)           echo "d" ;;
+        5|gnome|g)               echo "e" ;;
+        6|dwarf|d)               echo "f" ;;
+        7|half-orc|halforc|ho)   echo "g" ;;
+        8|half-troll|halftroll|troll|ht|t) echo "h" ;;
+        *)                       echo "" ;;
+    esac
+}
+
+resolve_class_key() {
+    case "$(echo "$1" | tr '[:upper:]' '[:lower:]')" in
+        1|warrior|w) echo "a" ;;
+        2|mage|m)    echo "b" ;;
+        3|priest|p)  echo "c" ;;
+        4|rogue|ro)  echo "d" ;;
+        5|ranger|ra) echo "e" ;;
+        6|paladin|pa) echo "f" ;;
+        *)           echo "" ;;
+    esac
+}
+
+resolve_sex_key() {
+    case "$(echo "$1" | tr '[:upper:]' '[:lower:]')" in
+        1|m|male)   echo "m" ;;
+        2|f|female) echo "f" ;;
+        *)          echo "m" ;;
+    esac
 }
 
 # Parse options
@@ -61,6 +103,20 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             show_help
             exit 0
+            ;;
+        --new|--auto)
+            AUTO_START=1
+            shift
+            # Check if race/class/sex were supplied as parameters
+            if [[ $# -gt 0 && ! "$1" =~ ^- && ! "$1" =~ ^(STR|INT|WIS|DEX|CON|CHR)$ ]]; then
+                NEW_RACE="$1"; shift
+            fi
+            if [[ $# -gt 0 && ! "$1" =~ ^- && ! "$1" =~ ^(STR|INT|WIS|DEX|CON|CHR)$ ]]; then
+                NEW_CLASS="$1"; shift
+            fi
+            if [[ $# -gt 0 && ! "$1" =~ ^- && ! "$1" =~ ^(STR|INT|WIS|DEX|CON|CHR)$ ]]; then
+                NEW_SEX="$1"; shift
+            fi
             ;;
         -s|--session)
             SESSION="$2"
@@ -105,7 +161,7 @@ case "$STAT" in
         ;;
 esac
 
-# Function to convert Moria stat string (e.g. 17, 18, 18/20, 18/100) to an integer score
+# Function to convert Moria stat string to integer score
 stat_to_score() {
     local val="$1"
     if [[ "$val" =~ 18/([0-9]+) ]]; then
@@ -126,18 +182,104 @@ if [[ "$TARGET_SCORE" -eq 0 ]]; then
     exit 1
 fi
 
+# Automate Steps 1, 2, 3 if requested or if session is missing
+start_moria_automatically() {
+    echo "=========================================================="
+    echo " Automated Moria Character Setup (Steps 1, 2, 3)"
+    echo "=========================================================="
+
+    if [[ -z "$NEW_RACE" ]]; then
+        echo "Select Race:"
+        echo "  1) Human      2) Half-Elf   3) Elf       4) Halfling"
+        echo "  5) Gnome      6) Dwarf      7) Half-Orc  8) Half-Troll"
+        read -r -p "Enter choice [1-8] (default: 3 Elf): " r_choice
+        NEW_RACE="${r_choice:-3}"
+    fi
+    RACE_KEY=$(resolve_race_key "$NEW_RACE")
+    [[ -z "$RACE_KEY" ]] && RACE_KEY="c"
+
+    if [[ -z "$NEW_SEX" ]]; then
+        read -r -p "Select Sex [m/f] (default: m): " s_choice
+        NEW_SEX="${s_choice:-m}"
+    fi
+    SEX_KEY=$(resolve_sex_key "$NEW_SEX")
+
+    if [[ -z "$NEW_CLASS" ]]; then
+        echo "Select Class:"
+        echo "  1) Warrior    2) Mage       3) Priest"
+        echo "  4) Rogue      5) Ranger     6) Paladin"
+        read -r -p "Enter choice [1-6] (default: 2 Mage): " c_choice
+        NEW_CLASS="${c_choice:-2}"
+    fi
+    CLASS_KEY=$(resolve_class_key "$NEW_CLASS")
+    [[ -z "$CLASS_KEY" ]] && CLASS_KEY="b"
+
+    echo "-> Step 1: Spawning background tmux session '$SESSION'..."
+    tmux new-session -d -s "$SESSION" "moria"
+    sleep 0.6
+
+    echo "-> Step 2: Passing intro and selecting character..."
+    # Clear intro / title screen
+    tmux send-keys -t "$SESSION" " "
+    sleep 0.3
+    # Send Race
+    tmux send-keys -t "$SESSION" "$RACE_KEY"
+    sleep 0.3
+    # Send Sex
+    tmux send-keys -t "$SESSION" "$SEX_KEY"
+    sleep 0.3
+    # Send Class
+    tmux send-keys -t "$SESSION" "$CLASS_KEY"
+    sleep 0.5
+
+    # Verify we reached the dice rolling screen
+    READY=0
+    for i in {1..10}; do
+        PANE=$(tmux capture-pane -t "$SESSION" -p 2>/dev/null || true)
+        if [[ "$PANE" =~ "Hit space to re-roll or ESC to accept" ]]; then
+            READY=1
+            break
+        fi
+        sleep 0.3
+    done
+
+    if [[ "$READY" -eq 1 ]]; then
+        echo "-> Step 3: [SUCCESS] Moria is ready at the dice roller screen!"
+    else
+        echo "-> [NOTICE] Session created. Waiting for Moria prompt..."
+    fi
+}
+
 # Verify tmux session exists
 if ! tmux has-session -t "$SESSION" 2>/dev/null; then
-    cat << EOF >&2
+    if [[ "$AUTO_START" -eq 1 ]]; then
+        start_moria_automatically
+    elif [ -t 0 ]; then
+        echo "tmux session '$SESSION' not found."
+        read -r -p "Would you like to automatically launch Moria and create a character? [Y/n] " ans
+        if [[ "$ans" =~ ^[Yy]?$ ]]; then
+            start_moria_automatically
+        else
+            echo "Aborted."
+            exit 1
+        fi
+    else
+        cat << EOF >&2
 Error: tmux session '$SESSION' does not exist!
 
-To set it up:
-  1) Start tmux: tmux new -s $SESSION
-  2) Run Moria, choose your race/class, and reach the dice rolling screen.
-  3) Detach: press Ctrl-b then d
+To automate setup completely, run:
+  $0 --new [race] [class] [sex] $STAT $TARGET
+Example:
+  $0 --new troll warrior male STR 18/50
+
+Or manually start Moria:
+  1) tmux new -s $SESSION moria
+  2) Pick race & class to reach stat roller
+  3) Detach with Ctrl-b d
   4) Run: $0 $STAT $TARGET
 EOF
-    exit 1
+        exit 1
+    fi
 fi
 
 echo "=========================================================="
@@ -153,7 +295,6 @@ ROLLS=0
 HIGHEST_SCORE=0
 HIGHEST_STR="N/A"
 
-# Graceful exit on Ctrl+C
 trap 'echo -e "\n\nAborted by user. Total rolls: $ROLLS"; exit 130' INT TERM
 
 while true; do
@@ -227,7 +368,7 @@ while true; do
         echo "   tmux attach -t $SESSION"
         echo " =========================================================="
 
-        # Log entry
+        # Log entry to ~/.moria-roller/moria-roller.log
         TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
         {
             echo "[$TIMESTAMP] SUCCESS: Found $STAT=$CURRENT_VAL (Target: $TARGET) after $ROLLS rolls ($TIME_STR)"
