@@ -128,7 +128,10 @@ def main(stdscr):
             for dy, dx in pattern_cells:
                 grid[(cursor_y + dy, cursor_x + dx)] = 1  # Place Wire
         elif key == ord('s'):
-            save_state({k: v for k, v in grid.items() if v != 0})
+            saved_file = save_state({k: v for k, v in grid.items() if v != 0})
+            stdscr.addstr(height + 2, 0, f"Saved to {saved_file}"[:width - 1])
+            stdscr.refresh()
+            time.sleep(0.4)
             running = True
         elif key == ord('+'):
             speed = max(0.01, speed - 0.02)

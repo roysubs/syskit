@@ -50,16 +50,19 @@ def save_state(grid):
     return filename
 
 def load_state(filename):
-    """Loads grid state from a JSON file."""
+    """Loads grid state from a JSON file (checks current dir and ~/.automata-game-of-life/)."""
+    target = filename
+    if not os.path.exists(target):
+        candidate = os.path.join(SAVE_DIR, os.path.basename(filename))
+        if os.path.exists(candidate):
+            target = candidate
     try:
-        with open(filename, "r") as f:
+        with open(target, "r") as f:
             loaded_data = json.load(f)
             # Convert string keys back to tuple keys
             return {tuple(map(int, k.split(','))): v for k, v in loaded_data.items()}
-    except FileNotFoundError:
-        return {} # Return empty grid if file not found
-    except json.JSONDecodeError:
-        return {} # Return empty grid if JSON is invalid
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
 
 def get_neighbors(y, x, height, width):
     """Returns coordinates of the 8 neighbors, handling wrapping."""
