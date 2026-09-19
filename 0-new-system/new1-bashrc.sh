@@ -243,6 +243,7 @@ alias ll.='ls -ald .[!.]* ..?*' # -a includes hidden, -d for dirs, -l long
 alias l='ls -CF'
 alias ifconfig='sudo ifconfig'    # 'ifconfig' (apt install net-tools) causes 'command not found' if run without sudo
 alias ipconfig='sudo ifconfig'    # Common typo for Windows users, just try ifconfig instead
+alias myip='curl -s https://ifconfig.me; echo' # Show public WAN IP address
 alias venvh='source $HOME/syskit/0-scripts/venv-helper.sh'   # Uses 0-scripts/venv-helper.sh to manage Python venv's
 
 # tmux helpers (using 't' script) and git helpers (using 'g' script)
