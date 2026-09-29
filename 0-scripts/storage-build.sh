@@ -287,7 +287,24 @@ if [ "$IS_MACOS" = true ]; then
     esac
 
     echo -e "${INFO_COLOR}Formatting $device as $MAC_FS with volume name '$USER_CONFIG_NAME'...${RESET_COLOR}"
-    run_command diskutil eraseDisk "$MAC_FS" "$USER_CONFIG_NAME" GPT "$device"
+    formatted=false
+    for attempt in 1 2 3; do
+        echo -e "${CMD_PREFIX_COLOR}Running: ${CMD_COLOR}diskutil eraseDisk $MAC_FS $USER_CONFIG_NAME GPT $device${RESET_COLOR}"
+        if diskutil eraseDisk "$MAC_FS" "$USER_CONFIG_NAME" GPT "$device"; then
+            formatted=true
+            break
+        fi
+        echo -e "${WARN_COLOR}diskutil eraseDisk failed (attempt $attempt/3) - see error output above from diskutil itself.${RESET_COLOR}"
+        if [ "$attempt" -lt 3 ]; then
+            echo -e "${WARN_COLOR}Forcing an unmount of $device and retrying...${RESET_COLOR}"
+            diskutil unmountDisk force "$device" || true
+            sleep 2
+        fi
+    done
+    if [ "$formatted" = false ]; then
+        echo -e "${ERROR_COLOR}ERROR: Failed to erase/format $device as $MAC_FS after 3 attempts. See diskutil errors above.${RESET_COLOR}"
+        exit 1
+    fi
     mount_point="/Volumes/$USER_CONFIG_NAME"
 
     # ---- macOS Sharing Setup ----
