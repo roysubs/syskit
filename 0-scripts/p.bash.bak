@@ -1,0 +1,1612 @@
+#!/usr/bin/env bash
+if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
+# Author: Roy Wiseman 2025-01
+
+# A helpful wrapper for nmap, ss, lsof, ip, and other networking tools.
+
+# ANSI color codes
+BOLD=$(printf '[1m')
+DIM=$(printf '[2m')
+GREEN=$(printf '[0;32m')
+BRIGHT_GREEN=$(printf '[1;32m')
+RED=$(printf '[0;31m')
+YELLOW=$(printf '[1;33m')
+BLUE=$(printf '[0;34m')
+PURPLE=$(printf '[0;35m')
+MAGENTA=$(printf '[1;35m')
+CYAN=$(printf '[0;36m')
+BRIGHT_CYAN=$(printf '[1;36m')
+WHITE=$(printf '[1;37m')
+GRAY=$(printf '[0;90m')
+NC=$(printf '[0m') # No Color
+
+# --- Global Variables ---
+SHOW_CMD=false
+NO_SUDO=false
+RAW_OUTPUT=false
+ACTION=""
+POSITIONAL_ARGS=() # Store all non-option arguments
+
+# --- Utility Functions ---
+check_command() {
+    command -v "$1" >/dev/null 2>&1 || { echo -e "${RED}Error: Command '$1' not found. Please install it to use this feature.${NC}"; exit 1; }
+}
+
+needs_sudo_warning() {
+    echo -e "${YELLOW}Note: This command usually requires root privileges (sudo).${NC}"
+}
+
+# --- Interactive Built-in Guide Engine ---
+
+display_guide() {
+    local topic="$1"
+    topic="${topic,,}" # lowercase
+    topic="${topic#:}" # strip leading colon if port
+
+    case "$topic" in
+        health|chk|check|triage)
+            cat << EOF
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+  ${WHITE}${BOLD}P GUIDE: Network Connectivity Triage Ladder ("p health")${NC}
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+
+${YELLOW}${BOLD}OVERVIEW:${NC}
+  During a network outage or connectivity failure, running individual pings and
+  inspecting routes by hand wastes critical minutes. ${CYAN}p health${NC} automates the
+  classic 4-stage network triage ladder in 2 seconds.
+
+${YELLOW}${BOLD}THE 4-STAGE TRIAGE LADDER:${NC}
+  ${GREEN}1. Loopback Stack (127.0.0.1)${NC}
+     Verifies the Linux kernel network subsystem and localhost interface are alive.
+     ${RED}Failure means:${NC} Kernel network stack panic or 'lo' interface is down.
+
+  ${GREEN}2. Default Gateway & LAN (ip route -> router IP)${NC}
+     Finds your default gateway IP via ${CYAN}ip route${NC} and pings it via the primary interface.
+     ${RED}Failure means:${NC} Physical Ethernet cable disconnected, WiFi down, or switch fault.
+
+  ${GREEN}3. Outbound WAN Internet (1.1.1.1 / 8.8.8.8)${NC}
+     Pings public anycast DNS root IPs to verify traffic leaves your local LAN.
+     ${RED}Failure means:${NC} Gateway/modem is up, but ISP uplink or external routing has dropped.
+
+  ${GREEN}4. DNS Name Resolution (google.com)${NC}
+     Tests resolving a public domain name using the local nameserver configuration.
+     ${RED}Failure means:${NC} Internet is reachable, but DNS servers in /etc/resolv.conf are dead.
+
+${YELLOW}${BOLD}USAGE:${NC}
+  ${WHITE}p health${NC}               Run the complete 4-stage connectivity triage
+  ${WHITE}p health -g${NC}            Show this guide page
+EOF
+            ;;
+
+        top-ips|top|conns|topconns)
+            cat << EOF
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+  ${WHITE}${BOLD}P GUIDE: Active Remote Connections ("p top-ips")${NC}
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+
+${YELLOW}${BOLD}OVERVIEW:${NC}
+  Aggregates all currently established TCP connections by foreign IP address,
+  counts the open sockets per host, and resolves local LAN names or internet origins.
+
+${YELLOW}${BOLD}WHY THIS MATTERS IN PRODUCTION:${NC}
+  • ${WHITE}Connection Floods / Slowloris:${NC} Spot single IPs hogging hundreds of connections.
+  • ${WHITE}Rogue LAN Devices:${NC} Quickly see which internal machines are saturating services.
+  • ${WHITE}Replaces complex pipelines:${NC} Replaces:
+    ${GRAY}ss -Htn state established | awk '{print $4}' | cut -d: -f1 | sort | uniq -c | sort -nr${NC}
+
+${YELLOW}${BOLD}USAGE:${NC}
+  ${WHITE}p top-ips${NC}              List top remote IPs connected to this server
+  ${WHITE}p top-ips -g${NC}           Show this guide page
+EOF
+            ;;
+
+        choked|backlog|stalled)
+            cat << EOF
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+  ${WHITE}${BOLD}P GUIDE: Stalled Sockets & Application Backlog ("p choked")${NC}
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+
+${YELLOW}${BOLD}OVERVIEW:${NC}
+  In Linux socket statistics, the ${CYAN}Recv-Q${NC} and ${CYAN}Send-Q${NC} columns hold a hidden
+  diagnostic superpower during performance degradation or service freezes:
+
+${YELLOW}${BOLD}THE RECV-Q SECRET IN "LISTEN" STATE:${NC}
+  • For a socket in ${GREEN}LISTEN${NC} mode:
+    - ${CYAN}Send-Q${NC} = Maximum listen backlog setting (e.g. 128 or 4096)
+    - ${CYAN}Recv-Q${NC} = Number of client connections currently waiting to be accepted!
+  • If ${RED}Recv-Q > 0${NC} on a listening port:
+    The application (e.g. Node.js, Python, Java, qBittorrent) has locked its event loop,
+    exhausted its thread pool, or crashed internally, and has stopped calling ${WHITE}accept()${NC}.
+    Incoming clients are timing out before they can connect!
+
+${YELLOW}${BOLD}SEND-Q IN "ESTABLISHED" STATE:${NC}
+  • For a socket in ${GREEN}ESTABLISHED${NC} mode:
+    - ${CYAN}Send-Q${NC} = Data queued in kernel buffer waiting to be sent to remote client.
+    - If high: Remote client is stalled, buffer bloated, or network path is congested.
+
+${YELLOW}${BOLD}USAGE:${NC}
+  ${WHITE}p choked${NC}               Instantly audit all sockets for non-zero Recv-Q or Send-Q
+  ${WHITE}p choked -g${NC}            Show this guide page
+EOF
+            ;;
+
+        drops|errors|rx-errors|link-health)
+            cat << EOF
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+  ${WHITE}${BOLD}P GUIDE: Interface Health & Dropped Packets ("p drops")${NC}
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+
+${YELLOW}${BOLD}OVERVIEW:${NC}
+  Audits all network interfaces across the machine (physical Ethernet, WiFi, virtual
+  bridges, Docker virtual switches) and reports only interfaces with non-zero drop,
+  error, or collision counters.
+
+${YELLOW}${BOLD}COMMON CAUSES OF DROPPED PACKETS:${NC}
+  • ${WHITE}RX Drops (Receive):${NC} Kernel ring buffer overrun (CPU cannot process packets fast enough),
+    or packet filtering / MTU fragmentation issues.
+  • ${WHITE}RX Errors:${NC} Physical cable fault, bad NIC port, or duplex/speed mismatch on the switch.
+  • ${WHITE}Virtual Bridge Drops (virbr0, docker0):${NC} High container traffic exceeding virtual buffer.
+
+${YELLOW}${BOLD}USAGE:${NC}
+  ${WHITE}p drops${NC}                Scan all interfaces for dropped packets or CRC errors
+  ${WHITE}p drops -g${NC}             Show this guide page
+EOF
+            ;;
+
+        fw|firewall|ufw|iptables)
+            cat << EOF
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+  ${WHITE}${BOLD}P GUIDE: Firewall Status & Port Verification ("p fw")${NC}
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+
+${YELLOW}${BOLD}OVERVIEW:${NC}
+  Verifies whether a port is being blocked by ${CYAN}UFW${NC} or ${CYAN}iptables/nftables${NC} without
+  having to wade through hundreds of auto-generated Docker chains.
+
+${YELLOW}${BOLD}THE DOCKER FIREWALL GOTCHA:${NC}
+  Docker modifies iptables directly by inserting rules before UFW. A port might appear
+  closed in UFW but still be accessible via Docker, or blocked by default host policy.
+  ${CYAN}p fw <PORT>${NC} inspects both active UFW rules and raw iptables INPUT chains.
+
+${YELLOW}${BOLD}USAGE:${NC}
+  ${WHITE}p fw${NC}                   Audit overall firewall status and default policies
+  ${WHITE}p fw 8080${NC}              Check if port 8080 is permitted or blocked by the firewall
+  ${WHITE}p fw -g${NC}                Show this guide page
+EOF
+            ;;
+
+        l|listen|listening)
+            cat << EOF
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+  ${WHITE}${BOLD}P GUIDE: Listening Sockets & Ports ("p l")${NC}
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+
+${YELLOW}${BOLD}OVERVIEW:${NC}
+  Lists all sockets currently in ${GREEN}LISTEN${NC} (TCP) or ${GREEN}UNCONN${NC} (UDP) mode.
+  Uses native kernel socket inspection via ${CYAN}ss -tulnp${NC}, auto-elevates with ${CYAN}sudo${NC}
+  when interactive to reveal process names, and parses published Docker containers.
+
+${YELLOW}${BOLD}SYNTAX & EXAMPLES:${NC}
+  ${WHITE}p l${NC}                    List all listening sockets with clean process names
+  ${WHITE}p l 53${NC}                 Inspect only port 53
+  ${WHITE}p l 0 1024${NC}             Inspect all listening services in privileged range (0-1024)
+  ${WHITE}p l 8000 9000${NC}          Inspect services in web / media stack range (8000-9000)
+  ${WHITE}p l tcp 8080${NC}           Filter by TCP protocol specifically
+  ${WHITE}p l udp${NC}                Show only UDP listening sockets
+
+${YELLOW}${BOLD}INTELLIGENT ENRICHMENTS:${NC}
+  • Drops noisy internal file descriptors (${DIM}fd=...${NC}) and consolidates worker threads.
+  • Automatically queries Docker to identify container names mapped to published ports.
+EOF
+            ;;
+
+        e|estab|established|active)
+            cat << EOF
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+  ${WHITE}${BOLD}P GUIDE: Active Established Connections ("p e")${NC}
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+
+${YELLOW}${BOLD}OVERVIEW:${NC}
+  Displays active, two-way network connections currently established between this
+  machine and remote hosts or clients (${CYAN}ss -tuanp state established${NC}).
+
+${YELLOW}${BOLD}SYNTAX & EXAMPLES:${NC}
+  ${WHITE}p e${NC}                    List all active established connections
+  ${WHITE}p e tcp${NC}                List only established TCP connections
+  ${WHITE}p e 443${NC}                List established connections communicating on port 443
+EOF
+            ;;
+
+        [0-9]*|port)
+            cat << EOF
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+  ${WHITE}${BOLD}P GUIDE: Port Lookup & Termination ("p <PORT>" / "p k <PORT>")${NC}
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+
+${YELLOW}${BOLD}OVERVIEW:${NC}
+  Directly inspects what process or container is bound to a specific port.
+
+${YELLOW}${BOLD}TRIPLE-LAYER INSPECTION:${NC}
+  1. ${GREEN}Kernel Socket:${NC} Checks ss for process name and PID.
+  2. ${GREEN}IANA Registry:${NC} Resolves standard registered service name (e.g. 445 -> SMB).
+  3. ${GREEN}Docker Engine:${NC} Queries Docker daemon for container name and image.
+
+${YELLOW}${BOLD}SYNTAX & EXAMPLES:${NC}
+  ${WHITE}p 8080${NC}                 What is running on port 8080?
+  ${WHITE}p 0 1024${NC}               Directly inspect range 0 to 1024
+  ${WHITE}p k 8080${NC}               Safely terminate the process hogging port 8080
+EOF
+            ;;
+
+        d|docker|containers)
+            cat << EOF
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+  ${WHITE}${BOLD}P GUIDE: Docker Container Port Mappings ("p d")${NC}
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+
+${YELLOW}${BOLD}OVERVIEW:${NC}
+  Provides an instant overview table of all running Docker containers and their
+  forwarded host ports, eliminating manual ${CYAN}docker ps | grep${NC} acrobatics.
+
+${YELLOW}${BOLD}SYNTAX:${NC}
+  ${WHITE}p d${NC}                    Display table of running containers and port mappings
+EOF
+            ;;
+
+        sn|subnet)
+            cat << EOF
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+  ${WHITE}${BOLD}P GUIDE: Subnet Ping Sweep ("p sn")${NC}
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+
+${YELLOW}${BOLD}OVERVIEW:${NC}
+  Discovers all live IP addresses on your local network using ICMP/ARP ping sweep
+  without port scanning targets. Automatically detects your active LAN subnet if
+  no CIDR is provided.
+
+${YELLOW}${BOLD}SYNTAX:${NC}
+  ${WHITE}p sn${NC}                   Sweep current local LAN (e.g. auto-detects 192.168.1.0/24)
+  ${WHITE}p sn 10.0.0.0/24${NC}       Sweep a specific CIDR subnet block
+EOF
+            ;;
+
+        scan|s)
+            cat << EOF
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+  ${WHITE}${BOLD}P GUIDE: Remote Port Scanning ("p scan")${NC}
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+
+${YELLOW}${BOLD}OVERVIEW:${NC}
+  Performs smart port scanning on a target host. Uses high-speed TCP SYN stealth scan
+  if root/sudo is available; automatically falls back to TCP Connect scan if unprivileged.
+
+${YELLOW}${BOLD}SYNTAX:${NC}
+  ${WHITE}p scan 192.168.1.50${NC}               Scan top 1000 ports on target
+  ${WHITE}p scan 192.168.1.50 22,80,443${NC}     Scan specific ports
+EOF
+            ;;
+
+        *)
+            cat << EOF
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+  ${WHITE}${BOLD}P BUILT-IN GUIDE TABLE OF CONTENTS${NC}
+  ${DIM}Append -g anywhere to any command (e.g. "p health -g", "p l 0 1024 -g")${NC}
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+
+${YELLOW}${BOLD}AVAILABLE GUIDE TOPICS:${NC}
+
+  ${MAGENTA}${BOLD}Diagnostic Lifesavers (Outage & Incident Response):${NC}
+    ${BRIGHT_GREEN}p -g health${NC}      (or p health -g)    The 4-stage network triage ladder
+    ${BRIGHT_GREEN}p -g top-ips${NC}     (or p top-ips -g)   Active remote connection flood detector
+    ${BRIGHT_GREEN}p -g choked${NC}      (or p choked -g)    Stalled process / full Recv-Q backlog detector
+    ${BRIGHT_GREEN}p -g drops${NC}       (or p drops -g)     Interface health, dropped packets & CRC errors
+    ${BRIGHT_GREEN}p -g fw${NC}          (or p fw 8080 -g)   Firewall rules & port verification (UFW/iptables)
+
+  ${MAGENTA}${BOLD}Port & Socket Discovery:${NC}
+    ${BRIGHT_GREEN}p -g l${NC}           (or p l 0 1024 -g)  Listening sockets, ranges & Docker mapping
+    ${BRIGHT_GREEN}p -g e${NC}           (or p e -g)         Established active connections
+    ${BRIGHT_GREEN}p -g 8080${NC}        (or p 8080 -g)      Single port inspection, IANA & killing
+    ${BRIGHT_GREEN}p -g d${NC}           (or p d -g)         Docker container port mappings
+
+  ${MAGENTA}${BOLD}Network Probing & Scanning:${NC}
+    ${BRIGHT_GREEN}p -g sn${NC}          (or p sn -g)        Subnet ping sweep
+    ${BRIGHT_GREEN}p -g scan${NC}        (or p scan -g)      Remote host port scanning
+
+${YELLOW}${BOLD}TIP:${NC}
+  If you type a command and get stuck or want to understand what it does,
+  press ${WHITE}<Up>${NC}, append ${CYAN}-g${NC} to the end of the line, and press Enter!
+EOF
+            ;;
+    esac
+}
+
+# --- High-Impact Network Diagnostics ---
+
+diagnose_health() {
+    echo -e "${YELLOW}${BOLD}Network Connectivity Triage Ladder:${NC}"
+    echo ""
+
+    # 1. Loopback
+    if ping -c 1 -W 1 127.0.0.1 >/dev/null 2>&1; then
+        echo -e "  ${GREEN}[✓] 1. Loopback Stack  :${NC} ${WHITE}127.0.0.1${NC} ${DIM}(Local kernel network stack is healthy)${NC}"
+    else
+        echo -e "  ${RED}[✗] 1. Loopback Stack  :${NC} ${WHITE}127.0.0.1${NC} ${RED}(Local loopback failure - check 'lo' interface!)${NC}"
+    fi
+
+    # 2. Gateway
+    local gw_ip gw_if
+    gw_ip=$(ip route 2>/dev/null | awk '/default/ {print $3}' | head -n 1)
+    gw_if=$(ip route 2>/dev/null | awk '/default/ {print $5}' | head -n 1)
+    if [[ -z "$gw_ip" ]]; then
+        echo -e "  ${RED}[✗] 2. Default Gateway :${NC} ${RED}No default route found! Check DHCP / IP config.${NC}"
+    elif ping -c 1 -W 2 "$gw_ip" >/dev/null 2>&1; then
+        echo -e "  ${GREEN}[✓] 2. Default Gateway :${NC} ${WHITE}${gw_ip}${NC} via ${CYAN}${gw_if}${NC} ${DIM}(LAN link & router reachable)${NC}"
+    else
+        echo -e "  ${RED}[✗] 2. Default Gateway :${NC} ${WHITE}${gw_ip}${NC} via ${CYAN}${gw_if}${NC} ${RED}(Router unreachable - check physical cable/switch!)${NC}"
+    fi
+
+    # 3. WAN Internet
+    if ping -c 1 -W 2 1.1.1.1 >/dev/null 2>&1; then
+        echo -e "  ${GREEN}[✓] 3. WAN Internet    :${NC} ${WHITE}1.1.1.1${NC} ${DIM}(Outbound Internet routing & ISP healthy)${NC}"
+    elif ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
+        echo -e "  ${GREEN}[✓] 3. WAN Internet    :${NC} ${WHITE}8.8.8.8${NC} ${DIM}(Outbound Internet routing & ISP healthy)${NC}"
+    else
+        echo -e "  ${RED}[✗] 3. WAN Internet    :${NC} ${WHITE}1.1.1.1 / 8.8.8.8${NC} ${RED}(Internet unreachable - possible ISP or modem outage!)${NC}"
+    fi
+
+    # 4. DNS Resolution
+    local dns_res=""
+    if command -v getent >/dev/null 2>&1; then
+        dns_res=$(getent ahosts google.com 2>/dev/null | awk '{print $1}' | head -n 1)
+    fi
+    if [[ -n "$dns_res" ]]; then
+        echo -e "  ${GREEN}[✓] 4. DNS Resolution  :${NC} ${WHITE}google.com${NC} -> ${CYAN}${dns_res}${NC} ${DIM}(Nameservers resolving correctly)${NC}"
+    else
+        echo -e "  ${RED}[✗] 4. DNS Resolution  :${NC} ${RED}Failed to resolve google.com (Check /etc/resolv.conf or local DNS!)${NC}"
+    fi
+}
+
+diagnose_top_ips() {
+    check_command ss
+    echo -e "${YELLOW}${BOLD}Top Remote Connected IPs (Active Established Sockets):${NC}"
+    echo ""
+
+    local raw_conns
+    raw_conns=$(ss -Htn state established 2>/dev/null | awk '{print $4}')
+    if [[ -z "$raw_conns" ]]; then
+        echo -e "  ${DIM}No active established TCP connections at this moment.${NC}"
+        return 0
+    fi
+
+    local ip_counts
+    ip_counts=$(awk '{
+        peer = $1
+        sub(/^\[/, "", peer)
+        sub(/\]:[0-9]+$/, "", peer)
+        sub(/:[0-9]+$/, "", peer)
+        if (peer != "127.0.0.1" && peer != "::1" && peer != "") {
+            print peer
+        }
+    }' <<< "$raw_conns" | sort | uniq -c | sort -nr | head -n 15)
+
+    if [[ -z "$ip_counts" ]]; then
+        echo -e "  ${DIM}Only local loopback connections established.${NC}"
+        return 0
+    fi
+
+    printf "  ${CYAN}%-6s  %-22s  %-35s${NC}\n" "CONNS" "REMOTE IP" "REVERSE HOSTNAME / TYPE"
+    printf "  ${GRAY}%-6s  %-22s  %-35s${NC}\n" "------" "----------------------" "-----------------------------------"
+
+    while read -r count ip; do
+        [[ -z "$ip" ]] && continue
+        local host=""
+        if command -v getent >/dev/null 2>&1; then
+            host=$(getent hosts "$ip" 2>/dev/null | awk '{print $2}' | head -n 1)
+        fi
+        if [[ -z "$host" ]]; then
+            if [[ "$ip" =~ ^192\.168\. || "$ip" =~ ^10\. || "$ip" =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]]; then
+                host="[Local Private LAN]"
+            else
+                host="[Public Internet IP]"
+            fi
+        fi
+        printf "  ${WHITE}%-6s${NC}  ${BRIGHT_GREEN}%-22s${NC}  ${DIM}%-35s${NC}\n" "$count" "$ip" "$host"
+    done <<< "$ip_counts"
+}
+
+diagnose_choked() {
+    check_command ss
+    echo -e "${YELLOW}${BOLD}Audit: Checking for Choked or Stalled Sockets (Recv-Q / Send-Q > 0)...${NC}"
+    echo ""
+
+    local raw_output
+    raw_output=$(execute_command "ss -tulpn" | awk '
+    NR == 1 { header = $0; next }
+    # In LISTEN mode, Recv-Q > 0 is a clogged backlog. (Send-Q is just the max limit).
+    # In non-LISTEN (ESTAB, etc.), either Recv-Q > 0 or Send-Q > 0 is buffered/stalled data.
+    ($2 == "LISTEN" && $3 > 0) || ($2 != "LISTEN" && ($3 > 0 || $4 > 0)) {
+        if (!found) { print header; found = 1 }
+        print $0
+    }')
+
+    if [[ -z "$raw_output" ]]; then
+        echo -e "  ${GREEN}[✓] All socket queues clear! No choked or stalled sockets detected.${NC}"
+        echo -e "      ${DIM}(All listening services are accepting connections promptly; no backlog buildup)${NC}"
+    else
+        echo "$raw_output"
+        echo ""
+        echo -e "  ${RED}${BOLD}Diagnostic Note:${NC}"
+        echo -e "  ${YELLOW}• High Recv-Q in LISTEN state:${NC} The application backlog queue is full! The process event loop"
+        echo -e "    or worker thread pool is locked/stalled and failing to accept incoming connections."
+        echo -e "  ${YELLOW}• High Send-Q in ESTAB state:${NC} Outbound network buffer is full or remote peer is not ACKing."
+    fi
+}
+
+diagnose_drops() {
+    check_command ip
+    echo -e "${YELLOW}${BOLD}Network Interface Health & Dropped Packet Audit:${NC}"
+    echo ""
+
+    local problematic
+    problematic=$(ip -s link 2>/dev/null | awk '
+    /^[0-9]+: / {
+        if (iface != "" && (rx_drop > 0 || rx_err > 0 || tx_drop > 0 || tx_err > 0 || collsns > 0)) {
+            print iface " | RX drops=" rx_drop ", errors=" rx_err " | TX drops=" tx_drop ", errors=" tx_err ", collsns=" collsns
+        }
+        iface = $2
+        sub(/:$/, "", iface)
+        rx_drop = 0; rx_err = 0; tx_drop = 0; tx_err = 0; collsns = 0
+        next
+    }
+    /RX:/ { getline; rx_err = $3 + 0; rx_drop = $4 + 0 }
+    /TX:/ { getline; tx_err = $3 + 0; tx_drop = $4 + 0; collsns = $6 + 0 }
+    END {
+        if (iface != "" && (rx_drop > 0 || rx_err > 0 || tx_drop > 0 || tx_err > 0 || collsns > 0)) {
+            print iface " | RX drops=" rx_drop ", errors=" rx_err " | TX drops=" tx_drop ", errors=" tx_err ", collsns=" collsns
+        }
+    }')
+
+    local all_ifaces
+    all_ifaces=$(ip -br link 2>/dev/null | awk '{print $1}' | tr '\n' ' ')
+
+    if [[ -z "$problematic" ]]; then
+        echo -e "  ${GREEN}[✓] All network interfaces healthy! No dropped packets, CRC errors, or collisions.${NC}"
+        echo -e "      ${DIM}Audited interfaces: ${all_ifaces}${NC}"
+    else
+        echo -e "  ${RED}${BOLD}Interfaces reporting dropped packets or errors:${NC}"
+        while IFS= read -r line; do
+            echo -e "    ${RED}•${NC} ${WHITE}${line}${NC}"
+        done <<< "$problematic"
+        echo ""
+        echo -e "  ${YELLOW}Possible causes:${NC} Physical cable fault, duplex mismatch, MTU fragmentation, or virtual bridge buffer overflow."
+    fi
+}
+
+diagnose_firewall() {
+    local target_port="$1"
+    target_port="${target_port#:}"
+
+    echo -e "${YELLOW}${BOLD}Firewall Status & Port Accessibility Audit:${NC}"
+    echo ""
+
+    local checked=false
+
+    # Check UFW
+    if command -v ufw >/dev/null 2>&1; then
+        local ufw_out
+        ufw_out=$(sudo ufw status 2>/dev/null || ufw status 2>/dev/null || true)
+        if [[ "$ufw_out" == *"Status: active"* ]]; then
+            checked=true
+            echo -e "  ${GREEN}UFW Firewall:${NC} ${WHITE}${BOLD}ACTIVE${NC}"
+            if [[ -n "$target_port" ]]; then
+                local port_rules
+                port_rules=$(grep -E "\b${target_port}(/(tcp|udp))?\b" <<< "$ufw_out" || true)
+                if [[ -n "$port_rules" ]]; then
+                    echo -e "  ${CYAN}Rules matching Port ${target_port}:${NC}"
+                    echo "$port_rules" | sed 's/^/    /'
+                else
+                    echo -e "  ${YELLOW}No explicit UFW rule for port ${target_port}.${NC}"
+                    echo -e "  ${DIM}(Default incoming policy applies: $(grep -i 'Default:' <<< "$ufw_out" || echo 'check ufw status verbose'))${NC}"
+                fi
+            else
+                echo "$ufw_out" | sed 's/^/    /'
+            fi
+            return 0
+        fi
+    fi
+
+    # Check iptables
+    if command -v iptables >/dev/null 2>&1; then
+        local input_policy
+        input_policy=$(sudo iptables -S INPUT 2>/dev/null | grep -E "^-P INPUT" | awk '{print $3}' || true)
+        local drop_rules
+        drop_rules=$(sudo iptables -S INPUT 2>/dev/null | grep -E -- "-(j|g) (DROP|REJECT)" || true)
+
+        if [[ -n "$input_policy" || -n "$drop_rules" ]]; then
+            checked=true
+            if [[ "$input_policy" == "DROP" || -n "$drop_rules" ]]; then
+                echo -e "  ${YELLOW}iptables Firewall:${NC} ${WHITE}Active filtering detected${NC} ${DIM}(Default INPUT: ${input_policy:-UNKNOWN})${NC}"
+                if [[ -n "$target_port" ]]; then
+                    local pt_rules
+                    pt_rules=$(sudo iptables -S INPUT 2>/dev/null | grep -E -- "--(d|s)port ${target_port}\b" || true)
+                    if [[ -n "$pt_rules" ]]; then
+                        echo -e "  ${CYAN}iptables rules matching port ${target_port}:${NC}"
+                        echo "$pt_rules" | sed 's/^/    /'
+                    else
+                        echo -e "  ${YELLOW}No specific iptables INPUT rule for port ${target_port}.${NC}"
+                    fi
+                fi
+            else
+                echo -e "  ${GREEN}Firewall Status:${NC} ${WHITE}Open / Permissive${NC} ${DIM}(No blocking INPUT rules detected, default policy ACCEPT)${NC}"
+                if [[ -n "$target_port" ]]; then
+                    echo -e "  ${GREEN}[✓] Port ${target_port} is not being blocked by local host firewall.${NC}"
+                fi
+            fi
+        fi
+    fi
+
+    if [[ "$checked" != "true" ]]; then
+        echo -e "  ${GREEN}Firewall Status:${NC} ${WHITE}Open / Unrestricted${NC} ${DIM}(No active UFW or iptables blocking rules on host)${NC}"
+        if [[ -n "$target_port" ]]; then
+            echo -e "  ${GREEN}[✓] Port ${target_port} is completely open to local and network traffic.${NC}"
+        fi
+    fi
+}
+
+# --- Help Display Functions ---
+
+usage() {
+    local exit_code="${1:-0}"
+    cat << EOF
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+  ${WHITE}${BOLD}Ports & Network Swiss Army Knife ("p")${NC}
+  ${DIM}Layered network discovery, socket inspection, and port diagnostics${NC}
+${CYAN}═══════════════════════════════════════════════════════════════════════════════${NC}
+
+${YELLOW}${BOLD}USAGE:${NC}
+  ${CYAN}p${NC} ${GREEN}[COMMAND / OPTION] [ARGS...]${NC}
+  ${CYAN}p${NC} ${WHITE}<PORT | RANGE>${NC}               ${DIM}Inspect port or range (e.g. p 8080, p 0 1024, p 0-1024)${NC}
+  ${CYAN}p${NC} ${WHITE}<CIDR>${NC}                       ${DIM}Ping sweep a network subnet (e.g. p 192.168.1.0/24)${NC}
+  ${CYAN}p${NC} ${WHITE}<HOST>${NC}                       ${DIM}Smart port scan a host (e.g. p 192.168.1.50)${NC}
+
+${YELLOW}${BOLD}PRIMARY COMMANDS (Everyday 80-90% Operations):${NC}
+
+${MAGENTA}${BOLD}  Local Ports & Sockets:${NC}
+    ${BRIGHT_GREEN}l${NC}, ${GREEN}listen${NC} ${CYAN}[tcp|udp] [PORT|START END]${NC} List listening sockets (e.g. p l 53, p l 0 1024)${NC}
+    ${BRIGHT_GREEN}e${NC}, ${GREEN}estab${NC} ${CYAN}[tcp|udp]${NC}           List active / established network connections
+    ${BRIGHT_GREEN}a${NC}, ${GREEN}all${NC} ${CYAN}[tcp|udp|STATE]${NC}       List all sockets ${GRAY}(listening + established + timers)${NC}
+    ${BRIGHT_GREEN}<PORT>${NC}, ${GREEN}port${NC} ${CYAN}<PORT>${NC}          Inspect process on a port ${GRAY}(e.g., p 8080 or p :8080)${NC}
+    ${BRIGHT_GREEN}k${NC}, ${GREEN}kill${NC} ${CYAN}<PORT>${NC}               Safely terminate the process hogging a port ${GRAY}(e.g., p k 8080)${NC}
+    ${GREEN}summary${NC}, ${GREEN}stats${NC}               Socket overview statistics and connection counts ${GRAY}(ss -s)${NC}
+
+${MAGENTA}${BOLD}  Incident Response & Network Diagnostics:${NC}
+    ${BRIGHT_GREEN}health${NC}, ${GREEN}chk${NC}                     Run 4-stage network triage ladder (Loopback->GW->WAN->DNS)
+    ${BRIGHT_GREEN}top-ips${NC}, ${GREEN}conns${NC}                  List top remote IPs connected to this server
+    ${BRIGHT_GREEN}choked${NC}, ${GREEN}backlog${NC}                Audit sockets for frozen/choked processes (Recv-Q > 0)
+    ${BRIGHT_GREEN}drops${NC}, ${GREEN}errors${NC}                   Audit network interfaces for dropped packets & CRC errors
+    ${BRIGHT_GREEN}fw${NC}, ${GREEN}firewall${NC} ${CYAN}[PORT]${NC}             Check if firewall (UFW/iptables) is blocking a port
+
+${MAGENTA}${BOLD}  Docker & Containers:${NC}
+    ${BRIGHT_GREEN}d${NC}, ${GREEN}docker${NC}                   Show all active Docker containers & port mappings
+
+${MAGENTA}${BOLD}  Network Identity & Local LAN:${NC}
+    ${BRIGHT_GREEN}ip${NC}, ${GREEN}local${NC}                    Show local network interfaces and IP addresses
+    ${BRIGHT_GREEN}myip${NC}, ${GREEN}wan${NC}, ${GREEN}pub${NC}               Show public WAN IPv4 address ${GRAY}(curl ifconfig.me)${NC}
+    ${BRIGHT_GREEN}gw${NC}, ${GREEN}route${NC}                    Show default gateway and routing table ${GRAY}(ip route)${NC}
+    ${BRIGHT_GREEN}arp${NC}, ${GREEN}neigh${NC}, ${GREEN}devices${NC}          Show ARP neighbor table ${GRAY}(discovered devices on LAN)${NC}
+
+${MAGENTA}${BOLD}  Network Probing & Remote Diagnostics:${NC}
+    ${BRIGHT_GREEN}sn${NC}, ${GREEN}subnet${NC} ${CYAN}[CIDR]${NC}            Ping sweep subnet ${GRAY}(auto-detects local LAN if no CIDR given)${NC}
+    ${BRIGHT_GREEN}scan${NC}, ${GREEN}s${NC} ${CYAN}<HOST> [PORTS]${NC}       Smart port scan on target ${GRAY}(SYN if root/sudo, Connect if not)${NC}
+    ${BRIGHT_GREEN}test${NC}, ${GREEN}check${NC} ${CYAN}<HOST> <PORT>${NC}    Instant TCP reachability test via netcat ${GRAY}(nc -zv)${NC}
+    ${BRIGHT_GREEN}ping${NC} ${CYAN}<HOST> [COUNT]${NC}          Send ping packets to test host latency and packet loss
+    ${BRIGHT_GREEN}trace${NC} ${CYAN}<HOST>${NC}                 Trace network route hops to destination ${GRAY}(mtr / traceroute)${NC}
+    ${BRIGHT_GREEN}dns${NC} ${CYAN}<DOMAIN> [TYPE]${NC}          Query DNS records for a domain ${GRAY}(dig +noall +answer)${NC}
+
+${MAGENTA}${BOLD}  Utility & Global Options:${NC}
+    ${YELLOW}-g${NC}, ${YELLOW}--guide${NC} ${CYAN}[TOPIC]${NC}             Show built-in guide for any command (append -g anywhere!)
+    ${YELLOW}--cmd${NC} ${CYAN}<ANY_COMMAND>${NC}          Show the raw native Linux command before executing
+    ${YELLOW}--no-sudo${NC}                    Bypass automatic sudo elevation (strict unprivileged run)
+    ${YELLOW}--raw${NC}                        Display raw unformatted ss socket output
+    ${YELLOW}install${NC}                      Install global symlink in ${CYAN}/usr/local/bin/p${NC} so 'sudo p' works
+    ${YELLOW}h${NC}, ${YELLOW}help${NC}                         Show this overview screen
+
+${YELLOW}${BOLD}DEEPER LAYERS (Subsystem Manuals & Advanced References):${NC}
+    ${CYAN}p help ss${NC}       ${GRAY}(or hs)${NC}      Deep socket filtering ${GRAY}(TCP/UDP, socket states, raw filters)${NC}
+    ${CYAN}p help nmap${NC}     ${GRAY}(or hn)${NC}      Advanced Nmap scans ${GRAY}(SYN, UDP, OS detection, NSE scripts)${NC}
+    ${CYAN}p help lsof${NC}     ${GRAY}(or hl)${NC}      Deep file descriptor & user socket auditing
+    ${CYAN}p help ip${NC}       ${GRAY}(or hi)${NC}      Advanced iproute2 commands ${GRAY}(link stats, policy routing)${NC}
+    ${CYAN}p help tools${NC}    ${GRAY}(or ho)${NC}      Netcat, Curl, Dig, Whois, MTR advanced references
+
+${YELLOW}${BOLD}EXAMPLES:${NC}
+    ${WHITE}p l${NC}                            ${GRAY}# What is listening on this machine right now?${NC}
+    ${WHITE}p 8080${NC}                         ${GRAY}# What process is using port 8080?${NC}
+    ${WHITE}p l 0 1024${NC}                     ${GRAY}# List all listening services in privileged range (0-1024)${NC}
+    ${WHITE}p 8000-9000${NC}                    ${GRAY}# Inspect any sockets in range 8000 to 9000${NC}
+    ${WHITE}p k 8080${NC}                       ${GRAY}# Kill whatever process is on port 8080${NC}
+    ${WHITE}p e${NC}                            ${GRAY}# What outbound connections are established right now?${NC}
+    ${WHITE}p sn${NC}                           ${GRAY}# Discover all live devices on my current local LAN${NC}
+    ${WHITE}p scan 192.168.1.1 22,80,443${NC}   ${GRAY}# Scan specific ports on a router or server${NC}
+    ${WHITE}p test github.com 443${NC}          ${GRAY}# Is github.com port 443 reachable right now?${NC}
+    ${WHITE}p --cmd l${NC}                      ${GRAY}# Learn: prints 'ss -tulnp' before running it${NC}
+EOF
+    exit "$exit_code"
+}
+
+display_nmap_examples() {
+    check_command nmap
+    printf '%s\n' "\
+$(tput bold)$(tput setaf 3)NMAP EXAMPLES – PAGE 1: COMMON SCANS & TARGETS$(tput sgr0)
+==========================================================================================================
+$(tput setaf 2)Nmap ('Network Mapper') is a powerful open source tool for network exploration and security auditing.$(tput sgr0)
+$(tput setaf 1)Many options require root privileges (sudo will be prepended by 'p' where needed).$(tput sgr0)
+
+$(tput setaf 3)BASIC SCAN TYPES$(tput sgr0)                   |  $(tput setaf 3)TARGET SPECIFICATION$(tput sgr0)
+nmap <target>             # Default: 1000 TCP ports (SYN if root, else Connect)
+nmap -sS <target>         # TCP SYN scan (stealth, default for root)
+nmap -sT <target>         # TCP Connect scan (default for non-root, reliable)
+nmap -sU <target>         # UDP scan (slow, requires root)
+nmap -sA <target>         # TCP ACK scan (firewall rule testing)
+nmap -sF/-sX/-sN <target> # FIN/Xmas/Null scans (stealthy, UNIX-only targets)
+nmap -sn <target>         # Ping scan only (host discovery, no ports) - $(tput bold)p npp <target>$(tput sgr0)
+nmap -sL <target>         # List scan (DNS resolution only) - $(tput bold)p npr <target>$(tput sgr0)
+                          |  <target> can be:
+                          |    example.com (hostname)
+$(tput setaf 3)SERVICE & OS DETECTION$(tput sgr0)             |    192.168.1.1 (single IP)
+nmap -sV <target>         # Version detection - $(tput bold)p npv <target> [ports]$(tput sgr0)
+nmap -O <target>          # OS detection (needs root) - $(tput bold)p npo <target>$(tput sgr0)
+nmap -A <target>          # Aggressive: OS, Version, Scripts, Traceroute - $(tput bold)p npA <target>$(tput sgr0)
+                          |    192.168.1.0/24 (CIDR block)
+$(tput setaf 3)PORT SPECIFICATION (-p <portranges>)$(tput sgr0)|    192.168.1.1-100 (IP range)
+-p 22                     # Single port              |    -iL <file> (list from file)
+-p 1-100                  # Range of ports
+-p U:53,T:21-25,80,443    # UDP 53, TCP 21-25, 80, 443
+-p-                       # All 65535 ports
+--top-ports 10            # Scan N most common ports
+-F                        # Fast scan (top 100 ports) - $(tput bold)p npF <target>$(tput sgr0)
+
+$(tput setaf 3)TIMING & PERFORMANCE (-T<0-5>)$(tput sgr0)     |  $(tput setaf 3)SCRIPTING ENGINE (NSE)$(tput sgr0)
+-T0 (paranoid), -T1 (sneaky)  # Slower, IDS evasion
+-T2 (polite), -T3 (normal)    # Default behavior
+-T4 (aggressive), -T5 (insane) # Faster, may be intrusive
+--min-rate <num>, --max-rate <num> # Packets/sec
+--max-retries <num>       # Max port scan probe retransmissions
+                          |  nmap --script default <target>
+                          |  nmap -sC <target> (equiv. to --script default)
+                          |  nmap --script <name>,<category>
+                          |  nmap --script-args <arg1=val1,...>
+                          |  $(tput bold)p npsc <target> [--script=...]$(tput sgr0)
+
+$(tput setaf 2)Use 'p --cmd <nmap_action> ...' to see the generated command. 'man nmap' for full details.$(tput sgr0)
+----------------------------------------------------------------------------------------------------------
+Press any key to continue to page 2..."
+    read -rsn1
+    printf '%s\n' "\
+$(tput bold)$(tput setaf 3)NMAP EXAMPLES – PAGE 2: OUTPUT, EVASION & ADVANCED$(tput sgr0)
+==========================================================================================================
+
+$(tput setaf 3)OUTPUT FORMATS$(tput sgr0)                      |  $(tput setaf 3)FIREWALL/IDS EVASION & SPOOFING (ADVANCED)$(tput sgr0)
+-oN <file.nmap>   # Normal output           |  -f; --mtu <val>       # Fragment packets
+-oX <file.xml>    # XML output              |  -D <decoy1,decoy2,ME> # Cloak scan with decoys
+-oG <file.gnmap>  # Grepable output         |  -S <IP_Address>       # Spoof source address (risky!)
+-oA <basename>    # Output in all 3 formats |  --source-port <port>  # Use specific source port
+-v / -vv          # Verbosity / More verb.  |  --data-length <num>   # Append random data
+-d / -dd          # Debugging / More debug. |  --proxies <url,...>   # Relay via HTTP/SOCKS4 proxies
+--reason          # Display reason port is in a state
+--open            # Only show open (or possibly open) ports
+
+$(tput setaf 3)OTHER USEFUL OPTIONS$(tput sgr0)                 |  $(tput setaf 3)COMMON COMBINATIONS (using 'p' tool where applicable)$(tput sgr0)
+--traceroute      # Trace path to host (p npt) | p npv target.com -p 80,443 # Version on specific ports
+-6                # Enable IPv6 scanning    | sudo nmap -sS -sV -O -p- target.com -oA full_scan
+--iflist          # List interfaces/routes  | $(tput bold)p npA target.com --reason -T4 -oN detailed_A_scan.nmap$(tput sgr0)
+--send-ip / --send-eth # Send raw IP/Eth   | $(tput bold)p nps 192.168.1.0/24 -p 22,3389 --open -oG open_ports.gnmap$(tput sgr0)
+--exclude <h1,h2> # Exclude hosts/networks  | $(tput bold)p npp 10.0.0.0/8 -T5 --min-hostgroup 1024 -oN large_ping_scan$(tput sgr0)
+--excludefile <f> # Exclude from file
+
+$(tput setaf 3)NMAP SCRIPTING ENGINE (NSE) EXAMPLES$(tput sgr0)
+nmap --script default <target>                 # $(tput bold)p npsc <target>$(tput sgr0)
+nmap --script banner <target>                  # Grabs banners
+nmap --script=http-title --script-args http.max-cache-size=0 <target> -p 80,443
+nmap --script \"vuln\" <target>                # Run all scripts in 'vuln' category (use with caution!)
+nmap --script-updatedb                       # Update script database
+
+$(tput setaf 2)Tip: Combine 'p --cmd' with nmap options to craft complex scans easily and see the result.$(tput sgr0)
+$(tput setaf 2)Always ensure you have permission before scanning remote hosts.$(tput sgr0)
+----------------------------------------------------------------------------------------------------------"
+}
+
+display_ss_examples() {
+    check_command ss
+    printf '%s\n' "\
+$(tput bold)$(tput setaf 3)SS (SOCKET STATISTICS) EXAMPLES – PAGE 1: LISTING & FILTERING$(tput sgr0)
+==========================================================================================================
+$(tput setaf 2)ss is a utility to investigate sockets. It's the modern replacement for netstat.$(tput sgr0)
+$(tput setaf 1)Some options like '-p' (processes) may require root privileges for full info.$(tput sgr0)
+
+$(tput setaf 3)LISTING SOCKETS (Commonly Used)$(tput sgr0)     |  $(tput setaf 3)BASIC OPTIONS$(tput sgr0)
+ss -tulnp                 # TCP/UDP listening, numeric ports, process names $(tput bold)(Similar to p sl all)$(tput sgr0)
+ss -tuanp                 # TCP/UDP all states, numeric, process names $(tput bold)(Similar to p sa all)$(tput sgr0)
+ss -ltn                   # Listening TCP, numeric
+ss -lun                   # Listening UDP, numeric
+ss -xap                   # UNIX domain sockets, all, process
+ss -eatin                 # All TCP, extended info, timers, numeric
+                          | -t, --tcp         Display TCP sockets
+$(tput setaf 3)FILTERING BY STATE$(tput sgr0)                 | -u, --udp         Display UDP sockets
+ss -t state listening     # All listening TCP sockets | -d, --dccp        Display DCCP sockets
+ss -t state established   # All established TCP     | -w, --raw         Display RAW sockets
+ss -t state syn-sent      # TCP sockets in SYN_SENT | -x, --unix        Display Unix domain sockets
+ss state all              # All states (default)    | -S, --sctp        Display SCTP sockets
+ss state connected        # All states except listening and closed
+ss state synchronized     # All connected states where not SYN_SENT
+                          | -a, --all         Display all (listening and non-listening)
+$(tput setaf 3)FILTERING BY ADDRESS/PORT$(tput sgr0)          | -l, --listening   Display listening sockets
+ss sport = :80            # Source port is 80       | -n, --numeric     Don't resolve service names (numeric ports/hosts)
+ss dport = :443           # Destination port 443    | -p, --processes   Show process using socket
+ss src 192.168.1.5        # Source IP is 192.168.1.5| -e, --extended    Show detailed socket information
+ss dst 10.0.0.1:22        # Dest IP 10.0.0.1, port 22
+ss '( dport = :smtp or sport = :smtp )' # Logical OR
+ss '( dport = :http or dport = :https )' and src 192.168.0.0/16
+                          | -o, --options     Show timer information
+$(tput setaf 3)SHOWING PROCESS INFORMATION$(tput sgr0)         | -m, --memory      Show socket memory usage
+ss -p                     # Show processes (may need sudo) | -K, --kill        Forcefully close sockets (DANGEROUS!)
+ss -tp dst :ssh           # Processes for TCP connections to SSH port
+ss -lp sport = :http      # Listening processes on HTTP port $(tput bold)(p sp 80)$(tput sgr0)
+
+$(tput setaf 2)Use 'p --cmd <ss_action> ...' to see the generated command. 'man ss' for full details.$(tput sgr0)
+----------------------------------------------------------------------------------------------------------
+Press any key to continue to page 2..."
+    read -rsn1
+    printf '%s\n' "\
+$(tput bold)$(tput setaf 3)SS (SOCKET STATISTICS) EXAMPLES – PAGE 2: ADVANCED & OTHER INFO$(tput sgr0)
+==========================================================================================================
+
+$(tput setaf 3)OUTPUT FORMATTING & OTHER INFO$(tput sgr0)      |  $(tput setaf 3)COMBINED EXAMPLES (using 'p' tool where applicable)$(tput sgr0)
+ss -s                     # Summary statistics $(tput bold)(p su)$(tput sgr0) | p sl tcp 80     # Listening on TCP 80 (uses ss -ltnp sport = :80 or similar)
+ss -H                     # No header line          | p sp 22         # Process using port 22 (uses ss -lp sport = :22)
+ss -b                     # Show bpf filters        | p sa ESTABLISHED # All established connections
+ss -i                     # Internal TCP info       | ss -tuna src 192.168.1.100 # All TCP/UDP from specific IP
+ss -E                     # Extended statistics     | ss -tulnp sport gt :1023 # Listening on unprivileged ports
+ss -O                     # Show SO_MARK value      | ss -tn '( dport = :80 or dport = :443 )' # TCP to web ports
+                          |
+$(tput setaf 3)FILTERING WITH 'src/dst' and 'sport/dport'$(tput sgr0)|
+ss src <CIDR/IP>          # Filter by source network/IP
+ss dst <CIDR/IP>          # Filter by destination network/IP
+ss sport <operator> <port>  # Filter by source port (e.g. sport = :80, sport \\< :1024)
+ss dport <operator> <port>  # Filter by destination port (e.g. dport gt :1023)
+  Operators: =, !=, <, >, <=, >= (use \\ for <, > in shell or quotes)
+                          |
+$(tput setaf 3)FAMILIES$(tput sgr0)                            |  $(tput setaf 3)USING WITH OTHER TOOLS$(tput sgr0)
+ss -f inet                # IPv4 sockets            | ss -tulnp | grep nginx # Find sockets used by nginx
+ss -f inet6               # IPv6 sockets            | watch -d 'ss -s'       # Monitor summary stats
+ss -f unix                # Unix domain sockets     | ss -Htnp state established | awk '{print \$5}' | cut -d':' -f1 | sort -u
+ss -f link                # Netlink sockets         # Get unique destination IPs of established connections
+ss -f vsock               # VMWare VSockets
+ss -f all                 # All families
+
+$(tput setaf 3)EXPRESSIONS$(tput sgr0)
+ss can use complex boolean expressions:
+  'and', 'or', 'not', '(', ')'
+  Example: ss -tn '( src 192.168.1.0/24 and dport = :22 ) or ( dst 10.0.0.5 and dport = :3306 )'
+
+$(tput setaf 2)Tip: 'ss' is very fast. Combine its filtering with 'grep', 'awk', 'sort' for powerful queries.${NC}
+$(tput setaf 2)Remember that '-p' for process info often needs root for non-owned processes.${NC}
+----------------------------------------------------------------------------------------------------------"
+}
+
+display_lsof_examples() {
+    check_command lsof
+    printf '%s\n' "\
+$(tput bold)$(tput setaf 3)LSOF NETWORKING EXAMPLES (List Open Files)$(tput sgr0)
+==========================================================================================================
+$(tput setaf 2)lsof lists information about files opened by processes. It's very versatile for network diagnostics.$(tput sgr0)
+$(tput setaf 1)Often requires root privileges (sudo) for a complete view of all processes.${NC}
+
+$(tput setaf 3)LISTING PORTS & CONNECTIONS$(tput sgr0)         |  $(tput setaf 3)COMMON OPTIONS FOR NETWORKING$(tput sgr0)
+lsof -i                   # All Internet connections & listening ports
+lsof -i TCP               # All TCP connections/ports
+lsof -i UDP               # All UDP connections/ports
+lsof -i :22               # Connections/listening on port 22 (TCP & UDP)
+lsof -i TCP:22            # TCP connections/listening on port 22 $(tput bold)(p lp 22 can use this)$(tput sgr0)
+lsof -i UDP:53            # UDP connections/listening on port 53
+lsof -i @192.168.1.1      # Connections to/from host 192.168.1.1
+lsof -i @example.com:80   # Connections to example.com on port 80
+                          | -i [46][protocol][@hostname|hostaddr][:service|port]
+                          |   4: IPv4, 6: IPv6
+$(tput setaf 3)FILTERING BY PROCESS / USER$(tput sgr0)          |   protocol: TCP, UDP, SCTP, RAW
+lsof -i -a -p 1234        # Network connections for PID 1234
+lsof -i -a -c nginx       # Network connections for 'nginx' command
+lsof -i -a -u httpd       # Network connections for user 'httpd' $(tput bold)(p lpu httpd)$(tput sgr0)
+lsof -i TCP -a -u nobody  # TCP connections by user 'nobody'
+                          | -P                # Inhibits port number to name conversion (faster)
+$(tput setaf 3)SHOWING LISTENING PORTS$(tput sgr0)              | -n                # Inhibits host name conversion (faster)
+lsof -i -sTCP:LISTEN      # Show TCP ports in LISTEN state
+lsof -i -sUDP:LISTEN      # (UDP doesn't really have LISTEN state, shows UDP sockets)
+lsof -iTCP -P -n -sTCP:LISTEN # Numeric, TCP listening ports
+                          | -s<p>:<S>       # Filter by protocol state (e.g., TCP:LISTEN)
+$(tput setaf 3)OTHER USEFUL COMBINATIONS$(tput sgr0)            | -a                # AND conditions (default is OR)
+lsof -i -U                # UNIX domain sockets with network state
+lsof -N                   # List NFS files
+lsof +r 1                 # Repeat display every 1 second (until ^C)
+lsof -i @192.168.1.1 -a -i TCP:22 # TCP/22 connections to/from specific host
+
+$(tput setaf 2)Use 'p --cmd <lsof_action> ...' to see the generated command. 'man lsof' for full details.${NC}
+$(tput setaf 2)Output can be extensive. Use 'grep' to filter further.${NC}
+----------------------------------------------------------------------------------------------------------"
+}
+
+display_ip_examples() {
+    check_command ip
+    printf '%s\n' "\
+$(tput bold)$(tput setaf 3)IPROUTE2 (ip command) EXAMPLES – PAGE 1: ADDRESS, ROUTE, LINK$(tput sgr0)
+==========================================================================================================
+$(tput setaf 2)The 'ip' command is the modern Linux tool for managing network interfaces, IP addresses, and routes.${NC}
+
+$(tput setaf 3)IP ADDRESS MANAGEMENT (ip addr)$(tput sgr0)     |  $(tput setaf 3)COMMON 'ip addr' OPTIONS$(tput sgr0)
+ip addr show              # Show all IP addresses $(tput bold)(p ia)$(tput sgr0) | -4, -6          Only IPv4 or IPv6
+ip addr show dev eth0     # Addresses for interface eth0 | -o              One-line output
+ip addr add 192.168.1.100/24 dev eth0 # Add IP   | -br             Brief output (addr only)
+ip addr del 192.168.1.100/24 dev eth0 # Delete IP| -c              Colorized output
+ip addr flush dev eth0    # Remove all IPs from eth0
+                          | -s              Show statistics
+$(tput setaf 3)ROUTING TABLE MANAGEMENT (ip route)$(tput sgr0)  |  $(tput setaf 3)COMMON 'ip route' OPTIONS$(tput sgr0)
+ip route show             # Show routing table $(tput bold)(p ir)$(tput sgr0)  | -n              Numeric (no resolve)
+ip route get 8.8.8.8      # Get route to an IP      | to <PREFIX>     Filter by destination
+ip route add default via 192.168.1.1 # Add default route | from <PREFIX>   Filter by source (policy routing)
+ip route add 10.0.0.0/8 via 192.168.1.254 dev eth0
+ip route del default
+ip route flush cache      # Clear routing cache
+                          |
+$(tput setaf 3)LINK LAYER (ip link)$(tput sgr0)                 |  $(tput setaf 3)COMMON 'ip link' OPTIONS$(tput sgr0)
+ip link show              # Show all network interfaces $(tput bold)(p il)$(tput sgr0)| -s              Statistics
+ip link show dev eth0     # Info for interface eth0 | -br             Brief link info
+ip link set dev eth0 up   # Bring interface up      | type <TYPE>     Filter by link type (ether, vlan)
+ip link set dev eth0 down # Bring interface down    | master <DEV>    Part of a master device (bridge/bond)
+ip link set dev eth0 mtu 1400 # Set MTU
+ip link set dev eth0 address AA:BB:CC:DD:EE:FF # Set MAC (use with caution)
+                          |
+$(tput setaf 3)NEIGHBOR/ARP CACHE (ip neigh)$(tput sgr0)        |  $(tput setaf 3)COMMON 'ip neigh' OPTIONS$(tput sgr0)
+ip neigh show             # Show ARP/NDP cache $(tput bold)(p in)$(tput sgr0)   | nud <STATE>     Filter by NUD state (REACHABLE, STALE)
+ip neigh show dev eth0    # Neighbors on eth0       | proxy           Show proxy NDP entries
+ip neigh flush dev eth0   # Flush ARP for eth0      | -s              Statistics
+ip neigh add 192.168.1.50 lladdr 00:11:22:33:44:55 dev eth0 nud perm # Add static ARP
+
+$(tput setaf 2)These are common informational commands. Modifying network config often requires root.${NC}
+$(tput setaf 2)'man ip' or 'ip help <subcommand>' for more details (e.g. 'ip addr help').${NC}
+----------------------------------------------------------------------------------------------------------"
+# Page 2 for IP could include: ip tunnel, ip rule, ip maddr, ip monitor etc. but this is good for now.
+}
+
+display_other_net_examples() {
+    printf '%s\n' "\
+$(tput bold)$(tput setaf 3)OTHER NETWORKING TOOLS EXAMPLES – PAGE 1$(tput sgr0)
+==========================================================================================================
+$(tput setaf 2)Quick examples for ping, mtr/traceroute, dig, nc, curl, and whois.${NC}
+
+$(tput setaf 3)PING (ICMP Echo)$(tput sgr0)                   |  $(tput setaf 3)MTR / TRACEROUTE (Network Path)$(tput sgr0)
+ping example.com          # Ping host (p pi example.com) | mtr example.com     # Realtime path trace (preferred)
+ping -c 5 example.com     # Send 5 packets (p pi example.com 5) | traceroute example.com # Classic traceroute
+ping -4/-6 example.com    # Force IPv4/IPv6        | mtr -n example.com  # MTR, no DNS resolution
+ping -s 1000 example.com  # Packet size 1000 bytes | mtr -rwc 10 example.com # MTR report, 10 cycles
+ping -W 1 example.com     # Timeout 1 sec for reply| traceroute -I example.com # ICMP traceroute
+ping -i 0.2 example.com   # Interval 0.2 sec (flood if <0.2, needs root)
+                          |
+$(tput setaf 3)DIG (DNS Lookup)$(tput sgr0)                    |  $(tput setaf 3)NETCAT (nc - Network Utility)$(tput sgr0)
+dig example.com           # A record (p di example.com) | nc -zv example.com 80   # Check TCP port 80 $(tput bold)(p ncc example.com 80)$(tput sgr0)
+dig example.com MX        # MX records (p di example.com MX)| nc -zvu example.com 53  # Check UDP port 53 $(tput bold)(p ncc example.com 53 udp)$(tput sgr0)
+dig example.com ANY       # All record types       | echo \"GET / HTTP/1.0\\r\\n\\r\\n\" | nc example.com 80 # HTTP GET
+dig @8.8.8.8 example.com  # Query specific DNS server| nc -l -p 1234         # Listen on TCP port 1234
+dig -x 1.2.3.4            # Reverse DNS lookup (PTR)
+dig +short example.com    # Minimal output
+                          |
+$(tput setaf 3)CURL (Client URL)$(tput sgr0)                   |  $(tput setaf 3)WHOIS (Domain/IP Lookup)$(tput sgr0)
+curl http://example.com   # Fetch URL (p ct http://example.com)| whois example.com   # Whois for domain $(tput bold)(p wh example.com)$(tput sgr0)
+curl -I http://example.com# Show headers only (p ct ...) | whois 8.8.8.8       # Whois for IP $(tput bold)(p wh 8.8.8.8)$(tput sgr0)
+curl -L http://bit.ly/xyz # Follow redirects
+curl -o page.html URL     # Save output to file
+curl -X POST -d \"data\" URL # POST request
+curl -sSL https://get.example.com | bash # Silent, follow redirects, fail on error (use with care!)
+
+$(tput setaf 2)'man <command>' for full details on each tool. These are just common snippets.${NC}
+----------------------------------------------------------------------------------------------------------"
+}
+
+format_process_output() {
+    awk '
+    function clean_users(str,   s, n, items, i, fields, proc, pid, procs, proc_pids, num_procs, out, pids, label, entry) {
+        s = str
+        if (s !~ /users:\(\(/) return s
+        sub(/.*users:\(\(/, "", s)
+        sub(/\)\).*/, "", s)
+        gsub(/"/, "", s)
+        n = split(s, items, /\),\(/)
+        num_procs = 0
+        delete procs
+        delete proc_pids
+        for (i = 1; i <= n; i++) {
+            split(items[i], fields, ",")
+            proc = fields[1]
+            pid = fields[2]
+            sub(/pid=/, "", pid)
+            if (!(proc in proc_pids)) {
+                procs[++num_procs] = proc
+                proc_pids[proc] = pid
+            } else {
+                proc_pids[proc] = proc_pids[proc] ", " pid
+            }
+        }
+        out = ""
+        for (i = 1; i <= num_procs; i++) {
+            proc = procs[i]
+            pids = proc_pids[proc]
+            label = (pids ~ /,/) ? "PIDs" : "PID"
+            entry = proc " (" label " " pids ")"
+            out = (out == "") ? entry : out ", " entry
+        }
+        return out
+    }
+    {
+        if ($0 ~ /users:\(\(/) {
+            prefix = $0
+            sub(/users:\(\(.*/, "", prefix)
+            print prefix clean_users($0)
+        } else {
+            print $0
+        }
+    }'
+}
+
+# --- Advanced Port & Docker Enrichment ---
+enrich_port_info() {
+    local port="$1"
+    [[ -z "$port" || ! "$port" =~ ^[0-9]+$ ]] && return 0
+
+    local svc=""
+    local friendly=""
+    case "$port" in
+        22) friendly="SSH Remote Shell" ;;
+        25) friendly="SMTP Mail Transfer Agent" ;;
+        53) friendly="DNS Name Resolution" ;;
+        67|68) friendly="DHCP Network IP Assignment" ;;
+        80) friendly="HTTP Web Server" ;;
+        137|138) friendly="NetBIOS Name / Datagram Service (Samba)" ;;
+        139) friendly="NetBIOS Session Service (Samba)" ;;
+        443) friendly="HTTPS Encrypted Web Server" ;;
+        445) friendly="SMB / CIFS (Samba Windows File Sharing)" ;;
+        631) friendly="CUPS Internet Printing Service" ;;
+        2049) friendly="NFS Network File System" ;;
+        3306) friendly="MySQL / MariaDB Database" ;;
+        5432) friendly="PostgreSQL Database" ;;
+        6379) friendly="Redis In-Memory Data Store" ;;
+        8080) friendly="HTTP-Alt (Common for Web UIs like qBittorrent, Tomcat, Traefik)" ;;
+        32400) friendly="Plex Media Server" ;;
+    esac
+
+    if command -v getent >/dev/null 2>&1; then
+        svc=$(getent services "$port" 2>/dev/null | awk '{print $1}' | head -n 1)
+    fi
+
+    local docker_info=""
+    if command -v docker >/dev/null 2>&1; then
+        docker_info=$(docker ps --filter "publish=$port" --format "  ${CYAN}Docker Container:${NC} ${WHITE}${BOLD}{{.Names}}${NC}  ${DIM}(Image: {{.Image}}, Status: {{.Status}})${NC}" 2>/dev/null || true)
+    fi
+
+    if [[ -n "$svc" || -n "$friendly" || -n "$docker_info" ]]; then
+        echo ""
+        if [[ -n "$friendly" ]]; then
+            local svc_tag=""
+            [[ -n "$svc" ]] && svc_tag=" [${svc}]"
+            echo -e "  ${YELLOW}Known Service:${NC}   ${WHITE}${BOLD}${friendly}${NC}${DIM}${svc_tag} (Port $port)${NC}"
+        elif [[ -n "$svc" ]]; then
+            echo -e "  ${YELLOW}Standard Service:${NC} ${WHITE}${svc}${NC} ${DIM}(IANA registered port $port)${NC}"
+        fi
+        if [[ -n "$docker_info" ]]; then
+            echo -e "$docker_info"
+        fi
+    fi
+}
+
+enrich_range_docker_info() {
+    local p_start="$1"
+    local p_end="$2"
+    [[ -z "$p_start" || -z "$p_end" ]] && return 0
+    ! command -v docker >/dev/null 2>&1 && return 0
+
+    local raw_ports
+    raw_ports=$(docker ps --format "{{.Names}}\t{{.Ports}}\t{{.Status}}" 2>/dev/null || true)
+    [[ -z "$raw_ports" ]] && return 0
+
+    local matched=()
+    while IFS=$'\t' read -r c_name c_ports c_status; do
+        [[ -z "$c_ports" ]] && continue
+        local remaining="$c_ports"
+        while [[ "$remaining" =~ :([0-9]+)-\> ]]; do
+            local matched_port="${BASH_REMATCH[1]}"
+            if (( matched_port >= p_start && matched_port <= p_end )); then
+                matched+=("  ${CYAN}Port $matched_port:${NC} ${WHITE}${BOLD}$c_name${NC} ${DIM}($c_status)${NC}")
+            fi
+            remaining="${remaining#*${BASH_REMATCH[0]}}"
+        done
+    done <<< "$raw_ports"
+
+    if ((${#matched[@]} > 0)); then
+        echo ""
+        echo -e "${MAGENTA}${BOLD}Docker Containers in range [$p_start-$p_end]:${NC}"
+        printf '%s\n' "${matched[@]}" | sort -u
+    fi
+}
+
+docker_list() {
+    if ! command -v docker >/dev/null 2>&1; then
+        echo -e "${RED}Error: Docker is not installed or not in PATH.${NC}"
+        return 1
+    fi
+    echo -e "${YELLOW}${BOLD}Active Docker Containers & Port Mappings:${NC}"
+    docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || {
+        echo -e "${RED}Unable to query Docker daemon (check permissions or if service is active).${NC}"
+    }
+}
+
+# --- Command Execution ---
+execute_command() {
+    local cmd="$1"
+    local needs_sudo_prefix=""
+
+    # Heuristic: if command requires root privileges and user is not root,
+    # auto-prepend sudo when in interactive terminal or when passwordless sudo is available.
+    # Can be completely disabled via --no-sudo or P_NO_SUDO=1.
+    if ! [[ "$(id -u)" == "0" ]] && [[ "$NO_SUDO" != "true" && "$P_NO_SUDO" != "1" ]]; then
+        local needs_sudo=false
+        if [[ "$cmd" == "nmap"* || "$cmd" == *"-sS"* || "$cmd" == *"-sU"* || "$cmd" == *"-O"* || "$cmd" == "lsof -i"* && "$cmd" != *" -u "* ]]; then
+            needs_sudo=true
+        fi
+        if [[ "$cmd" == ss* && ( "$cmd" =~ -[a-zA-Z]*p || "$cmd" == *"-K"* ) ]]; then
+            needs_sudo=true
+        fi
+
+        if [[ "$needs_sudo" == "true" && "$cmd" != "sudo "* ]]; then
+            if [ -t 0 ] || sudo -n true 2>/dev/null; then
+                needs_sudo_prefix="sudo "
+            fi
+        fi
+    fi
+    
+    local full_cmd="${needs_sudo_prefix}${cmd}"
+
+    if [[ "$SHOW_CMD" == "true" ]]; then
+        echo -e "${WHITE}#${NC} ${GREEN}${full_cmd}${NC}"
+        if [[ -n "$needs_sudo_prefix" ]]; then
+             echo -e "${YELLOW}Note: This command is being run with 'sudo'.${NC}"
+        fi
+        echo -e "${WHITE}Press any key to execute, or Ctrl+C to cancel...${NC}"
+        read -n 1 -s
+        echo -e "\r${WHITE}Executing...                                          ${NC}"
+    fi
+
+    if [[ "$RAW_OUTPUT" != "true" && "$cmd" == ss* ]]; then
+        eval "${full_cmd}" | format_process_output
+        return "${PIPESTATUS[0]}"
+    else
+        eval "${full_cmd}"
+    fi
+}
+
+
+# --- Argument Parser & Guide Interception ---
+SHOW_GUIDE=false
+PROCESSED_ARGS=()
+
+for arg in "$@"; do
+    if [[ "$arg" == "-g" || "$arg" == "--guide" || "$arg" == "guide" ]]; then
+        SHOW_GUIDE=true
+    else
+        PROCESSED_ARGS+=("$arg")
+    fi
+done
+
+if [[ "$SHOW_GUIDE" == "true" ]]; then
+    # Target topic is the first non-guide argument
+    TARGET_TOPIC="${PROCESSED_ARGS[0]}"
+    display_guide "$TARGET_TOPIC"
+    exit 0
+fi
+
+if [[ $# -eq 0 ]]; then
+    usage
+fi
+
+set -- "${PROCESSED_ARGS[@]}"
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        -h|--help)
+            usage 0 ;;
+        h|help)
+            case "$2" in
+                ss|h-ss|hs) display_ss_examples; exit 0 ;;
+                nmap|h-nmap|hn) display_nmap_examples; exit 0 ;;
+                lsof|h-lsof|hl) display_lsof_examples; exit 0 ;;
+                ip|h-ip|hi) display_ip_examples; exit 0 ;;
+                tools|other|h-other|ho) display_other_net_examples; exit 0 ;;
+                *) usage 0 ;;
+            esac
+            ;;
+        --cmd)
+            SHOW_CMD=true; shift ;;
+        --no-sudo)
+            NO_SUDO=true; shift ;;
+        --raw)
+            RAW_OUTPUT=true; shift ;;
+        hn|h-nmap)
+            ACTION="nmap_examples"; shift ;;
+        hs|h-ss)
+            ACTION="ss_examples"; shift ;;
+        hl|h-lsof)
+            ACTION="lsof_examples"; shift ;;
+        hi|h-ip)
+            ACTION="ip_examples"; shift ;;
+        ho|h-other)
+            ACTION="other_net_examples"; shift ;;
+
+        # Direct port or port range shorthand: e.g. "p 8080", "p 0-1024", "p 0 1024"
+        # Or CIDR subnet: e.g. "p 192.168.1.0/24"
+        [0-9]*|:[0-9]*)
+            if [[ "$key" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$ ]]; then
+                ACTION="nmap_ping"
+                TARGET_HOST="$key"
+                shift
+                POSITIONAL_ARGS+=("$TARGET_HOST" "$@")
+                break
+            elif [[ "$key" =~ ^:?([0-9]+)-([0-9]+)$ ]]; then
+                ACTION="port_range_lookup"
+                PORT_START="${BASH_REMATCH[1]}"
+                PORT_END="${BASH_REMATCH[2]}"
+                shift
+                break
+            elif [[ "$key" =~ ^:?[0-9]+$ ]] && [[ "$2" =~ ^[0-9]+$ ]]; then
+                ACTION="port_range_lookup"
+                PORT_START="${key#:}"
+                PORT_END="$2"
+                shift 2
+                break
+            elif [[ "$key" =~ ^:?[0-9]+$ ]]; then
+                ACTION="port_lookup"
+                TARGET_HOST="${key#:}"
+                shift
+                POSITIONAL_ARGS+=("$TARGET_HOST" "$@")
+                break
+            else
+                # Default IP target for smart scan
+                ACTION="nmap_scan"
+                TARGET_HOST="$key"
+                shift
+                POSITIONAL_ARGS+=("$TARGET_HOST" "$@")
+                break
+            fi
+            ;;
+
+        # High-Impact Network Diagnostics
+        health|chk|check-net)
+            ACTION="diag_health"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        top-ips|top|conns|topconns)
+            ACTION="diag_top_ips"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        choked|backlog|stalled)
+            ACTION="diag_choked"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        drops|errors|rx-errors|link-health)
+            ACTION="diag_drops"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        fw|firewall|ufw|iptables)
+            ACTION="diag_fw"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+
+        # Docker container port mappings
+        d|docker|containers|ps)
+            ACTION="docker_list"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+
+        # Sockets / Listening / Established
+        l|listen|listening|sl|ss-listen)
+            ACTION="ss_listen"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        e|estab|established|active)
+            ACTION="ss_estab"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        a|all|sa|ss-all)
+            ACTION="ss_all"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        port|sp|ss-proc)
+            ACTION="port_lookup"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        k|kill)
+            ACTION="port_kill"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        summary|stats|su|ss-summary)
+            ACTION="ss_summary"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+
+        # Subnet ping sweep
+        sn|subnet|scan-net|npp|nmap-ping)
+            ACTION="nmap_ping"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+
+        # Port scanning
+        scan|s|np|nmap-scan)
+            ACTION="nmap_scan"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        nps|nmap-syn)
+            ACTION="nmap_syn"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npc|nmap-connect)
+            ACTION="nmap_connect"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npu|nmap-udp)
+            ACTION="nmap_udp"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npv|nmap-version)
+            ACTION="nmap_version"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npo|nmap-os)
+            ACTION="nmap_os"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npsc|nmap-script)
+            ACTION="nmap_script"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npA|nmap-aggressive)
+            ACTION="nmap_aggressive"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npF|nmap-fast)
+            ACTION="nmap_fast"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npt|nmap-trace)
+            ACTION="nmap_trace"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        npr|nmap-resolve)
+            ACTION="nmap_resolve"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+
+        # lsof actions
+        lp|lsof-port)
+            ACTION="lsof_port"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        lpu|lsof-user)
+            ACTION="lsof_user"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        lpi|lsof-ip)
+            ACTION="lsof_ip"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+
+        # Network identity & iproute2
+        ip|local|local-ip|lip|list-local-ips|ia|ip-addr)
+            ACTION="ip_addr"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        myip|wan|pub|public-ip|gip|get-public-ip)
+            ACTION="get_public_ip"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        gw|route|gateway|ir|ip-route)
+            ACTION="ip_route"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        arp|neigh|neighbor|devices|in|ip-neigh)
+            ACTION="ip_neigh"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        il|ip-link)
+            ACTION="ip_link"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+
+        # Connectivity & Diagnostics
+        test|check|nc|ncc|nc-check)
+            ACTION="nc_check"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        ping|pi)
+            ACTION="ping"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        trace|traceroute|mtr|mtr-trace)
+            ACTION="mtr_trace"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        dns|dig|di)
+            ACTION="dig"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        wh|whois)
+            ACTION="whois"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+        ct|curl-test)
+            ACTION="curl_test"; shift; POSITIONAL_ARGS+=("$@"); break ;;
+
+        # System Integration
+        install|setup-link)
+            ACTION="install_link"; shift; break ;;
+
+        *)
+            # If argument contains a dot, treat as host/domain to scan
+            if [[ "$key" == *"."* && "$key" != "-"* ]]; then
+                ACTION="nmap_scan"
+                TARGET_HOST="$key"
+                shift
+                POSITIONAL_ARGS+=("$TARGET_HOST" "$@")
+                break
+            fi
+            echo -e "${RED}Error: Unknown option or action: $key${NC}"
+            usage 1
+            ;;
+    esac
+done
+
+# --- Perform Action ---
+TARGET_HOST="${POSITIONAL_ARGS[0]}"
+TARGET_PORT="${POSITIONAL_ARGS[1]}" # May be port, or second arg for some commands
+NMAP_EXTRA_ARGS=("${POSITIONAL_ARGS[@]:1}") # For nmap, target is [0], ports can be [1] or part of extra
+NMAP_PORTS_OPT="" # Will be set if ports are explicitly given as second arg for nmap
+
+case "$ACTION" in
+    nmap_examples) display_nmap_examples ;;
+    ss_examples) display_ss_examples ;;
+    lsof_examples) display_lsof_examples ;;
+    ip_examples) display_ip_examples ;;
+    other_net_examples) display_other_net_examples ;;
+    docker_list) docker_list ;;
+    diag_health) diagnose_health ;;
+    diag_top_ips) diagnose_top_ips ;;
+    diag_choked) diagnose_choked ;;
+    diag_drops) diagnose_drops ;;
+    diag_fw) diagnose_firewall "${POSITIONAL_ARGS[0]}" ;;
+
+    ss_listen)
+        check_command ss
+        proto=""
+        p_start=""
+        p_end=""
+
+        for arg in "${POSITIONAL_ARGS[@]}"; do
+            if [[ "$arg" == "tcp" || "$arg" == "udp" ]]; then
+                proto="$arg"
+            elif [[ "$arg" =~ ^:?([0-9]+)-([0-9]+)$ ]]; then
+                p_start="${BASH_REMATCH[1]}"
+                p_end="${BASH_REMATCH[2]}"
+            elif [[ "$arg" =~ ^:?([0-9]+)$ ]]; then
+                if [[ -z "$p_start" ]]; then
+                    p_start="${BASH_REMATCH[1]}"
+                elif [[ -z "$p_end" ]]; then
+                    p_end="${BASH_REMATCH[1]}"
+                fi
+            fi
+        done
+
+        CMD_ss="ss -tulnp"
+        if [[ "$proto" == "tcp" ]]; then CMD_ss="ss -tlnp";
+        elif [[ "$proto" == "udp" ]]; then CMD_ss="ss -ulnp";
+        fi
+
+        if [[ -n "$p_start" && -n "$p_end" ]]; then
+            if (( p_start > p_end )); then
+                tmp=$p_start; p_start=$p_end; p_end=$tmp
+            fi
+            CMD_ss+=" 'sport >= :$p_start and sport <= :$p_end'"
+        elif [[ -n "$p_start" ]]; then
+            CMD_ss+=" sport = :$p_start"
+        fi
+        execute_command "$CMD_ss"
+        if [[ -n "$p_start" && -n "$p_end" ]]; then
+            enrich_range_docker_info "$p_start" "$p_end"
+        elif [[ -n "$p_start" ]]; then
+            enrich_port_info "$p_start"
+        fi
+        ;;
+    ss_all)
+        check_command ss
+        PROTO_FILTER="${POSITIONAL_ARGS[0]}"
+        STATE_FILTER="${POSITIONAL_ARGS[1]}"
+        CMD_ss="ss -tuanp" # TCP, UDP, All states, Numeric, Processes
+        if [[ "$PROTO_FILTER" == "tcp" ]]; then CMD_ss="ss -tanp";
+        elif [[ "$PROTO_FILTER" == "udp" ]]; then CMD_ss="ss -uanp";
+        fi
+        if [[ -n "$STATE_FILTER" ]]; then
+             if [[ "$PROTO_FILTER" != "tcp" && "$PROTO_FILTER" != "udp" ]]; then # If first arg wasn't proto, it's state
+                STATE_FILTER="$PROTO_FILTER"
+            fi
+            CMD_ss+=" state $STATE_FILTER"
+        elif [[ "$PROTO_FILTER" != "tcp" && "$PROTO_FILTER" != "udp" && -n "$PROTO_FILTER" ]]; then # e.g. p sa ESTABLISHED
+            CMD_ss+=" state $PROTO_FILTER"
+        fi
+        execute_command "$CMD_ss"
+        ;;
+    ss_proc)
+        check_command ss
+        [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: Port number required for ss-proc.${NC}"; usage; }
+        execute_command "ss -lp sport = :${TARGET_HOST}" # TARGET_HOST is actually port here
+        ;;
+    ss_estab)
+        check_command ss
+        PROTO_FILTER="${POSITIONAL_ARGS[0]}"
+        CMD_ss="ss -tuanp state established"
+        if [[ "$PROTO_FILTER" == "tcp" ]]; then CMD_ss="ss -tanp state established";
+        elif [[ "$PROTO_FILTER" == "udp" ]]; then CMD_ss="ss -uanp state established";
+        fi
+        execute_command "$CMD_ss"
+        ;;
+    port_range_lookup)
+        check_command ss
+        if (( PORT_START > PORT_END )); then
+            tmp=$PORT_START; PORT_START=$PORT_END; PORT_END=$tmp
+        fi
+        execute_command "ss -tulpn 'sport >= :$PORT_START and sport <= :$PORT_END'"
+        enrich_range_docker_info "$PORT_START" "$PORT_END"
+        ;;
+    port_lookup)
+        check_command ss
+        target="${TARGET_HOST:-${POSITIONAL_ARGS[0]}}"
+        target="${target#:}"
+        if [[ "$target" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+            p_start="${BASH_REMATCH[1]}"
+            p_end="${BASH_REMATCH[2]}"
+            if (( p_start > p_end )); then
+                tmp=$p_start; p_start=$p_end; p_end=$tmp
+            fi
+            execute_command "ss -tulpn 'sport >= :$p_start and sport <= :$p_end'"
+            enrich_range_docker_info "$p_start" "$p_end"
+        elif [[ "$target" =~ ^[0-9]+$ ]] && [[ "${POSITIONAL_ARGS[1]}" =~ ^[0-9]+$ ]]; then
+            p_start="$target"
+            p_end="${POSITIONAL_ARGS[1]}"
+            if (( p_start > p_end )); then
+                tmp=$p_start; p_start=$p_end; p_end=$tmp
+            fi
+            execute_command "ss -tulpn 'sport >= :$p_start and sport <= :$p_end'"
+            enrich_range_docker_info "$p_start" "$p_end"
+        else
+            [[ -z "$target" ]] && { echo -e "${RED}Error: Port number required.${NC}"; usage; }
+            execute_command "ss -tulpn sport = :$target or dport = :$target"
+            enrich_port_info "$target"
+        fi
+        ;;
+    port_kill)
+        PORT="${TARGET_HOST#:}"
+        [[ -z "$PORT" ]] && { echo -e "${RED}Error: Port number required to kill.${NC}"; usage; }
+        echo -e "${YELLOW}Searching for processes using port $PORT...${NC}"
+        PIDS=$(lsof -ti :$PORT 2>/dev/null || fuser $PORT/tcp 2>/dev/null || true)
+        if [[ -z "$PIDS" ]]; then
+            echo -e "${GREEN}No active processes found listening on port $PORT.${NC}"
+        else
+            echo -e "Found PID(s) on port $PORT: ${BOLD}$PIDS${NC}"
+            ps -p $PIDS -o pid,user,stat,comm,args 2>/dev/null || true
+            read -r -p "Kill these process(es)? [y/N]: " confirm
+            if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                execute_command "kill -15 $PIDS" 2>/dev/null || execute_command "sudo kill -15 $PIDS"
+                sleep 1
+                REMAINING=$(lsof -ti :$PORT 2>/dev/null || true)
+                if [[ -n "$REMAINING" ]]; then
+                    echo -e "${YELLOW}Force-killing remaining PID(s): $REMAINING...${NC}"
+                    execute_command "kill -9 $REMAINING" 2>/dev/null || execute_command "sudo kill -9 $REMAINING"
+                fi
+                echo -e "${GREEN}Port $PORT cleared.${NC}"
+            fi
+        fi
+        ;;
+    install_link)
+        SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+        echo -e "${CYAN}Setting up global symlink: /usr/local/bin/p -> $SCRIPT_PATH...${NC}"
+        execute_command "sudo ln -sf '$SCRIPT_PATH' /usr/local/bin/p"
+        if [[ -x "/usr/local/bin/p" ]]; then
+            echo -e "${GREEN}✅ 'p' is now available globally! You can run 'p' or 'sudo p' from any directory.${NC}"
+        else
+            echo -e "${RED}❌ Failed to create symlink in /usr/local/bin.${NC}"
+        fi
+        ;;
+    ss_summary)
+        check_command ss
+        execute_command "ss -s"
+        ;;
+
+    nmap_scan|nmap_syn|nmap_connect|nmap_udp|nmap_version|nmap_os|nmap_script|nmap_aggressive|nmap_fast|nmap_ping|nmap_trace|nmap_resolve)
+        check_command nmap
+        if [[ -z "$TARGET_HOST" ]]; then
+            if [[ "$ACTION" == "nmap_ping" ]]; then
+                # Auto-detect local subnet from primary non-loopback IP
+                LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+                if [[ -n "$LOCAL_IP" ]]; then
+                    TARGET_HOST="${LOCAL_IP%.*}.0/24"
+                    echo -e "${CYAN}Auto-detected local subnet: ${BOLD}$TARGET_HOST${NC}\n"
+                else
+                    echo -e "${RED}Error: Target host/IP required for nmap ping.${NC}"; usage 1;
+                fi
+            else
+                echo -e "${RED}Error: Target host/IP required for nmap actions.${NC}"; usage 1;
+            fi
+        fi
+        
+        # Nmap specific port handling. If second arg looks like ports, use it.
+        # e.g. 22  or 22,80,443 or 1-1000 or U:53,T:22
+        if [[ "${#POSITIONAL_ARGS[@]}" -gt 1 ]] && [[ "${POSITIONAL_ARGS[1]}" =~ ^([0-9]+([,-][0-9]+)*|[TU]:[0-9]+([,-][0-9]+)*)+$ || "${POSITIONAL_ARGS[1]}" == "-"* ]]; then
+            if [[ "${POSITIONAL_ARGS[1]}" != "-"* ]]; then # if it's not an nmap option like -p-
+                NMAP_PORTS_OPT="-p ${POSITIONAL_ARGS[1]}"
+                NMAP_EXTRA_ARGS=("${POSITIONAL_ARGS[@]:2}") # Shift extra args
+            else # it is an nmap option, likely -p-, or other flags
+                 NMAP_EXTRA_ARGS=("${POSITIONAL_ARGS[@]:1}")
+            fi
+        else # No specific ports given as second arg, or it's not in a recognized port format
+            NMAP_EXTRA_ARGS=("${POSITIONAL_ARGS[@]:1}")
+        fi
+
+        NMAP_CMD_BASE="nmap"
+        case "$ACTION" in
+            nmap_scan) # Smart scan: -sS if sudo, -sT if not. Let execute_command handle sudo.
+                if [[ "$(id -u)" == "0" ]]; then NMAP_CMD_BASE+=" -sS"; else NMAP_CMD_BASE+=" -sT"; fi
+                ;;
+            nmap_syn) NMAP_CMD_BASE+=" -sS" ;;
+            nmap_connect) NMAP_CMD_BASE+=" -sT" ;;
+            nmap_udp) NMAP_CMD_BASE+=" -sU" ;;
+            nmap_version) NMAP_CMD_BASE+=" -sV" ;; # Often combined with -sS or -sT
+            nmap_os) NMAP_CMD_BASE+=" -O" ;;
+            nmap_script) NMAP_CMD_BASE+=" -sC" ;; # Default scripts, user can override with --script=
+            nmap_aggressive) NMAP_CMD_BASE+=" -A" ;;
+            nmap_fast) NMAP_CMD_BASE+=" -F" ;;
+            nmap_ping) NMAP_CMD_BASE+=" -sn" ;;
+            nmap_trace) NMAP_CMD_BASE+=" --traceroute" ;;
+            nmap_resolve) NMAP_CMD_BASE+=" -sL" ;;
+        esac
+        
+        # Construct the full command
+        FULL_NMAP_CMD="$NMAP_CMD_BASE"
+        if [[ -n "$NMAP_PORTS_OPT" ]] && [[ "$ACTION" != "nmap_ping" && "$ACTION" != "nmap_resolve" && "$ACTION" != "nmap_os" && "$ACTION" != "nmap_trace" && "$ACTION" != "nmap_aggressive" && "$ACTION" != "nmap_fast" ]]; then
+             # Only add -p if not implied by -F, -A or if action doesn't use ports.
+             # For -sV, -sS, -sT, -sU, -sC explicit ports are good.
+            FULL_NMAP_CMD+=" $NMAP_PORTS_OPT"
+        fi
+        FULL_NMAP_CMD+=" \"$TARGET_HOST\"" # Quote target
+        if [[ ${#NMAP_EXTRA_ARGS[@]} -gt 0 ]]; then
+            FULL_NMAP_CMD+=" ${NMAP_EXTRA_ARGS[*]}" # Add any extra nmap arguments
+        fi
+        execute_command "$FULL_NMAP_CMD"
+        ;;
+
+    lsof_port)
+        check_command lsof
+        [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: Port number required for lsof-port.${NC}"; usage; }
+        execute_command "lsof -i :${TARGET_HOST} -P -n -sTCP:LISTEN -sUDP:*" # TARGET_HOST is port
+        ;;
+    lsof_user)
+        check_command lsof
+        [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: Username required for lsof-user.${NC}"; usage; }
+        execute_command "lsof -i -a -u ${TARGET_HOST}" # TARGET_HOST is user
+        ;;
+    lsof_ip)
+        check_command lsof
+        [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: IP address required for lsof-ip.${NC}"; usage; }
+        execute_command "lsof -i @${TARGET_HOST} -P -n"
+        ;;
+
+    ip_addr) check_command ip; execute_command "ip -c addr show" ;;
+    ip_route) check_command ip; execute_command "ip -c route show" ;;
+    ip_neigh) check_command ip; execute_command "ip -c neigh show" ;;
+    ip_link) check_command ip; execute_command "ip -c -s link show" ;;
+
+    ping)
+        check_command ping
+        [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: Target host required for ping.${NC}"; usage; }
+        COUNT_ARG=""
+        if [[ -n "$TARGET_PORT" ]]; then COUNT_ARG="-c $TARGET_PORT"; fi # TARGET_PORT is count
+        execute_command "ping $COUNT_ARG \"$TARGET_HOST\""
+        ;;
+    mtr_trace)
+        if command -v mtr >/dev/null 2>&1; then
+            check_command mtr
+            [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: Target host required for mtr.${NC}"; usage; }
+            execute_command "mtr \"$TARGET_HOST\""
+        elif command -v traceroute >/dev/null 2>&1; then
+            check_command traceroute
+            echo -e "${YELLOW}mtr not found, using traceroute instead.${NC}"
+            [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: Target host required for traceroute.${NC}"; usage; }
+            execute_command "traceroute \"$TARGET_HOST\""
+        else
+            echo -e "${RED}Error: Neither mtr nor traceroute found.${NC}"; exit 1;
+        fi
+        ;;
+    dig)
+        check_command dig
+        [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: Domain or IP required for dig.${NC}"; usage; }
+        RECORD_TYPE="${TARGET_PORT:-A}" # TARGET_PORT is record type, defaults to A
+        execute_command "dig \"$TARGET_HOST\" $RECORD_TYPE"
+        ;;
+    whois)
+        check_command whois
+        [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: Domain or IP required for whois.${NC}"; usage; }
+        execute_command "whois \"$TARGET_HOST\""
+        ;;
+    nc_check)
+        check_command nc
+        [[ -z "$TARGET_HOST" || -z "$TARGET_PORT" ]] && { echo -e "${RED}Error: Target host and port required for nc-check.${NC}"; usage; }
+        UDP_FLAG=""
+        if [[ "${POSITIONAL_ARGS[2]}" == "udp" ]]; then UDP_FLAG="-u"; fi
+        execute_command "nc -zvn $UDP_FLAG \"$TARGET_HOST\" $TARGET_PORT"
+        ;;
+    curl_test)
+        check_command curl
+        [[ -z "$TARGET_HOST" ]] && { echo -e "${RED}Error: URL or IP:PORT required for curl-test.${NC}"; usage; }
+        # Ensure TARGET_HOST has a scheme for curl if it's not just an IP:port
+        TARGET_URL="$TARGET_HOST"
+        if [[ ! "$TARGET_URL" =~ ^[a-zA-Z]+:// ]] && [[ "$TARGET_URL" =~ :[0-9]+$ ]]; then # If it looks like IP:PORT or HOST:PORT
+            TARGET_URL="http://$TARGET_URL" # Default to http, user can override
+        elif [[ ! "$TARGET_URL" =~ ^[a-zA-Z]+:// ]]; then
+             TARGET_URL="http://$TARGET_URL"
+        fi
+        CURL_EXTRA_ARGS=("${POSITIONAL_ARGS[@]:1}")
+        execute_command "curl -IL --connect-timeout 5 ${CURL_EXTRA_ARGS[*]} \"$TARGET_URL\""
+        ;;
+    get_public_ip)
+        # Try multiple methods
+        CMD_ip='dig +short myip.opendns.com @resolver1.opendns.com 2>/dev/null || curl -s ifconfig.me || curl -s icanhazip.com || echo "Could not determine public IP"'
+        execute_command "$CMD_ip" # eval directly as it's a compound command
+        ;;
+    list_local_ips)
+        check_command ip
+        CMD_ip="ip -4 addr show | grep -oP 'inet \\K[0-9\\.]+(?=/)' | grep -v '^127\\.'; ip -6 addr show | grep -oP 'inet6 \\K[0-9a-fA-F:]+(?=/)' | grep -v '^::1'"
+        execute_command "$CMD_ip"
+        ;;
+
+    *)
+        echo -e "${RED}Error: Action '$ACTION' not implemented or no action specified.${NC}"
+        usage
+        ;;
+esac
