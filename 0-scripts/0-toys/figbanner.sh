@@ -45,9 +45,36 @@ detect_colors() {
 }
 
 
+# macOS helpers (native tools only: sysctl, vm_stat, ifconfig, sw_vers, uptime)
+_is_darwin() { [ "$(uname -s)" = "Darwin" ]; }
+
+# Prints "<total> <used>" in GB on macOS; used = active + wired + compressed pages
+_mac_mem() {
+    vm_stat | awk -v total="$(sysctl -n hw.memsize)" '
+        /page size of/ { ps = $8 }
+        /Pages active/ { act = $3 }
+        /Pages wired down/ { wir = $4 }
+        /Pages occupied by compressor/ { cmp = $5 }
+        END { printf "%.1fGB %.1fGB\n", total/1073741824, (act + wir + cmp) * ps / 1073741824 }'
+}
+
+# macOS replacement for the /proc + free based sys() below
+_sys_macos() {
+    local cpu cores virt tot used ips
+    cpu=$(sysctl -n machdep.cpu.brand_string)
+    cores=$(sysctl -n hw.ncpu)
+    if [ "$(sysctl -n kern.hv_support 2>/dev/null)" = "1" ]; then virt="Hypervisor-capable"; else virt="No Virtualisation"; fi
+    read -r tot used <<< "$(_mac_mem)"
+    ips=$(ifconfig | awk '$1 == "inet" && $2 != "127.0.0.1" {printf "%s ", $2}' | sed 's/ *$//')
+    printf "%s, %s core(s), %s, %s Memory (%s Used)\n" "$cpu" "$cores" "$virt" "$tot" "$used"
+    if [ -n "$ips" ]; then printf "%s\n" "$ips"; fi
+    uptime
+}
+
 # Function to detect system distribution/version
 ver() {
     local RELEASE="Linux"
+    if _is_darwin; then printf "\e[33mmacOS %s\e[00m: %s\n" "$(sw_vers -productVersion)" "$(uname -msr)"; return; fi
     [ -f /etc/os-release ] && RELEASE=$(grep -E "^PRETTY_NAME=" /etc/os-release | sed 's/PRETTY_NAME=//;s/"//g')
     [ -f /etc/redhat-release ] && RELEASE=$(cat /etc/redhat-release)
     [ -f /etc/lsb-release ] && RELEASE="$(grep DESCRIPTION /etc/lsb-release | sed 's/^.*=//g' | sed 's/\"//g')"
@@ -58,6 +85,7 @@ ver() {
 
 # Function to display system info
 sys() {
+    if _is_darwin; then _sys_macos; return; fi
     awk -F": " '
         FNR==NR { # Process /proc/cpuinfo first
             if (/^model name/) { mod=$2 }
@@ -144,12 +172,15 @@ type apk &> /dev/null && sys() {
 
 # Function to display figlet date and time
 type figlet &> /dev/null && fignow() {
-    printf "\e[33m$(figlet -w -t -f /usr/share/figlet/small.flf $(date +"%a, %d %b, wk%V"))"
+    # Font directory: /usr/share/figlet on Linux; figlet's own default on macOS (Homebrew)
+    local figdir=/usr/share/figlet
+    if _is_darwin; then figdir=$(figlet -I2 2>/dev/null); fi
+    printf "\e[33m$(figlet -w -t -f $figdir/small.flf $(date +"%a, %d %b, wk%V"))"
 
-    if [ -f /usr/share/figlet/univers.flf ]; then
-        local opts="-f /usr/share/figlet/univers.flf"
+    if [ -f $figdir/univers.flf ]; then
+        local opts="-f $figdir/univers.flf"
     else
-        local opts="-f /usr/share/figlet/big.flf"
+        local opts="-f $figdir/big.flf"
     fi
 
     printf "\n\e[94m$(figlet -t $opts $(date +"%H:%M"))\e[00m\n"
@@ -162,7 +193,7 @@ type figlet &> /dev/null && figclock() {
         printf "\e[33m"
         df -kh 2> /dev/null
         printf "\e[31m\n"
-        top -n 1 -b | head -11
+        if _is_darwin; then top -l 1 | head -11; else top -n 1 -b | head -11; fi
         printf "\e[33m$(figlet -w -t -f small $(date +"%b %d, week %V"))\n"
 
         font=$(figrandom 2>/dev/null || echo "big")
@@ -248,8 +279,14 @@ docker_info() {
 
 # System load indicator with color coding
 system_load() {
-    local load=$(cat /proc/loadavg | cut -d' ' -f1)
-    local cores=$(grep -c ^processor /proc/cpuinfo)
+    local load cores
+    if _is_darwin; then
+        load=$(sysctl -n vm.loadavg | awk '{print $2}')
+        cores=$(sysctl -n hw.ncpu)
+    else
+        load=$(cat /proc/loadavg | cut -d' ' -f1)
+        cores=$(grep -c ^processor /proc/cpuinfo)
+    fi
     local load_per_core="N/A"
     if [ "$cores" -gt 0 ]; then
       load_per_core=$(awk "BEGIN {printf \"%.2f\", $load / $cores}")
@@ -276,6 +313,14 @@ system_load() {
 # Function to display disk usage summary
 disk_status() {
     printf "\e[33mDisk Usage: \e[0m"
+
+    if _is_darwin; then
+        # lsblk does not exist on macOS; report the data volume via df
+        local dp=/
+        [ -d /System/Volumes/Data ] && dp=/System/Volumes/Data
+        df -h "$dp" | awk 'NR==2 {printf "%s (%s)\n", $2, $5}'
+        return
+    fi
 
     # Get partition list from lsblk, skip empty lines and filter real partitions
     local partitions

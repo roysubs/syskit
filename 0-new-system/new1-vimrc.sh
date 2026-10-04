@@ -34,7 +34,13 @@ install_package() {
     echo "'$exec_name' not found. Attempting to install package '$pkg_name'..."
 
     # Determine installation commands based on package manager
-    if command -v apt &> /dev/null; then
+    if command -v brew &> /dev/null; then
+        echo "Using brew"
+        if ! brew install "$pkg_name"; then
+             echo "Error: brew installation of '$pkg_name' failed."
+             return 1 # Indicate brew failure
+        fi
+    elif command -v apt &> /dev/null; then
         echo "Using apt"
         if ! sudo apt update || ! sudo apt install -y "$pkg_name"; then
              echo "Error: apt installation of '$pkg_name' failed."

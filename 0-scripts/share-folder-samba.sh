@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
+if [ "$(uname -s)" = "Darwin" ]; then
+    echo "share-folder-samba.sh configures a Linux Samba server (/etc/samba/smb.conf, smbd/nmbd via systemd) and does not apply on macOS."
+    echo "To share folders from this Mac, use macOS native sharing: see remote-access-mac.sh, section 9."
+    exit 0
+fi
 # Author: Roy Wiseman 2025-02
 
 # Script to create/manage a Samba share

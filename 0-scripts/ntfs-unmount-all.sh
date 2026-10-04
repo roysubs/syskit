@@ -11,6 +11,12 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
+# ── macOS not supported ───────────────────────────────────────────────────────
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo -e "${RED}[ FAIL ] This script targets Linux NTFS mount management (fstab/mount) — not implemented for macOS.${NC}"
+    exit 1
+fi
+
 # ── Auto-sudo elevation ───────────────────────────────────────────────────────
 SUDO_MODE=false
 if [[ $EUID -eq 0 ]]; then

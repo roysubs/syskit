@@ -9,7 +9,9 @@ check_gh_installed() {
     echo "Visit https://cli.github.com/ or use your package manager to install it."
     read -p "Try to install gh with apt/brew now? [y/N]: " INSTALL_CHOICE
     if [[ "$INSTALL_CHOICE" =~ ^[Yy]$ ]]; then
-      if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+      if [[ "$OSTYPE" == "linux-gnu"* ]] && command -v zypper &>/dev/null; then
+        sudo zypper --non-interactive install gh
+      elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
         sudo apt install gh
       elif [[ "$OSTYPE" == "darwin"* ]]; then
         brew install gh

@@ -18,16 +18,6 @@ pkg_install() {
 
 echo "Starting Debian X forwarding server setup..."
 
-# --- Step 1: Update package lists ---
-echo "Updating package lists..."
-sudo apt update
-if [ $? -eq 0 ]; then
-    echo "Package lists updated successfully."
-else
-    echo "Failed to update package lists. Please check your internet connection and try again."
-    exit 1
-fi
-
 # --- Step 2: Install necessary packages (openssh-server and xauth) ---
 echo "Installing openssh-server and xauth (if needed)..."
 pkg_install openssh-server xauth

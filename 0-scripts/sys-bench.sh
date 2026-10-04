@@ -63,6 +63,8 @@ is_command_available() {
 install_dependency() {
     local package_name="$1"
     local command_name="$2"
+    local zypper_pkg="$package_name"
+    case "$package_name" in lm-sensors) zypper_pkg="sensors" ;; esac
 
     if ! is_command_available "$command_name"; then
         local SUDO_CMD=""
@@ -79,7 +81,7 @@ install_dependency() {
         read -r -p "Install '$package_name'? [Y/n] " yn
         if [[ $yn =~ ^[Yy]$ ]] || [[ -z $yn ]]; then
             log "Installing $package_name..."
-            if $SUDO_CMD apt-get update && $SUDO_CMD apt-get install -y "$package_name"; then
+            if { command -v apt-get &>/dev/null && $SUDO_CMD apt-get update && $SUDO_CMD apt-get install -y "$package_name"; } || { command -v zypper &>/dev/null && $SUDO_CMD zypper --non-interactive refresh && $SUDO_CMD zypper --non-interactive install -y "$zypper_pkg"; }; then
                 log "$package_name installed successfully (or was already present)."
                 # Re-check availability after install
                 if ! is_command_available "$command_name"; then
@@ -106,7 +108,11 @@ install_dependency "jq" "jq"
 install_dependency "lshw" "lshw"
 install_dependency "lm-sensors" "sensors"
 install_dependency "smartmontools" "smartctl"
-install_dependency "speedtest-cli" "speedtest" # Note: For Ookla official, repo setup might be needed first
+if command -v zypper &>/dev/null && ! command -v apt-get &>/dev/null; then
+    log "Ookla speedtest CLI is not in openSUSE repos; not automated for openSUSE. Install from https://www.speedtest.net/apps/cli (skipping)."
+else
+    install_dependency "speedtest-cli" "speedtest" # Note: For Ookla official, repo setup might be needed first
+fi
 
 NUM_THREADS=$(nproc 2>/dev/null || echo 1)
 

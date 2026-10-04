@@ -6,9 +6,23 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 set -euo pipefail
 
 # ---- Configurable Defaults ----
-IFACE=$(ip route | awk '/default/ {print $5; exit}')
-MAC_ADDR=$(ip link show "$IFACE" | awk '/ether/ {print $2}')
 BROADCAST="255.255.255.255"
+
+# Interface/MAC detection is deferred until an action needs it, so --help and
+# argument errors work on every OS (the old top-level 'ip route' call crashed on macOS).
+init_iface() {
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    IFACE=$(netstat -rn | grep '^default' | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print $NF}' | head -n 1)
+    if [[ -z "$IFACE" ]]; then
+      echo "❌ No default IPv4 route found, so the network interface cannot be determined."
+      exit 1
+    fi
+    MAC_ADDR=$(ifconfig "$IFACE" | awk '/ether/ {print $2}')
+  else
+    IFACE=$(ip route | awk '/default/ {print $5; exit}')
+    MAC_ADDR=$(ip link show "$IFACE" | awk '/ether/ {print $2}')
+  fi
+}
 
 # ---- Functions ----
 
@@ -26,11 +40,16 @@ Options:
   -h, --help             Show this help message
 
 💡 Tips for waking up systems:
-  - Send a WoL packet from another machine using this script or tools like `wakeonlan`
+  - Send a WoL packet from another machine using this script or tools like wakeonlan
   - Use your router (many support WoL in their web interface)
   - Make sure BIOS/UEFI WoL is enabled (typically under Power Management)
 
 ⚠️ Most laptops do NOT support WoL from full power-off. Use sleep (S3/S4) instead.
+
+🍎 macOS notes:
+  - Uses 'pmset womp' (Wake for network access) and needs sudo. Works from sleep, not shutdown.
+  - Wired Ethernet (or USB-C/Thunderbolt Ethernet) is most reliable. Wi-Fi generally cannot wake a sleeping Mac.
+  - Laptops on battery may not wake reliably. Keep on power and check with 'pmset -g custom'.
 EOF
 }
 
@@ -39,7 +58,7 @@ pkg_install() {
     if command -v zypper &>/dev/null; then
         sudo zypper --non-interactive install --auto-agree-with-licenses -y "${pkgs[@]}"
     elif command -v apt-get &>/dev/null; then
-        pkg_install "${pkgs[@]}"
+        sudo apt-get install -y "${pkgs[@]}"
     elif command -v dnf &>/dev/null; then
         sudo dnf install -y "${pkgs[@]}"
     elif command -v yum &>/dev/null; then
@@ -48,10 +67,32 @@ pkg_install() {
         sudo pacman -Sy --noconfirm "${pkgs[@]}"
     elif command -v apk &>/dev/null; then
         sudo apk add "${pkgs[@]}"
+    elif command -v brew &>/dev/null; then
+        brew install "${pkgs[@]}"
     fi
 }
 
+enable_wol_macos() {
+  echo "🔎 Checking Wake-on-LAN on macOS, interface $IFACE..."
+  local port
+  port=$(networksetup -listallhardwareports | awk -v d="$IFACE" '/^Hardware Port:/ {p=substr($0,16)} $0 == "Device: " d {print p; exit}')
+  echo "🔌 Hardware port: ${port:-unknown}"
+  if [[ "$port" == "Wi-Fi" ]]; then
+    echo "⚠️ $IFACE is Wi-Fi. macOS generally cannot wake a sleeping Mac over Wi-Fi."
+    echo "   Use wired Ethernet or a USB-C/Thunderbolt Ethernet adapter instead."
+  fi
+  echo "📝 Setting womp (Wake for network access) = 1 (sudo required)..."
+  sudo pmset -a womp 1
+  echo "🔁 Current pmset womp setting:"
+  pmset -g custom | grep -i womp || echo "⚠️ pmset does not report 'womp' on this Mac"
+}
+
 enable_wol() {
+  init_iface
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    enable_wol_macos
+    return
+  fi
   echo "🔎 Checking Wake-on-LAN compatibility on interface $IFACE..."
 
   if ! command -v ethtool >/dev/null; then
@@ -93,6 +134,13 @@ enable_wol() {
 }
 
 disable_wol() {
+  init_iface
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    echo "🚫 Disabling Wake-on-LAN (womp=0) on macOS (sudo required)..."
+    sudo pmset -a womp 0
+    pmset -g custom | grep -i womp || true
+    return
+  fi
   echo "🚫 Disabling Wake-on-LAN on interface $IFACE..."
   sudo ethtool -s "$IFACE" wol d
   echo "🔍 Current status:"
@@ -102,7 +150,11 @@ disable_wol() {
 sleep_now() {
   enable_wol
   echo "😴 Sleeping now..."
-  systemctl suspend
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    pmset sleepnow
+  else
+    systemctl suspend
+  fi
 }
 
 wake_now() {
@@ -114,7 +166,11 @@ wake_now() {
 
   echo "🌐 Resolving MAC of $target..."
   ping -c 1 "$target" >/dev/null || true
-  arp_entry=$(ip neigh show "$target" | awk '{print $5}')
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    arp_entry=$(arp -n "$target" 2>/dev/null | awk '$3 == "at" {print $4; exit}')
+  else
+    arp_entry=$(ip neigh show "$target" | awk '{print $5}')
+  fi
   if [[ -z "$arp_entry" ]]; then
     echo "❌ Failed to get MAC for $target. Try pinging it first from a session when it's awake."
     exit 1

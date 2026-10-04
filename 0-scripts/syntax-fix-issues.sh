@@ -199,7 +199,17 @@ if [[ -z "$TARGET_PATH" ]]; then
 fi
 
 # Convert TARGET_PATH to an absolute path for consistent backup paths
-initial_target_path_abs=$(readlink -f "$TARGET_PATH")
+if command -v greadlink &>/dev/null; then
+  initial_target_path_abs=$(greadlink -f "$TARGET_PATH")
+elif [[ "$(uname)" == "Darwin" ]]; then
+  if [[ -d "$TARGET_PATH" ]]; then
+    initial_target_path_abs=$(cd "$TARGET_PATH" && pwd -P)
+  else
+    initial_target_path_abs=$(cd "$(dirname "$TARGET_PATH")" && pwd -P)/$(basename "$TARGET_PATH")
+  fi
+else
+  initial_target_path_abs=$(readlink -f "$TARGET_PATH")
+fi
 
 
 # --- Main Logic ---

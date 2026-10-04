@@ -19,6 +19,84 @@ EXCLUDE_REGEX='^[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +/$|^[^ ]+ +[^ ]+ +[^ ]
 EXCLUDE_REGEX='^[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +(/|/sys|/proc|/dev|/run|/snap|/var/lib/docker)/|^[^ ]+ +(sysfs|proc|devtmpfs|devpts|tmpfs|securityfs|cgroup|pstore|bpf|autofs|mqueue|hugetlbfs|debugfs|tracefs|configfs|ramfs|fusectl|nsfs|portal|overlay|squashfs|binfmt_misc|rpc_pipefs|fuse.*|nfsd) '
 
 
+# --- macOS ---
+# macOS has no findmnt. Build the same sections from `mount` (device, mount point, fstype)
+# and `df -Ph` (sizes). Lines look like:
+#   /dev/disk3s1s1 on / (apfs, sealed, local, read-only, journaled)
+#   //user@nas/share on /Volumes/share (smbfs, nodev, nosuid, mounted by user)
+#   nas:/export on /Volumes/nfs (nfs, nodev, nosuid)
+# Pseudo/system mounts (devfs, autofs "map ..." entries, VM/Preboot/Update volumes) are skipped.
+macos_mounts() {
+    local mount_re='^(.*) on (/.*) \((.*)\)$'
+    local local_lines=() samba_lines=() nfs_lines=()
+    local mount_output line source target inner fstype opts df_line size used avail pct rec
+
+    mount_output=$(mount)
+    while IFS= read -r line; do
+        [[ "$line" =~ $mount_re ]] || continue
+        source="${BASH_REMATCH[1]}"
+        target="${BASH_REMATCH[2]}"
+        inner="${BASH_REMATCH[3]}"
+
+        fstype="${inner%%,*}"
+        opts=""
+        if [[ "$inner" == *,* ]]; then opts="${inner#*, }"; fi
+
+        case "$fstype" in
+            devfs|autofs) continue ;;
+        esac
+        case "$source" in
+            map\ *) continue ;;
+        esac
+        case "$target" in
+            /System/Volumes/VM|/System/Volumes/Preboot|/System/Volumes/Update|/System/Volumes/xarts|/System/Volumes/iSCPreboot|/System/Volumes/Hardware) continue ;;
+        esac
+
+        # df -Ph: one data line per filesystem; fields are Filesystem Size Used Avail Capacity
+        df_line=$(df -Ph "$target" 2>/dev/null | tail -n 1)
+        size="-"; used="-"; avail="-"; pct="-"
+        if [ -n "$df_line" ]; then read -r _fs size used avail pct _rest <<< "$df_line"; fi
+
+        printf -v rec '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s' "$target" "$source" "$fstype" "$size" "$used" "$avail" "$pct" "$opts"
+
+        if [[ "$fstype" == "smbfs" || "$fstype" == "cifs" ]]; then
+            samba_lines+=("$rec")
+        elif [[ "$fstype" == "nfs" ]]; then
+            nfs_lines+=("$rec")
+        elif [[ "$source" == /dev/disk* ]]; then
+            local_lines+=("$rec")
+        fi
+    done <<< "$mount_output"
+
+    macos_print_section "Local Disk Mounts" "${local_lines[@]}"
+    macos_print_section "Remote SAMBA/CIFS Mounts" "${samba_lines[@]}"
+    macos_print_section "NFS Mounts" "${nfs_lines[@]}"
+}
+
+# Same column layout as the Linux output: TARGET SOURCE FSTYPE SIZE USED AVAIL USE% OPTIONS
+macos_print_section() {
+    local title="$1"
+    shift
+    if [ $# -eq 0 ]; then
+        return
+    fi
+    echo -e "${COLOR_HEADER}\n--- $title ---${COLOR_RESET}"
+    printf "%-35s %-35s %-10s %-8s %-8s %-8s %-5s %s\n" \
+        "TARGET" "SOURCE" "FSTYPE" "SIZE" "USED" "AVAIL" "USE%" "OPTIONS"
+    printf -- "-%.0s" {1..120}
+    printf "\n"
+    printf '%s\n' "$@" | sort -t "$(printf '\t')" -k1,1 | while IFS=$'\t' read -r m_target m_source m_fstype m_size m_used m_avail m_pct m_opts; do
+        printf "${COLOR_FIELD}%-35s${COLOR_RESET} ${COLOR_FIELD}%-35s${COLOR_RESET} %-10s %-8s %-8s %-8s %-5s %s\n" \
+            "$m_target" "$m_source" "$m_fstype" "$m_size" "$m_used" "$m_avail" "$m_pct" "$m_opts"
+    done
+    echo ""
+}
+
+if [ "$(uname -s)" = "Darwin" ]; then
+    macos_mounts
+    exit 0
+fi
+
 # --- Processing ---
 
 # Get mount output with disk space info using findmnt --df -n

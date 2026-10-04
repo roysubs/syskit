@@ -19,7 +19,12 @@ echo "Result: $hostname_output"
 echo
 
 # Get IP of the current host
-ip=$(hostname -I | awk '{print $1}')
+if [[ "$(uname)" == "Darwin" ]]; then
+    iface=$(route -n get 1.1.1.1 2>/dev/null | awk '/interface: /{print $2}')
+    ip=$(ipconfig getifaddr "$iface" 2>/dev/null)
+else
+    ip=$(hostname -I | awk '{print $1}')
+fi
 print_green "🔍 Checking reverse DNS (IP → hostname)..."
 echo "Command: dig -x $ip +short"
 reverse_name=$(dig -x "$ip" +short)
@@ -42,13 +47,26 @@ if [[ "$confirm" =~ ^[Yy]$ ]]; then
 
     print_green "Setting hostname to '$new_hostname'..."
 
-    echo -e "\nCommand: sudo hostnamectl set-hostname $new_hostname"
-    sudo hostnamectl set-hostname "$new_hostname"
+    if [[ "$(uname)" == "Darwin" ]]; then
+        echo -e "\nCommand: sudo scutil --set HostName $new_hostname"
+        sudo scutil --set HostName "$new_hostname"
+        echo -e "Command: sudo scutil --set LocalHostName $new_hostname"
+        sudo scutil --set LocalHostName "$new_hostname"
+        echo -e "Command: sudo scutil --set ComputerName $new_hostname"
+        sudo scutil --set ComputerName "$new_hostname"
+    else
+        echo -e "\nCommand: sudo hostnamectl set-hostname $new_hostname"
+        sudo hostnamectl set-hostname "$new_hostname"
+    fi
 
     print_green "Updating /etc/hosts..."
 
     echo -e "\nCommand: sudo sed -i ..."
-    sudo sed -i "/127.0.1.1/d" /etc/hosts
+    if [[ "$(uname)" == "Darwin" ]]; then
+        sudo sed -i '' "/127.0.1.1/d" /etc/hosts
+    else
+        sudo sed -i "/127.0.1.1/d" /etc/hosts
+    fi
     echo "127.0.1.1   $new_hostname" | sudo tee -a /etc/hosts
 
     echo -e "\nHostname successfully updated to: $new_hostname"

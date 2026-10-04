@@ -4,7 +4,24 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 
 # Use ntpdate or timedatectl to sync the clock with an internet time server.
 # This will enable automatic time synchronization using the system's default NTP servers.
-sudo apt install systemd-timesyncd
+
+# macOS has no systemd/timedatectl. Use systemsetup (needs admin rights, so sudo),
+# and sntp only as a fallback if network time did not switch on.
+if [[ "$(uname)" == "Darwin" ]]; then
+  sudo systemsetup -settimezone Europe/London
+  sudo systemsetup -setusingnetworktime on
+  if ! systemsetup -getusingnetworktime | grep -q "On"; then
+    sudo sntp -sS time.apple.com
+  fi
+  systemsetup -gettimezone
+  exit 0
+fi
+
+if command -v zypper &>/dev/null; then
+  echo "Not automated for openSUSE: install systemd-timesyncd (or chrony) with zypper or YaST first. Continuing with the timedatectl steps."
+else
+  sudo apt install systemd-timesyncd
+fi
 sudo systemctl enable --now systemd-timesyncd
 sudo timedatectl set-ntp true
 sudo systemctl restart systemd-timesyncd   # This will manually trugger an immediate sync

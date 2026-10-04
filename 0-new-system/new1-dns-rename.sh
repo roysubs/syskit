@@ -13,7 +13,12 @@ echo
 echo "🧭 Checking current forward and reverse DNS..."
 
 # Get IP address (first non-loopback, non-docker)
-IP=$(ip route get 1 | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}' | head -n1)
+if [[ "$(uname)" == "Darwin" ]]; then
+    IFACE=$(route -n get 1.1.1.1 2>/dev/null | awk '/interface: /{print $2}')
+    IP=$(ipconfig getifaddr "$IFACE" 2>/dev/null)
+else
+    IP=$(ip route get 1 | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}' | head -n1)
+fi
 
 # Show forward DNS
 echo
@@ -44,15 +49,28 @@ fi
 # Set forward DNS (local hostname)
 echo
 echo "⚙️  Setting hostname to: $NEW_HOSTNAME"
-echo -e "${GREEN}sudo hostnamectl set-hostname $NEW_HOSTNAME${RESET}"
-sudo hostnamectl set-hostname "$NEW_HOSTNAME"
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo -e "${GREEN}sudo scutil --set HostName $NEW_HOSTNAME${RESET}"
+    sudo scutil --set HostName "$NEW_HOSTNAME"
+    echo -e "${GREEN}sudo scutil --set LocalHostName $NEW_HOSTNAME${RESET}"
+    sudo scutil --set LocalHostName "$NEW_HOSTNAME"
+    echo -e "${GREEN}sudo scutil --set ComputerName $NEW_HOSTNAME${RESET}"
+    sudo scutil --set ComputerName "$NEW_HOSTNAME"
+else
+    echo -e "${GREEN}sudo hostnamectl set-hostname $NEW_HOSTNAME${RESET}"
+    sudo hostnamectl set-hostname "$NEW_HOSTNAME"
+fi
 
 # Add reverse DNS via /etc/hosts if IP is local
 if grep -q "$IP" /etc/hosts; then
     echo
     echo "🧹 Cleaning up old /etc/hosts entries for $IP"
     echo -e "${GREEN}sudo sed -i '/^$IP/d' /etc/hosts${RESET}"
-    sudo sed -i "/^$IP/d" /etc/hosts
+    if [[ "$(uname)" == "Darwin" ]]; then
+        sudo sed -i '' "/^$IP/d" /etc/hosts
+    else
+        sudo sed -i "/^$IP/d" /etc/hosts
+    fi
 fi
 
 echo

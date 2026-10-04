@@ -12,6 +12,13 @@ BLUE='\033[0;34m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# ── macOS not supported ───────────────────────────────────────────────────────
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo -e "\033[1;33moptimal-disks-policy.sh tunes Linux-only hdparm power settings — not applicable on macOS.\033[0m"
+    echo -e "\033[1;33mFor SMART disk-health reporting on macOS, use optimal-disks-policy-mac.sh instead.\033[0m"
+    exit 1
+fi
+
 # ── Auto-sudo elevation ───────────────────────────────────────────────────────
 if [[ $EUID -ne 0 ]]; then
     echo -e "\033[0;34m[ INFO ] Not running as root — attempting to re-launch with sudo...\033[0m"
@@ -28,7 +35,7 @@ pkg_install() {
     if command -v zypper &>/dev/null; then
         zypper --non-interactive install --auto-agree-with-licenses -y "${pkgs[@]}"
     elif command -v apt-get &>/dev/null; then
-        pkg_install "${pkgs[@]}"
+        sudo apt-get install -y "${pkgs[@]}"
     elif command -v dnf &>/dev/null; then
         dnf install -y "${pkgs[@]}"
     elif command -v yum &>/dev/null; then

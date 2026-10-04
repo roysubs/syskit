@@ -147,7 +147,10 @@ run_setup() {
       exit 1
     fi
 
-    # 1. Update package lists and install XRDP
+    # 1. Update package lists and install XRDP (apt only)
+    if command -v zypper &>/dev/null; then
+        _warn "Not automated for openSUSE: install XRDP (and dbus-1-x11) yourself from https://github.com/neutrinolabs/xrdp or the openSUSE repositories (https://software.opensuse.org). Continuing with the configuration steps."
+    else
     _msg "Updating package lists..."
     if ! sudo apt update; then
         _err "Failed to update package lists. Please check your network connection and repositories."
@@ -168,6 +171,7 @@ run_setup() {
     if ! _is_pkg_installed "dbus-x11"; then
         _msg "Installing dbus-x11 (often required for desktop environments over XRDP)..."
         sudo apt install -y dbus-x11
+    fi
     fi
 
 
@@ -363,6 +367,11 @@ run_troubleshooting() {
 
 
 # --- Main Script Logic ---
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo "X11 forwarding/xrdp are Linux desktop features; on macOS use Screen Sharing or remote-access-mac.sh instead."
+    exit 0
+fi
+
 if [[ "$1" == "--troubleshoot" || "$1" == "troubleshoot" ]]; then
     if [ "$EUID" -ne 0 ]; then # Troubleshooting might need sudo for commands
       _warn "Running troubleshooting. Some steps might require sudo privileges."
