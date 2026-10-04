@@ -3,6 +3,12 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-03 (Updated for Multi-Distro / openSUSE Compatibility)
 set -euo pipefail
 
+# This script is Linux-specific (built around dmidecode, with no macOS equivalent).
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo "sys-info-basic.sh is Linux-specific (relies on dmidecode). Use sys-info-mac.sh on macOS." >&2
+    exit 1
+fi
+
 # Ensure we are running as root
 if [[ $EUID -ne 0 ]]; then
     echo "Elevation required; rerunning as sudo..."
@@ -15,7 +21,7 @@ pkg_install() {
     if command -v zypper &>/dev/null; then
         zypper --non-interactive install --auto-agree-with-licenses -y "$package_name"
     elif command -v apt-get &>/dev/null; then
-        pkg_install "$package_name"
+        sudo apt-get install -y "$package_name"
     elif command -v dnf &>/dev/null; then
         dnf install -y "$package_name"
     elif command -v pacman &>/dev/null; then

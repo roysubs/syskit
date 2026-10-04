@@ -433,10 +433,15 @@ if [ -z "$1" ]; then
     display_usage
 fi
 
+if [ "$(uname)" = "Darwin" ]; then
+    _log_error "storage-decom.sh manages Linux fstab/exports/Samba and partition tables — not implemented for macOS. Use Disk Utility / diskutil directly."
+    exit 1
+fi
+
 if [ "$(id -u)" -ne 0 ]; then
     _log_warn "Root privileges required. Rerunning with sudo..."
     exec sudo -E "$0" "$@"
-    exit $? 
+    exit $?
 fi
 
 TARGET_INPUT="$1"

@@ -41,6 +41,11 @@ if [[ -t 1 ]]; then R=$'\e[31m' Y=$'\e[33m' G=$'\e[32m' B=$'\e[1m' D=$'\e[2m' N=
 say()  { printf '%s\n' "$*"; }
 warn() { printf '%s[!] %s%s\n' "$Y" "$*" "$N"; }
 
+if [[ "$(uname)" == "Darwin" ]]; then
+  echo "stop-GUI.sh targets Linux display servers (X11/Wayland) and session management — not applicable on macOS." >&2
+  exit 1
+fi
+
 if [[ $EUID -ne 0 ]]; then
   if [[ $DRY -eq 1 ]]; then
     warn "not root: the preview can only see YOUR processes and display connections. Run with sudo for the real picture."

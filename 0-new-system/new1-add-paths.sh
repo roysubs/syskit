@@ -16,7 +16,9 @@ clean_path() {
 add_to_path() {
   local DIR="$1"
   # Resolve absolute path (handles ~/ correctly)
-  DIR=$(realpath -e "$HOME/${DIR/#\~\//}") || { echo "Directory $DIR does not exist, skipping."; return 1; }
+  local RAW_DIR="$HOME/${DIR/#\~\//}"
+  [ -e "$RAW_DIR" ] || { echo "Directory $DIR does not exist, skipping."; return 1; }
+  DIR=$(realpath "$RAW_DIR") || { echo "Directory $DIR does not exist, skipping."; return 1; }
 
   # Add to current session if sourced
   if (return 0 2>/dev/null); then

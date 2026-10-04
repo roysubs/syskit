@@ -12,6 +12,13 @@ BLUE='\033[0;34m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# ── macOS not supported ───────────────────────────────────────────────────────
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo -e "${YELLOW}optimal-cpu-policy.sh tunes Linux cpufreq governors. macOS exposes no equivalent${NC}"
+    echo -e "${YELLOW}user-tunable CPU frequency policy — the OS fully manages this. Not applicable here.${NC}"
+    exit 1
+fi
+
 # ── Auto-sudo elevation ───────────────────────────────────────────────────────
 if [[ $EUID -ne 0 ]]; then
     echo -e "${BLUE}[ INFO ] Not running as root — attempting to re-launch with sudo...${NC}"
@@ -28,7 +35,7 @@ pkg_install() {
     if command -v zypper &>/dev/null; then
         zypper --non-interactive install --auto-agree-with-licenses -y "${pkgs[@]}"
     elif command -v apt-get &>/dev/null; then
-        pkg_install "${pkgs[@]}"
+        sudo apt-get install -y "${pkgs[@]}"
     elif command -v dnf &>/dev/null; then
         dnf install -y "${pkgs[@]}"
     elif command -v yum &>/dev/null; then

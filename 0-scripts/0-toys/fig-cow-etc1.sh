@@ -163,6 +163,17 @@ if [ ${#MISSING_TOOLS[@]} -gt 0 ]; then
             fi
         done
 
+        if command_exists "zypper" && ! command_exists "apt"; then
+            # openSUSE: zypper names for cowsay/figlet/toilet only; the rest are not automated
+            echo -e "${CYAN}openSUSE detected: installing cowsay, figlet and toilet via zypper...${NC}"
+            if sudo zypper --non-interactive refresh && sudo zypper --non-interactive install -y cowsay figlet toilet; then
+                echo -e "${GREEN}zypper packages installed successfully or were already present.${NC}"
+            else
+                echo -e "${RED}Error: zypper install failed. Please check the output above.${NC}"
+            fi
+            echo -e "${YELLOW}Not automated for openSUSE (install manually if wanted): fortune, lolcat, aafire, hollywood, bb, ponysay.${NC}"
+        else
+        # apt-only steps below (skipped on zypper-only systems)
         sudo apt update || echo -e "${YELLOW}Warning: Failed to update package lists. Installation might fail.${NC}"
 
         # Install APT packages
@@ -207,6 +218,8 @@ if [ ${#MISSING_TOOLS[@]} -gt 0 ]; then
             else
                 echo -e "${RED}Failed to download ponysay.${NC}"
             fi
+        fi
+
         fi
 
         # Install GitHub tools

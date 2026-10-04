@@ -3,7 +3,8 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 
 # ==============================================================================
 # NTFS Mount + Samba Share Script
-# Optimized for: openSUSE, Debian/Ubuntu/Mint, Fedora/RHEL, Arch, macOS
+# Optimized for: openSUSE, Debian/Ubuntu/Mint, Fedora/RHEL, Arch
+# (macOS not supported: NTFS mounting here needs real macFUSE/ntfs-3g work, not just this guard)
 # ==============================================================================
 
 set -euo pipefail
@@ -86,6 +87,12 @@ print_smart_summary() {
 # ── Dynamic OS Root Disk Detection ───────────────────────────────────────────
 OS_ROOT_DISK=$(lsblk -no PKNAME "$(findmnt -n -o SOURCE / 2>/dev/null || echo '/dev/sdb2')" 2>/dev/null || echo "sdb")
 if [[ -z "$OS_ROOT_DISK" ]]; then OS_ROOT_DISK="sdb"; fi
+
+# ── macOS not supported ───────────────────────────────────────────────────────
+if [[ "$(uname)" == "Darwin" ]]; then
+    fail "NTFS mounting via this script isn't implemented for macOS (would need macFUSE + ntfs-3g and different mount plumbing)."
+    exit 1
+fi
 
 # ── Auto-Sudo Re-Execution ────────────────────────────────────────────────────
 SUDO_MODE=false

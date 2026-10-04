@@ -30,13 +30,16 @@ read -p "Would you like to continue? [Y/n] " choice
 [[ "$choice" =~ ^[Yy]$ ]] || { echo "Exiting."; exit 1; }
 
 # Only update if it's been more than 2 days since the last update (to avoid constant updates)
-if [ -e /var/cache/apt/pkgcache.bin ]; then
-    if [ $(find /var/cache/apt/pkgcache.bin -mtime +2 -print) ]; then
+# (apt-specific cache check; only applies when apt is the detected package manager)
+if command -v apt &>/dev/null; then
+    if [ -e /var/cache/apt/pkgcache.bin ]; then
+        if [ $(find /var/cache/apt/pkgcache.bin -mtime +2 -print) ]; then
+            sudo apt update && sudo apt upgrade -y
+        fi
+    else
+        echo "Cache file not found, running update anyway..."
         sudo apt update && sudo apt upgrade -y
     fi
-else
-    echo "Cache file not found, running update anyway..."
-    sudo apt update && sudo apt upgrade -y
 fi
 
 confirm() {

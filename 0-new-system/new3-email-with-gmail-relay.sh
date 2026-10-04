@@ -7,10 +7,11 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Define colors for better readability
 
 pkg_install() {
-    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    if command -v brew &>/dev/null; then brew install "$@"
+    elif command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
     elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
     elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
-    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    else echo "No supported package manager found (need brew/apt/zypper/dnf)." >&2; exit 1
     fi
 }
 
@@ -24,10 +25,14 @@ echo ""
 
 # Update and install necessary packages
 echo -e "${GREEN}Step 1: Updating system packages...${NC}"
-sudo apt update && sudo apt upgrade -y
+if command -v apt &>/dev/null; then sudo apt update && sudo apt upgrade -y; fi
 
 echo -e "${GREEN}Step 2: Installing Postfix and required dependencies...${NC}"
-pkg_install postfix mailutils libsasl2-2 libsasl2-modules
+if command -v zypper &>/dev/null; then
+    pkg_install postfix mailx cyrus-sasl cyrus-sasl-plain
+else
+    pkg_install postfix mailutils libsasl2-2 libsasl2-modules
+fi
 
 # Configure Postfix
 echo -e "${GREEN}Step 3: Configuring Postfix for Gmail relay...${NC}"

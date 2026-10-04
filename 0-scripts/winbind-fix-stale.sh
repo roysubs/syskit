@@ -21,6 +21,12 @@ print_header() {
     echo -e "${CYAN}${BOLD}========================================${NC}"
 }
 
+# This is a one-off Linux/Samba diagnostic hardcoded to a specific host - not applicable on macOS.
+if [ "$(uname)" = "Darwin" ]; then
+    echo -e "${YELLOW}winbind-fix-stale.sh is a Linux/Samba-specific diagnostic — not applicable on macOS.${NC}"
+    exit 1
+fi
+
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
     echo -e "${YELLOW}Re-executing with sudo...${NC}"

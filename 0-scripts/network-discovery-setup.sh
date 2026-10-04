@@ -106,7 +106,6 @@ if dpkg -l 2>/dev/null | grep -q "^ii  avahi-daemon"; then
   echo "✅ Avahi is already installed - skipping installation"
 else
   echo "📦 Installing avahi-daemon (mDNS responder)..."
-  sudo apt-get update -qq
   pkg_install avahi-daemon avahi-utils libnss-mdns
   echo "✅ Avahi installed"
 fi

@@ -37,7 +37,13 @@ for commit in $commits; do
     timestamp=$(git show -s --format=%cd --date=iso-strict "$commit")
     
     # Convert the timestamp to yymmdd-hhmmss format (using UTC to avoid local timezone issues)
-    timestamp_filename=$(date -d "$timestamp" -u +'%y%m%d-%H%M%S')
+    if [[ "$(uname)" == "Darwin" ]]; then
+        # BSD date's %z can't parse the colon in iso-strict's +HH:MM offset, so strip it first
+        timestamp_no_colon=$(echo "$timestamp" | sed -E 's/([+-][0-9]{2}):([0-9]{2})$/\1\2/')
+        timestamp_filename=$(date -j -u -f "%Y-%m-%dT%H:%M:%S%z" "$timestamp_no_colon" +'%y%m%d-%H%M%S')
+    else
+        timestamp_filename=$(date -d "$timestamp" -u +'%y%m%d-%H%M%S')
+    fi
     
     # Checkout the file as it was at that commit (so we get the content)
     git checkout "$commit" -- "$file"

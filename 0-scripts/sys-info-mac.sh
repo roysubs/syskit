@@ -42,7 +42,7 @@ install_tools() {
         # Check for lspci
         if ! command -v lspci &>/dev/null; then
             read -p "'lspci' (pciutils) is not available. Install it? [y/N] " yn
-            [[ $yn =~ ^[Yy]$ ]] && sudo apt-get update && sudo apt-get install -y pciutils || exit 1
+            [[ $yn =~ ^[Yy]$ ]] && pkg_install pciutils || exit 1
         fi
     fi
     # macOS uses built-in tools, no installation needed

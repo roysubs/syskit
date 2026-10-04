@@ -177,7 +177,11 @@ echo "$commit_data_list" | while IFS=' ' read -r commit_hash commit_unix_timesta
 
     # Format the timestamp for the directory name (YYYYMMDD_HHMMSS)
     # Appending short commit hash for uniqueness if multiple commits share the exact same second.
-    dir_timestamp_name=$(date -d "@$commit_unix_timestamp" +"%Y%m%d_%H%M%S")
+    if [[ "$(uname)" == "Darwin" ]]; then
+        dir_timestamp_name=$(date -r "$commit_unix_timestamp" +"%Y%m%d_%H%M%S")
+    else
+        dir_timestamp_name=$(date -d "@$commit_unix_timestamp" +"%Y%m%d_%H%M%S")
+    fi
     target_checkout_dir="${OUTPUT_PARENT_DIR}/syskit_${dir_timestamp_name}_${commit_hash:0:7}"
 
     log_message "Processing commit ${commit_hash:0:7} (Timestamp: $dir_timestamp_name)..."

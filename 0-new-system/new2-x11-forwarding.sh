@@ -62,6 +62,11 @@ _ensure_sshd_config() {
 
 # --- Main Script ---
 
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo "X11 forwarding/xrdp are Linux desktop features; on macOS use Screen Sharing or remote-access-mac.sh instead."
+    exit 0
+fi
+
 # Check if the script is run as root or with sudo
 if [ "$EUID" -ne 0 ]; then
   _err "This script must be run as root or with sudo."
@@ -70,7 +75,10 @@ fi
 
 _msg "Starting X11 Forwarding Setup..."
 
-# 1. Update package lists
+# 1-2. Update package lists and install required packages (apt only)
+if command -v zypper &>/dev/null; then
+    _warn "Not automated for openSUSE: install these first with 'sudo zypper install openssh xauth xclip' (plus an X11 test app such as xeyes from https://software.opensuse.org). Continuing with the sshd and firewall steps."
+else
 _msg "Updating package lists..."
 if ! sudo apt update; then
     _err "Failed to update package lists. Please check your network connection and repositories."
@@ -98,6 +106,7 @@ if [ ${#missing_packages[@]} -gt 0 ]; then
     fi
 else
     _msg "All required packages are already installed."
+fi
 fi
 
 # 3. Configure SSH server for X11 Forwarding

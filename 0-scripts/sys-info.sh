@@ -4,6 +4,15 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 set -euo pipefail
 
 # ----------------------
+# This script is Linux-specific (uses getent and other glibc-only tooling below).
+# On macOS, use sys-info-mac.sh, or sys-info-lin-mac.sh for a unified cross-platform version.
+# ----------------------
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo "sys-info.sh is Linux-specific. On macOS, use sys-info-mac.sh (or sys-info-lin-mac.sh)." >&2
+    exit 1
+fi
+
+# ----------------------
 # Ensure script is run as root. If not, re-execute with sudo.
 # ----------------------
 if [[ $EUID -ne 0 ]]; then

@@ -36,7 +36,7 @@ fi
 
 if ! command -v img2txt &>/dev/null; then
     echo "Installing caca-utils..."
-    sudo apt install -y caca-utils
+    pkg_install caca-utils
 fi
 
 # Convert image to ASCII art

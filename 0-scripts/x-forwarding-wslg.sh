@@ -16,16 +16,6 @@ pkg_install() {
 
 echo "Starting WSLg X forwarding setup and verification..."
 
-# --- Step 1: Update package lists ---
-echo "Updating package lists..."
-sudo apt update
-if [ $? -eq 0 ]; then
-    echo "Package lists updated successfully."
-else
-    echo "Failed to update package lists. Please check your internet connection and try again."
-    exit 1
-fi
-
 # --- Step 2: Install necessary X11 applications (if not already installed) ---
 # x11-apps includes xclock, xeyes, etc., useful for testing X forwarding.
 echo "Installing x11-apps package (if needed)..."

@@ -37,34 +37,38 @@ echo ""
 echo -e "${CYAN}--- Step 1: Update Package Lists (System-Wide Check) ---${NC}"
 echo "This script will check if 'apt update' has been run system-wide in the last 24 hours."
 
-RECENT_APT_ACTIVITY_FOUND=false
-# We need to check if any list file was updated, sudo is required to traverse /var/lib/apt/lists
-echo "Checking system apt list modification times..."
-if sudo find /var/lib/apt/lists -type f -mmin -1440 -print -quit 2>/dev/null | grep -q .; then
-    # -mmin -1440: modified less than 1440 minutes (24 hours) ago.
-    # -print -quit: find will print the first match and exit immediately (GNU extension, common on Linux).
-    # grep -q .: checks if find produced any output (i.e., found a recent file).
-    # 2>/dev/null: suppresses find errors (e.g., permission denied if not using sudo, though sudo should prevent this).
-    echo -e "${YELLOW}A system-wide 'apt update' appears to have been run in the last 24 hours. Skipping 'apt update' for this script.${NC}"
-    RECENT_APT_ACTIVITY_FOUND=true
-else
-    echo "No system-wide 'apt update' activity detected in the last 24 hours, or unable to determine."
-fi
-
-if [ "$RECENT_APT_ACTIVITY_FOUND" = false ]; then
-    echo "Package lists will be updated to ensure installation of the latest software versions."
-    echo -e "Command to be run: ${GREEN}sudo apt update${NC}"
-    read -p "Press Enter to run this command..."
-    sudo apt update
-    if [ $? -eq 0 ]; then
-        echo -e "${YELLOW}Package lists updated successfully.${NC}"
+if command -v apt &>/dev/null; then
+    RECENT_APT_ACTIVITY_FOUND=false
+    # We need to check if any list file was updated, sudo is required to traverse /var/lib/apt/lists
+    echo "Checking system apt list modification times..."
+    if sudo find /var/lib/apt/lists -type f -mmin -1440 -print -quit 2>/dev/null | grep -q .; then
+        # -mmin -1440: modified less than 1440 minutes (24 hours) ago.
+        # -print -quit: find will print the first match and exit immediately (GNU extension, common on Linux).
+        # grep -q .: checks if find produced any output (i.e., found a recent file).
+        # 2>/dev/null: suppresses find errors (e.g., permission denied if not using sudo, though sudo should prevent this).
+        echo -e "${YELLOW}A system-wide 'apt update' appears to have been run in the last 24 hours. Skipping 'apt update' for this script.${NC}"
+        RECENT_APT_ACTIVITY_FOUND=true
     else
-        echo -e "${YELLOW}Failed to update package lists. Please check your internet connection and try again.${NC}"
-        exit 1
+        echo "No system-wide 'apt update' activity detected in the last 24 hours, or unable to determine."
+    fi
+
+    if [ "$RECENT_APT_ACTIVITY_FOUND" = false ]; then
+        echo "Package lists will be updated to ensure installation of the latest software versions."
+        echo -e "Command to be run: ${GREEN}sudo apt update${NC}"
+        read -p "Press Enter to run this command..."
+        sudo apt update
+        if [ $? -eq 0 ]; then
+            echo -e "${YELLOW}Package lists updated successfully.${NC}"
+        else
+            echo -e "${YELLOW}Failed to update package lists. Please check your internet connection and try again.${NC}"
+            exit 1
+        fi
+    else
+        # If skipped, still give a positive confirmation that this step is okay.
+        echo -e "${YELLOW}Package list check complete (system-wide update was recent, so 'apt update' by this script was skipped).${NC}"
     fi
 else
-    # If skipped, still give a positive confirmation that this step is okay.
-    echo -e "${YELLOW}Package list check complete (system-wide update was recent, so 'apt update' by this script was skipped).${NC}"
+    echo "apt not detected; skipping apt-specific package list freshness check ('pkg_install' below will handle the detected package manager)."
 fi
 
 # --- Step 2: Install necessary packages (openssh-server and xauth) ---

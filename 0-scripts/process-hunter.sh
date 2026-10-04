@@ -27,6 +27,14 @@ print_command() {
     echo -e "${C_GREEN}# $description: ${C_BOLD}$cmd_string${C_RESET}"
 }
 
+# macOS has no /proc, systemd, cgroups or ss. Those paths are Linux-only and are
+# replaced by ps/lsof/launchd-aware equivalents (or a "not available" note) on Darwin.
+is_macos() { [ "$(uname -s)" = "Darwin" ]; }
+
+# lsof ANDs the -p and -i selections only with -a; Linux output stays exactly as before.
+LSOF_AND=""
+if is_macos; then LSOF_AND="-a"; fi
+
 analyze_pid() {
     local pid="$1"
     local exe_target="" # Store the resolved executable path
@@ -35,7 +43,12 @@ analyze_pid() {
         echo -e "${C_RED}Error: '$pid' is not a valid PID format.${C_RESET}"
         return 1
     fi
-    if [ ! -d "/proc/$pid" ]; then
+    if is_macos; then
+        if ! ps -p "$pid" -o pid= >/dev/null 2>&1; then
+            echo -e "${C_RED}Error: Process with PID '$pid' does not exist.${C_RESET}"
+            return 1
+        fi
+    elif [ ! -d "/proc/$pid" ]; then
         echo -e "${C_RED}Error: Process with PID '$pid' does not exist.${C_RESET}"
         return 1
     fi
@@ -47,14 +60,25 @@ analyze_pid() {
     print_header "Process Information (from ps)"
     local ps_user
     local ps_cmd="ps -p \"$pid\" -o user:20,ppid,ni,%cpu,%mem,stat,etime,args --no-headers"
-    print_command "Getting process details" "$ps_cmd"
     local ps_info
-    ps_info=$(ps -p "$pid" -o user:20,ppid,ni,%cpu,%mem,stat,etime,args --no-headers)
+    if is_macos; then
+        # BSD ps has no --no-headers; a trailing '=' on every column suppresses the header
+        ps_cmd="ps -p \"$pid\" -o user=,ppid=,ni=,%cpu=,%mem=,stat=,etime=,args="
+        print_command "Getting process details" "$ps_cmd"
+        ps_info=$(ps -p "$pid" -o user=,ppid=,ni=,%cpu=,%mem=,stat=,etime=,args= 2>/dev/null)
+    else
+        print_command "Getting process details" "$ps_cmd"
+        ps_info=$(ps -p "$pid" -o user:20,ppid,ni,%cpu,%mem,stat,etime,args --no-headers)
+    fi
     if [ -z "$ps_info" ]; then
         echo -e "${C_YELLOW}Could not retrieve basic process info for PID $pid. It might have terminated.${C_RESET}"
-        local stat_cmd="stat -c '%U' \"/proc/$pid\""
-        print_command "Attempting to get user via stat" "$stat_cmd"
-        ps_user=$(stat -c '%U' "/proc/$pid" 2>/dev/null || echo "unknown")
+        if is_macos; then
+            ps_user="unknown"
+        else
+            local stat_cmd="stat -c '%U' \"/proc/$pid\""
+            print_command "Attempting to get user via stat" "$stat_cmd"
+            ps_user=$(stat -c '%U' "/proc/$pid" 2>/dev/null || echo "unknown")
+        fi
     else
         echo -e "${C_CYAN}USER                  PPID  NI %CPU %MEM STAT  ELAPSED   COMMAND${C_RESET}" # Adjusted header for alignment
         echo "$ps_info"
@@ -66,7 +90,20 @@ analyze_pid() {
     # --- Executable Path ---
     print_header "Executable Path"
     local exe_symlink_path="/proc/$pid/exe"
-    if [ -L "$exe_symlink_path" ]; then
+    if is_macos; then
+        # lsof's 'txt' descriptor is the executable image; -Fn prints it as an 'n' line
+        local lsof_exe_cmd="sudo lsof -nP -a -p \"$pid\" -d txt -Fn"
+        print_command "Resolving executable via lsof (txt descriptor)" "$lsof_exe_cmd"
+        exe_target=$(sudo lsof -nP -a -p "$pid" -d txt -Fn 2>/dev/null | grep '^n' | head -n 1 | cut -c2-)
+        if [ -n "$exe_target" ]; then
+            echo "Target:  $exe_target"
+            if [ ! -e "$exe_target" ]; then
+                echo -e "${C_YELLOW}Note: The executable appears to have been deleted from disk.${C_RESET}"
+            fi
+        else
+            echo -e "${C_YELLOW}Could not resolve the executable for PID $pid (process exited, or permission issue; try sudo).${C_RESET}"
+        fi
+    elif [ -L "$exe_symlink_path" ]; then
         local ls_cmd="sudo ls -ld \"$exe_symlink_path\""
         print_command "Getting symlink information" "$ls_cmd"
         sudo ls -ld "$exe_symlink_path" # Let ls print directly, including its own errors/formatting
@@ -115,6 +152,12 @@ analyze_pid() {
     if [[ "$exe_target" == "KERNEL_THREAD" ]]; then
         echo -e "${C_MAGENTA}Skipping Systemd, CGroup, Network, Files, and Env checks for kernel thread.${C_RESET}"
     else
+        if is_macos; then
+            print_header "Systemd Service Status"
+            echo -e "${C_YELLOW}Not available on macOS because macOS has no systemd. Its service manager is launchd (see 'launchctl list').${C_RESET}"
+            print_header "Control Groups (CGroups)"
+            echo -e "${C_YELLOW}Not available on macOS because the kernel has no cgroups. Docker Desktop runs containers in a Linux VM.${C_RESET}"
+        else
         # --- Systemd Service Status ---
         print_header "Systemd Service Status"
         local systemctl_cmd="sudo systemctl status \"$pid\""
@@ -177,10 +220,12 @@ analyze_pid() {
             echo -e "${C_YELLOW}Cannot read $cgroup_path.${C_RESET}"
         fi
 
+        fi
+
         # --- Network Connections ---
         print_header "Network Connections (Listening TCP/UDP)"
         local found_ports=0
-        if command -v ss >/dev/null; then
+        if ! is_macos && command -v ss >/dev/null; then
             # --- SS FIX INTEGRATED HERE ---
             local ss_listen_cmd="sudo ss -tulpn -p | grep \"pid=$pid[,)]\""
             print_command "Checking listening ports with ss and grep" "$ss_listen_cmd"
@@ -195,10 +240,10 @@ analyze_pid() {
             fi
         elif command -v lsof >/dev/null; then
             echo -e "${C_YELLOW}ss command not found, trying lsof (may be slower)...${C_RESET}"
-            local lsof_listen_cmd="sudo lsof -nP -p \"$pid\" -iTCP -sTCP:LISTEN -iUDP"
+            local lsof_listen_cmd="sudo lsof -nP $LSOF_AND -p \"$pid\" -iTCP -sTCP:LISTEN -iUDP"
             print_command "Checking listening ports with lsof" "$lsof_listen_cmd"
             local lsof_listen
-            lsof_listen=$(sudo lsof -nP -p "$pid" -iTCP -sTCP:LISTEN -iUDP 2>/dev/null | grep -E "(LISTEN|UDP)")
+            lsof_listen=$(sudo lsof -nP $LSOF_AND -p "$pid" -iTCP -sTCP:LISTEN -iUDP 2>/dev/null | grep -E "(LISTEN|UDP)")
             if [ -n "$lsof_listen" ]; then
                 echo "Listening (lsof):"
                 echo "$lsof_listen"
@@ -213,7 +258,7 @@ analyze_pid() {
 
         print_header "Established Network Connections (TCP)"
         local found_established=0
-        if command -v ss >/dev/null; then
+        if ! is_macos && command -v ss >/dev/null; then
             # --- SS FIX INTEGRATED HERE ---
             local ss_est_cmd="sudo ss -tpn -p state established | grep \"pid=$pid[,)]\""
             print_command "Checking established TCP connections with ss and grep" "$ss_est_cmd"
@@ -227,10 +272,10 @@ analyze_pid() {
             fi
         elif command -v lsof >/dev/null; then
             echo -e "${C_YELLOW}ss command not found, trying lsof for established connections...${C_RESET}"
-            local lsof_est_cmd="sudo lsof -nP -p \"$pid\" -iTCP -sTCP:ESTABLISHED"
+            local lsof_est_cmd="sudo lsof -nP $LSOF_AND -p \"$pid\" -iTCP -sTCP:ESTABLISHED"
             print_command "Checking established TCP connections with lsof" "$lsof_est_cmd"
             local lsof_established
-            lsof_established=$(sudo lsof -nP -p "$pid" -iTCP -sTCP:ESTABLISHED 2>/dev/null)
+            lsof_established=$(sudo lsof -nP $LSOF_AND -p "$pid" -iTCP -sTCP:ESTABLISHED 2>/dev/null)
             if [ -n "$lsof_established" ]; then
                 echo "Established (lsof):"
                 echo "$lsof_established"
@@ -267,6 +312,19 @@ analyze_pid() {
 
         # --- Environment (first few variables) ---
         print_header "Environment Variables (Sample - first 5 valid-looking)"
+        if is_macos; then
+            # macOS has no /proc/<pid>/environ. 'ps eww' appends the environment to the
+            # command line; split on spaces and keep KEY=VALUE tokens (best effort).
+            local ps_env_cmd="sudo ps eww -p \"$pid\" -o command="
+            print_command "Reading environment via ps (macOS has no /proc)" "$ps_env_cmd"
+            local mac_env
+            mac_env=$(sudo ps eww -p "$pid" -o command= 2>/dev/null | tr ' ' '\n' | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' | head -n 5)
+            if [ -n "$mac_env" ]; then
+                echo "$mac_env"
+            else
+                echo -e "${C_YELLOW}No KEY=VALUE environment variables visible via ps (process exited, or not permitted).${C_RESET}"
+            fi
+        else
         local environ_path="/proc/$pid/environ"
         if [ -e "$environ_path" ]; then # Check if file exists first
             local cat_env_cmd_base
@@ -322,6 +380,7 @@ analyze_pid() {
         else
             echo -e "${C_YELLOW}Environment file $environ_path does not exist. (Process likely terminated).${C_RESET}"
         fi
+        fi
     fi
 
     echo "--------------------------------------------------"
@@ -341,10 +400,16 @@ find_and_analyze_string() {
     local ps_pipeline_desc="ps aux (then awk to keep ssh but remove self_pid and ${0##*/} references)"
     print_command "Filtering processes with ps and awk" "$ps_pipeline_desc"
     
-    local ps_output
-    ps_output=$(ps aux | awk -v s="$search_string" -v self="$self_pid" -v script="$script_name_pattern" '
-        BEGIN{IGNORECASE=1} # Case-insensitive search for the string
-        $0 ~ s { # If line matches search_string
+    local ps_output match_string="$search_string" mac_flag=0
+    if is_macos; then
+        # BSD awk (macOS) ignores IGNORECASE, so lowercase the pattern and each line instead
+        mac_flag=1
+        match_string=$(printf '%s' "$search_string" | tr '[:upper:]' '[:lower:]')
+    fi
+    ps_output=$(ps aux | awk -v s="$match_string" -v mac="$mac_flag" -v self="$self_pid" -v script="$script_name_pattern" '
+        BEGIN{IGNORECASE=1} # Case-insensitive search for the string (gawk; macOS path lowercases below)
+        { hay = $0; if (mac) hay = tolower($0) }
+        hay ~ s { # If line matches search_string
             # Exclude self, script name, typical grep, and this awk command itself
             if ($2 == self || $0 ~ script || $0 ~ "grep -F -- " || $0 ~ " awk -v s=") {
                 next;

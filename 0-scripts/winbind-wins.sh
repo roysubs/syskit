@@ -52,6 +52,11 @@ run_command() {
 
 # Function to auto-elevate script execution if not running as root
 auto_elevate() {
+    if [ "$(uname)" = "Darwin" ]; then
+        echo -e "${YELLOW}winbind-wins.sh rewires Linux's glibc NSS to resolve NetBIOS/WINS names.${NC}"
+        echo -e "${YELLOW}macOS's SMB stack resolves these natively — not applicable here.${NC}"
+        exit 1
+    fi
     if [ "$EUID" -ne 0 ]; then
         echo -e "${YELLOW}Root privileges required. Re-executing script with sudo...${NC}"
         # Preserve environment variables (-E) and pass all arguments ("$@")

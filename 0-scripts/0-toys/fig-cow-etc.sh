@@ -62,6 +62,8 @@ display_error() {
     echo -e "${RED}ERROR: $1${NC}"
 }
 
+display_warning() { printf '%b\n' "${YELLOW}WARNING: $1${NC}"; }
+
 # --- Main Script Logic ---
 
 clear -x # Clear the screen but keep the history visible
@@ -129,6 +131,18 @@ if [ ${#MISSING_TOOLS[@]} -gt 0 ]; then
             exit 1
         fi
 
+        if command_exists "zypper" && ! command_exists "apt"; then
+            # openSUSE: zypper names for cowsay/figlet/toilet only; the rest are not automated
+            display_info "openSUSE detected: installing cowsay, figlet and toilet via zypper..."
+            if sudo zypper --non-interactive refresh && sudo zypper --non-interactive install -y cowsay figlet toilet; then
+                echo "zypper packages installed successfully or were already present."
+            else
+                display_error "zypper install failed. Please check the output above."
+            fi
+            display_info "Not automated for openSUSE (install manually if wanted): fortune, lolcat, aafire, hollywood, bb, ponysay."
+            echo ""
+        else
+        # apt-only steps below (skipped on zypper-only systems)
         display_info "Updating package lists (sudo apt update)..."
         if ! sudo apt update; then
             display_warning "Failed to update package lists. Installation might fail for some tools."
@@ -198,6 +212,7 @@ if [ ${#MISSING_TOOLS[@]} -gt 0 ]; then
             echo ""
         fi
 
+        fi
         echo "Installation attempts finished."
         echo "Re-checking tool status:"
         # Update installed status

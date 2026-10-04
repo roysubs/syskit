@@ -98,8 +98,8 @@ for rel_path in "${rel_files[@]}"; do
     color_start=""
     color_end=""
 
-    [[ -f "$file1" ]] && size1=$(stat -c%s "$file1")
-    [[ -f "$file2" ]] && size2=$(stat -c%s "$file2")
+    [[ -f "$file1" ]] && size1=$(stat -c%s "$file1" 2>/dev/null || stat -f%z "$file1")
+    [[ -f "$file2" ]] && size2=$(stat -c%s "$file2" 2>/dev/null || stat -f%z "$file2")
 
     if [[ "$size1" != "$size2" ]]; then
         [[ "$size2" != "---" ]] && color_start=$'\e[32m' && color_end=$'\e[0m'

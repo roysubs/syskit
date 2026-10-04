@@ -70,6 +70,7 @@ detect_package_manager() {
   elif command -v dnf >/dev/null 2>&1; then echo "dnf";
   elif command -v yum >/dev/null 2>&1; then echo "yum";
   elif command -v pacman >/dev/null 2>&1; then echo "pacman";
+  elif command -v zypper >/dev/null 2>&1; then echo "zypper";
   else echo "unknown"; fi
 }
 
@@ -97,6 +98,10 @@ prompt_install_ssh() {
         ;;
       pacman)
         run_command pacman -Sy --noconfirm openssh # Already uses run_command
+        ;;
+      zypper)
+        run_command zypper --non-interactive refresh
+        run_command zypper --non-interactive install -y openssh # openSUSE: sshd is in the 'openssh' package
         ;;
       *)
         log_error "Unsupported package manager: $pm. Please install openssh-server manually."

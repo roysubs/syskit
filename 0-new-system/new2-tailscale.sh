@@ -4,10 +4,11 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 
 
 pkg_install() {
-    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    if command -v brew &>/dev/null; then brew install "$@"
+    elif command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
     elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
     elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
-    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    else echo "No supported package manager found (need brew/apt/zypper/dnf)." >&2; exit 1
     fi
 }
 
@@ -27,14 +28,14 @@ if command -V tailscale >/dev/null 2>&1; then
     tailscale ip   # Display the Tailscale IP address
 else
     # Install Tailscale
-    apt update
+    command -v apt &>/dev/null && apt update
     # Ensure curl is installed
     if ! command -V curl >/dev/null 2>&1; then
       echo "curl not found. Installing curl..."
       pkg_install curl
     fi
     curl -fsSL https://tailscale.com/install.sh | sh
-    apt update   # Update package list again to include Tailscale repository
+    command -v apt &>/dev/null && apt update   # Update package list again to include Tailscale repository
 
     # Start and enable the Tailscale service
     systemctl enable --now tailscaled
