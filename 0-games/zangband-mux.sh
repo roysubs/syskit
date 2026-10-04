@@ -3,7 +3,13 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-04
 
 # Check zangband exists, install if missing (silent)
-command -v zangband >/dev/null 2>&1 || sudo apt install -y zangband
+if ! command -v zangband >/dev/null 2>&1; then
+  if command -v zypper >/dev/null 2>&1; then
+    echo "zangband: not automated for openSUSE (package name not verified). Install it manually from its upstream project."
+  else
+    sudo apt install -y zangband
+  fi
+fi
 
 SESSION="zangband_session"
 

@@ -4,4 +4,8 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 
 # We just need to get the right console package name, which is 'cataclysm-dda-curses'
 
-sudo apt install cataclysm-dda-curses
+if command -v zypper &>/dev/null; then
+    echo "cataclysm-dda-curses: not automated for openSUSE (package name not verified). Install Cataclysm: Dark Days Ahead from https://cataclysmdda.org/ instead."
+else
+    sudo apt install cataclysm-dda-curses
+fi

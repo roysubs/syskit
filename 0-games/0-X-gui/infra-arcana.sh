@@ -15,30 +15,56 @@ echo "Using temporary source directory: $SOURCE_DIR"
 echo "Using temporary build directory: $BUILD_DIR"
 
 # Ensure the system is up-to-date and install dependencies
-echo "Updating system..."
-sudo apt update && sudo apt upgrade -y
+if command -v apt &>/dev/null; then
+    echo "Updating system..."
+    sudo apt update && sudo apt upgrade -y
 
-echo "Installing dependencies..."
-# Ensure comments are on their own lines or before the command
-# Using standard spaces for indentation if desired, or no indentation
-sudo apt install -y \
-    build-essential \
-    libasound2-dev \
-    libbrotli-dev \
-    libbz2-dev \
-    libdbus-1-dev \
-    libglib2.0-dev \
-    libicu-dev \
-    libpng-dev \
-    libfreetype-dev \
-    libjpeg-dev \
-    libx11-dev \
-    libxrandr-dev \
-    libsdl2-dev \
-    libsdl2-image-dev \
-    libsdl2-mixer-dev \
-    git \
-    cmake
+    echo "Installing dependencies..."
+    # Ensure comments are on their own lines or before the command
+    # Using standard spaces for indentation if desired, or no indentation
+    sudo apt install -y \
+        build-essential \
+        libasound2-dev \
+        libbrotli-dev \
+        libbz2-dev \
+        libdbus-1-dev \
+        libglib2.0-dev \
+        libicu-dev \
+        libpng-dev \
+        libfreetype-dev \
+        libjpeg-dev \
+        libx11-dev \
+        libxrandr-dev \
+        libsdl2-dev \
+        libsdl2-image-dev \
+        libsdl2-mixer-dev \
+        git \
+        cmake
+elif command -v zypper &>/dev/null; then
+    # Package names follow openSUSE conventions; libpng, libjpeg and libbrotli names are not verified on a live box
+    echo "Installing dependencies..."
+    sudo zypper --non-interactive refresh
+    sudo zypper install -y -t pattern devel_basis
+    sudo zypper install -y \
+        alsa-devel \
+        libbrotli-devel \
+        libbz2-devel \
+        dbus-1-devel \
+        glib2-devel \
+        libicu-devel \
+        libpng16-devel \
+        freetype2-devel \
+        libjpeg8-devel \
+        libX11-devel \
+        libXrandr-devel \
+        libSDL2-devel \
+        libSDL2_image-devel \
+        libSDL2_mixer-devel \
+        git \
+        cmake
+else
+    echo "No supported package manager found (need apt or zypper)." >&2; exit 1
+fi
 
 # Clean any pre-existing source or build directories (these will be the ones just created by mktemp, safe to remove if previous run failed prematurely)
 echo "Cleaning up potentially existing temporary directories..."

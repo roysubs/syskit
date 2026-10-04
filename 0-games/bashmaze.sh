@@ -146,8 +146,13 @@ carve_maze $((2 * MAZE_WIDTH + 2))
 maze[$((MAZE_WIDTH + 2))]=1
 maze[$(((MAZE_HEIGHT - 2) * MAZE_WIDTH + MAZE_WIDTH - 3))]=1
 print_maze > $TMP/maze.txt
-sed -i '1d' $TMP/maze.txt
-sed -i 's/^  //g' $TMP/maze.txt
+if [[ "$(uname)" == "Darwin" ]]; then
+    sed -i '' '1d' $TMP/maze.txt
+    sed -i '' 's/^  //g' $TMP/maze.txt
+else
+    sed -i '1d' $TMP/maze.txt
+    sed -i 's/^  //g' $TMP/maze.txt
+fi
 
 # Variables
 INPUT="0" # Input data

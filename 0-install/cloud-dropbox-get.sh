@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
+if [ "$(uname -s)" = "Darwin" ]; then
+    echo "cloud-dropbox-get.sh installs the Linux Dropbox daemon and a .desktop autostart entry, and does not apply on macOS."
+    echo "Use the official macOS Dropbox app from its website."
+    exit 0
+fi
 # Author: Roy Wiseman 2025-04
 
 # Install dependencies
@@ -13,7 +18,7 @@ pkg_install() {
 }
 
 echo "Installing Dropbox dependencies..."
-sudo apt update
+command -v apt &>/dev/null && sudo apt update
 pkg_install python3-gpg
 
 # Download and install Dropbox

@@ -178,6 +178,8 @@ download_and_install_ytdlp() {
     local version_tag="$1"
     # Correctly define the asset name on GitHub for Linux
     local github_asset_name_on_server="yt-dlp_linux"
+    # Release ships a single macOS asset (no arch suffix) alongside yt-dlp_linux
+    if [[ "$(uname -s)" == "Darwin" ]]; then github_asset_name_on_server="yt-dlp_macos"; fi
 
     msg "Preparing to install yt-dlp version $version_tag to $TARGET_EXE_PATH..."
     # $TARGET_EXE_PATH is "$INSTALL_DIR/$EXE_NAME" which resolves to "$HOME/.local/bin/yt-dlp"

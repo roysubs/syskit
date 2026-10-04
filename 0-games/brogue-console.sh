@@ -6,6 +6,12 @@ set -e # Exit immediately if a command exits with a non-zero status.
 REPO="tmewett/BrogueCE"
 API_URL="https://api.github.com/repos/${REPO}/releases/latest"
 
+portable_sed_i() {
+    if [[ "$(uname)" == "Darwin" ]]; then sed -i '' "$@"
+    else sed -i "$@"
+    fi
+}
+
 echo "BrogueCE Terminal Build and Install Script"
 echo "=========================================="
 echo "This script will download the latest source code for BrogueCE,"
@@ -113,21 +119,21 @@ echo "Backed up config.mk to config.mk.bak"
 echo "Modifying config.mk for a terminal-only (curses) build..."
 
 if grep -q -E '^[[:space:]]*#?[[:space:]]*TERMINAL[[:space:]]*:=' config.mk; then
-    sed -i -E 's/^[[:space:]]*#?[[:space:]]*(TERMINAL[[:space:]]*:=).*$/\1 YES/' config.mk
+    portable_sed_i -E 's/^[[:space:]]*#?[[:space:]]*(TERMINAL[[:space:]]*:=).*$/\1 YES/' config.mk
 else echo "TERMINAL := YES" >> config.mk; fi
 echo "  Ensured TERMINAL is set to YES."
 
 if grep -q -E '^[[:space:]]*#?[[:space:]]*SDL[[:space:]]*:=' config.mk; then
-    sed -i -E 's/^[[:space:]]*#?[[:space:]]*(SDL[[:space:]]*:=).*$/\1 NO/' config.mk
+    portable_sed_i -E 's/^[[:space:]]*#?[[:space:]]*(SDL[[:space:]]*:=).*$/\1 NO/' config.mk
 else echo "SDL := NO" >> config.mk; fi
 echo "  Ensured SDL is set to NO."
 
 if grep -q -E '^[[:space:]]*#?[[:space:]]*GRAPHICS[[:space:]]*:=' config.mk; then
-    sed -i -E 's/^[[:space:]]*#?[[:space:]]*(GRAPHICS[[:space:]]*:=).*$/\1 NO/' config.mk
+    portable_sed_i -E 's/^[[:space:]]*#?[[:space:]]*(GRAPHICS[[:space:]]*:=).*$/\1 NO/' config.mk
 else echo "GRAPHICS := NO" >> config.mk; fi
 echo "  Ensured GRAPHICS is set to NO."
 
-sed -i -E '/^[[:space:]]*#?[[:space:]]*DATADIR[[:space:]]*([:=])=/d' config.mk
+portable_sed_i -E '/^[[:space:]]*#?[[:space:]]*DATADIR[[:space:]]*([:=])=/d' config.mk
 echo "DATADIR = ." >> config.mk
 echo "  Ensured DATADIR is set to '.'"
 

@@ -5,5 +5,12 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 echo "A transport and business simulation game inspired by the classic Transport Tycoon Deluxe."
 echo "Works well on WSL in Windows (with WSLg)"
 
-sudo apt install openttd
+if command -v apt &>/dev/null; then
+  sudo apt install openttd
+elif command -v zypper &>/dev/null; then
+  # openSUSE package name not verified on a live box; see https://www.openttd.org/ if this fails
+  sudo zypper install -y openttd
+else
+  echo "No supported package manager found (need apt or zypper)." >&2; exit 1
+fi
 

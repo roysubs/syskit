@@ -8,9 +8,16 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Exit script on any error
 set -e
 
-sudo apt update
-sudo apt install libglfw3 libglfw3-dev libxrandr-dev libxi-dev libxxf86vm-dev
-sudo apt install openjdk-11-jre
+if command -v apt &>/dev/null; then
+  sudo apt update
+  sudo apt install libglfw3 libglfw3-dev libxrandr-dev libxi-dev libxxf86vm-dev
+  sudo apt install openjdk-11-jre
+elif command -v zypper &>/dev/null; then
+  # Java package name for openSUSE not verified; install a Java runtime manually if the game needs one
+  sudo zypper install -y glfw-devel libXrandr-devel libXi-devel libXxf86vm-devel
+else
+  echo "No supported package manager found (need apt or zypper)." >&2; exit 1
+fi
 
 # Define constants
 REPO_URL="https://api.github.com/repos/00-Evan/shattered-pixel-dungeon/releases/latest"

@@ -2,13 +2,20 @@
 if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 # Author: Roy Wiseman 2025-05
 
+pkg_install() {
+    if command -v brew &>/dev/null; then brew install "$@"
+    elif command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need brew/apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 # Make sure python3 and git are present for unimatrix setup
-echo "Updating package list..."
-sudo apt update
 echo "Installing dependencies..."
-sudo apt install -y python3 python3-pip git # build-essential
+pkg_install python3 python3-pip git # build-essential
 # Install cmatrix and bb
-sudo apt install cmatrix bb hollywood -y
+pkg_install cmatrix bb hollywood
 
 # Clone Unimatrix repository
 REPO_URL="https://github.com/will8211/unimatrix"

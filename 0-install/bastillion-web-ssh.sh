@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
+if [ "$(uname -s)" = "Darwin" ]; then
+    echo "bastillion-web-ssh.sh installs Bastillion as a Debian apt service under a dedicated useradd account, and does not apply on macOS."
+    echo "Not applicable on macOS. Use Screen Sharing for graphical remote access, or Terminal ssh for shell access."
+    exit 0
+fi
 # Author: Roy Wiseman 2025-05
 
 # Script to install Bastillion on Debian

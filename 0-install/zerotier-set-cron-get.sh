@@ -4,11 +4,17 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 
 
 pkg_install() {
-    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    if [[ "$(uname)" == "Darwin" ]]; then brew install "$@"
+    elif command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
     elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
     elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
     else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
     fi
+}
+
+# macOS only: ZeroTier is distributed as a GUI cask, not a formula
+cask_install() {
+    brew install --cask "$@"
 }
 
 echo "
@@ -20,6 +26,35 @@ and verify the network status. Then, a monitoring script will be setup in
 # Prompt the user for the ZeroTier network ID
 echo -e "\033[1;32mStep 1: Input the ZeroTier Network ID\033[0m"
 read -p "Please enter your ZeroTier network ID (e.g., 9f77fc393eeda812): " network_id
+
+# macOS: no systemd, and the CLI join needs root, so this path does not join or touch root cron.
+# It installs ZeroTier One if missing, writes a status-check script (zerotier-cli, no sudo),
+# and PRINTS the crontab line for the user to add themselves. The Linux path below is unchanged.
+if [[ "$(uname)" == "Darwin" ]]; then
+    if [[ ! -d "/Applications/ZeroTier One.app" ]]; then
+        if ! command -v brew &>/dev/null; then echo "Homebrew is required. Install it from https://brew.sh first." >&2; exit 1; fi
+        cask_install zerotier-one
+    else
+        echo "ZeroTier One is already installed"
+    fi
+    echo "Join network $network_id from the ZeroTier One app (menu bar icon > Join Network...)."
+    mkdir -p ~/.config
+    cat << 'EOF' > ~/.config/check_zerotier.sh
+#!/bin/bash
+# macOS check: is ZeroTier ONLINE? (macOS has no systemd)
+export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:$PATH"
+if zerotier-cli info 2>/dev/null | grep -q ONLINE; then
+    echo "ZeroTier service is online"
+else
+    echo "ZeroTier is not online. Open the ZeroTier One app to restart it."
+fi
+EOF
+    chmod +x ~/.config/check_zerotier.sh
+    echo "Check script written to ~/.config/check_zerotier.sh"
+    echo "The crontab was NOT changed. To check every 10 minutes, run 'crontab -e' and add:"
+    echo "*/10 * * * * $HOME/.config/check_zerotier.sh"
+    exit 0
+fi
 
 # Step 2: Install ZeroTier if not already installed
 echo -e "\033[1;32mStep 2: Installing ZeroTier...\033[0m"

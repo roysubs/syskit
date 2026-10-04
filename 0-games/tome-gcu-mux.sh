@@ -2,8 +2,14 @@
 if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 # Author: Roy Wiseman 2025-01
 
-# Check zangband exists, install if missing (silent)
-command -v tome-gcu >/dev/null 2>&1 || sudo apt install -y tome-gcu
+# Check tome-gcu exists, install if missing (silent)
+if ! command -v tome-gcu >/dev/null 2>&1; then
+  if command -v zypper >/dev/null 2>&1; then
+    echo "tome-gcu: not automated for openSUSE (package name not verified). Install it manually from its upstream project."
+  else
+    sudo apt install -y tome-gcu
+  fi
+fi
 
 SESSION="tome_session"
 
@@ -15,11 +21,11 @@ fi
 
 # Create new session that:
 # 1. Disables tmux status bar
-# 2. Runs zangband
+# 2. Runs tome-gcu
 # 3. On exit, kills the session automatically
 tmux new-session -s "$SESSION" -n game bash -c "
   tmux set-option status off;
-  zangband;
+  tome-gcu;
   tmux kill-session -t '$SESSION'
 "
 

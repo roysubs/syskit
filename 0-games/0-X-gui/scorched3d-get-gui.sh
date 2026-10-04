@@ -5,5 +5,10 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 echo "A 3D artillery game with destructible terrain and multiplayer support."
 echo "Works well on WSL in Windows (with WSLg)"
 
-sudo apt install scorched3d
+pkg_install() {
+    if command -v zypper &>/dev/null; then sudo zypper install -y "$@"
+    else sudo apt install "$@"
+    fi
+}
+pkg_install scorched3d
 

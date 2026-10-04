@@ -5,5 +5,10 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 echo "Open-source FPS with a strong multiplayer community and a built-in level editor."
 echo "Works well on WSL in Windows (with WSLg)"
 
-sudo apt install sauerbraten
+pkg_install() {
+    if command -v zypper &>/dev/null; then sudo zypper install -y "$@"
+    else sudo apt install "$@"
+    fi
+}
+pkg_install sauerbraten
 

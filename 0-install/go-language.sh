@@ -5,7 +5,12 @@ set -e
 # --- Configuration ---
 # You can change this variable to install a different version of Go
 GO_VERSION="1.22.5"
-GO_FILENAME="go${GO_VERSION}.linux-amd64.tar.gz"
+if [ "$(uname -s)" = "Darwin" ]; then
+    if [ "$(uname -m)" = "arm64" ]; then GO_PLATFORM="darwin-arm64"; else GO_PLATFORM="darwin-amd64"; fi
+else
+    GO_PLATFORM="linux-amd64"
+fi
+GO_FILENAME="go${GO_VERSION}.${GO_PLATFORM}.tar.gz"
 DOWNLOAD_URL="https://go.dev/dl/${GO_FILENAME}"
 INSTALL_DIR="/usr/local"
 GO_BIN_DIR="${INSTALL_DIR}/go/bin"

@@ -5,5 +5,7 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 echo "A realistic and open-source flight simulator."
 echo "Works well on WSL in Windows (with WSLg)"
 
-sudo apt install flightgear
+if command -v zypper &>/dev/null; then sudo zypper install -y FlightGear
+else sudo apt install flightgear
+fi
 

@@ -5,5 +5,10 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 echo "An open-source real-time strategy game focused on historical warfare and resource management."
 echo "Works well on WSL in Windows (with WSLg)"
 
-sudo apt install 0ad
+pkg_install() {
+    if command -v zypper &>/dev/null; then sudo zypper install -y "$@"
+    else sudo apt install "$@"
+    fi
+}
+pkg_install 0ad
 

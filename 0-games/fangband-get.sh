@@ -12,7 +12,6 @@ pkg_install() {
     fi
 }
 
-sudo apt update
 pkg_install build-essential ncurses-dev git cmake
 
 # Clone the FAangband repository into your home directory

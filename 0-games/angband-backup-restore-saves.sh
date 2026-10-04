@@ -28,8 +28,13 @@ backup_saves() {
     for file in "$SAVE_DIR"/*; do
         [ -f "$file" ] || continue
         base_name=$(basename "$file")
-        mod_time=$(stat -c "%Y" "$file")
-        timestamp=$(date -d "@$mod_time" +"%Y%m%d-%H%M%S")
+        if [[ "$(uname)" == "Darwin" ]]; then
+            mod_time=$(stat -f "%m" "$file")
+            timestamp=$(date -r "$mod_time" +"%Y%m%d-%H%M%S")
+        else
+            mod_time=$(stat -c "%Y" "$file")
+            timestamp=$(date -d "@$mod_time" +"%Y%m%d-%H%M%S")
+        fi
         cp -p "$file" "$BACKUP_DIR/${base_name}-${timestamp}.sav"
         echo "Backed up $base_name to ${base_name}-${timestamp}.sav"
     done

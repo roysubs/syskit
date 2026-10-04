@@ -5,10 +5,11 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Set Zsh as default shell
 
 pkg_install() {
-    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    if command -v brew &>/dev/null; then brew install "$@"
+    elif command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
     elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
     elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
-    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    else echo "No supported package manager found (need brew/apt/zypper/dnf)." >&2; exit 1
     fi
 }
 
@@ -25,8 +26,11 @@ echo 'source ~/.powerlevel10k/powerlevel10k.zsh-theme' >> ~/.zshrc
 
 # Install necessary fonts (Nerd Fonts)
 echo "Installing necessary fonts (Nerd Fonts)..."
-sudo apt update
-pkg_install fonts-font-awesome fonts-powerline
+if command -v zypper &>/dev/null && ! command -v apt &>/dev/null; then
+    echo "Skipping fonts-font-awesome and fonts-powerline: Debian package names with no verified openSUSE equivalent. Install a Font Awesome and a Powerline font manually."
+else
+    pkg_install fonts-font-awesome fonts-powerline
+fi
 
 # Install Nerd Fonts (additional fonts if required)
 echo "Installing Nerd Fonts..."

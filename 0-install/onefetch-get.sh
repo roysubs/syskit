@@ -17,6 +17,8 @@ GITHUB_REPO_NAME="onefetch"
 INSTALL_DIR="/usr/local/bin"
 # Asset name pattern for Linux generic tarball
 ASSET_PATTERN="onefetch-linux.tar.gz"
+# Release ships onefetch-mac.tar.gz for macOS (no arch suffix in the asset name)
+if [[ "$(uname -s)" == "Darwin" ]]; then ASSET_PATTERN="onefetch-mac.tar.gz"; fi
 DEFAULT_FALLBACK_VERSION="2.24.0" # Used if API fetch fails
 
 # --- Helper Functions for Colored Output ---

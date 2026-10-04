@@ -5,5 +5,10 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 echo "A fun, kart-racing game similar to Mario Kart, with a variety of tracks and characters from open-source projects."
 echo "Works well on WSL in Windows (with WSLg)"
 
-sudo apt install supertuxkart
+pkg_install() {
+    if command -v zypper &>/dev/null; then sudo zypper install -y "$@"
+    else sudo apt install "$@"
+    fi
+}
+pkg_install supertuxkart
 

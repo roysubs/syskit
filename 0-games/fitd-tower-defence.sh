@@ -19,6 +19,12 @@ GAME_INSTALL_PATH="${INSTALL_DIR}/${GAME_EXECUTABLE_NAME}"
 # Dependencies required by the game
 DEPENDENCIES=("cmake" "catch2" "libncurses5-dev" "doxygen" "git" "build-essential" "sed") # build-essential for make/g++
 
+portable_sed_i() {
+    if [[ "$(uname)" == "Darwin" ]]; then sed -i '' "$@"
+    else sed -i "$@"
+    fi
+}
+
 # --- Helper Functions for Colored Output ---
 print_header() { echo -e "\n\033[1;36m--- $1 ---\033[0m"; }
 print_info() { echo -e "\033[1;34m[INFO]\033[0m $1"; }
@@ -47,8 +53,8 @@ check_prerequisites() {
         if [[ "$pkg" == "catch2" || "$pkg" == "libncurses5-dev" || "$pkg" == "doxygen" ]]; then
             # For libraries, we rely on apt to handle them.
             # We ensure 'apt' itself is available for dependency installation.
-            if ! command -v apt &> /dev/null && ! command -v apt-get &> /dev/null; then
-                 print_error "'apt' or 'apt-get' command not found. Cannot manage Debian/Ubuntu packages."
+            if ! command -v apt &> /dev/null && ! command -v apt-get &> /dev/null && ! command -v zypper &> /dev/null; then
+                 print_error "'apt', 'apt-get' or 'zypper' command not found. Cannot manage packages."
             fi
             continue
         fi
@@ -138,6 +144,20 @@ install_game_dependencies() {
       print_warning "Sudo access is required. You might be prompted for your password."
     fi
 
+    if command -v zypper &> /dev/null; then
+        # catch2 is omitted: tests are disabled below. openSUSE package name not verified.
+        print_command "sudo zypper --non-interactive install -y cmake ncurses-devel doxygen git"
+        if ! sudo zypper --non-interactive install -y cmake ncurses-devel doxygen git; then
+            print_error "Failed to install one or more dependencies. Please check zypper output."
+        fi
+        print_command "sudo zypper --non-interactive install -t pattern devel_basis"
+        if ! sudo zypper --non-interactive install -t pattern devel_basis; then
+            print_error "Failed to install the devel_basis pattern. Please check zypper output."
+        fi
+        print_success "Dependencies should now be installed/updated."
+        return 0
+    fi
+
     print_command "sudo apt-get update"
     if ! sudo apt-get update; then
         print_warning "apt-get update failed. Continuing, but package lists might be outdated."
@@ -162,7 +182,7 @@ apply_source_fixes() {
     elif grep -q 'mvwprintw(' "${CLONE_DEST_DIR}/src/CGameGraphics.cpp"; then
         print_info "Applying fix to src/CGameGraphics.cpp..."
         print_command "sed -i 's/mvwprintw(/mvwprintw(stdscr, /' \"${CLONE_DEST_DIR}/src/CGameGraphics.cpp\""
-        sed -i 's/mvwprintw(/mvwprintw(stdscr, /' "${CLONE_DEST_DIR}/src/CGameGraphics.cpp"
+        portable_sed_i 's/mvwprintw(/mvwprintw(stdscr, /' "${CLONE_DEST_DIR}/src/CGameGraphics.cpp"
         print_success "CGameGraphics.cpp patched."
     else
         print_info "No calls to 'mvwprintw(' found in CGameGraphics.cpp that would require patching."

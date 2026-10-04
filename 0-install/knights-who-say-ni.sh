@@ -3,16 +3,25 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-01
 
 
+pkg_install() {
+    if command -v brew &>/dev/null; then brew install "$@"
+    elif command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
+    elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
+    else echo "No supported package manager found (need brew/apt/zypper/dnf)." >&2; exit 1
+    fi
+}
+
 # Only run 'apt update' if last update was 2 days or more
-if [ $(find /var/cache/apt/pkgcache.bin -mtime +2 -print) ]; then sudo apt update; fi
+if command -v apt &>/dev/null && [ $(find /var/cache/apt/pkgcache.bin -mtime +2 -print) ]; then sudo apt update; fi
 HOME_DIR="$HOME"
 
 # Install tools if not already installed
 PACKAGES=("lynx" "pv")
 install-if-missing() {
     local package="$1"
-    if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
-        echo "Installing $package..."; sudo apt-get install -y "$package"
+    if ! command -v "$package" &>/dev/null; then
+        echo "Installing $package..."; pkg_install "$package"
     fi
 }
 for package in "${PACKAGES[@]}"; do install-if-missing "$package"; done

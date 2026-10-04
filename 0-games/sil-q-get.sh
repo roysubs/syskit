@@ -8,6 +8,12 @@ INSTALL_DIR="$HOME/games/sil-q"
 BIN_DIR="$HOME/.local/bin"
 SYMLINK="$BIN_DIR/sil-q"
 
+portable_sed_i() {
+    if [[ "$(uname)" == "Darwin" ]]; then sed -i '' "$@"
+    else sed -i "$@"
+    fi
+}
+
 echo "📦 Fetching latest release info from GitHub..."
 API_URL="https://api.github.com/repos/${REPO}/releases/latest"
 TARBALL_URL=$(curl -s "$API_URL" | grep tarball_url | cut -d '"' -f 4)
@@ -24,12 +30,12 @@ curl -L "$TARBALL_URL" | tar -xz -C "$TMP_DIR" --strip-components=1
 cd "$TMP_DIR/src"
 echo "🛠️ Preparing Makefile..."
 # Enable terminal (GCU) and disable other frontends
-sed -i 's/^#\(.*USE_GCU.*\)/\1/' Makefile.std
-sed -i 's/^\(.*USE_X11.*\)/#\1/' Makefile.std
-sed -i 's/^\(.*USE_SDL.*\)/#\1/' Makefile.std
+portable_sed_i 's/^#\(.*USE_GCU.*\)/\1/' Makefile.std
+portable_sed_i 's/^\(.*USE_X11.*\)/#\1/' Makefile.std
+portable_sed_i 's/^\(.*USE_SDL.*\)/#\1/' Makefile.std
 
 # Remove macOS-specific flags
-sed -i 's/-arch [^ ]*//g' Makefile.std
+portable_sed_i 's/-arch [^ ]*//g' Makefile.std
 
 echo "⚙️ Building with GCU terminal backend..."
 make -f Makefile.std install

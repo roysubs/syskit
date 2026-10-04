@@ -43,7 +43,15 @@ get_latest_release_info() {
 
     LATEST_VERSION=$(echo "$release_info" | jq -r '.tag_name')
     LATEST_DATE=$(echo "$release_info" | jq -r '.published_at' | cut -d'T' -f1)
-    DOWNLOAD_URL=$(echo "$release_info" | jq -r '.assets[] | select(.name | test("x86_64-unknown-linux-gnu\\.tar\\.gz$")) | .browser_download_url')
+    # Release assets: fd-vX.Y.Z-aarch64-apple-darwin.tar.gz / fd-vX.Y.Z-x86_64-apple-darwin.tar.gz on macOS
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        if [[ "$(uname -m)" == "arm64" ]]; then FD_ASSET_PATTERN='aarch64-apple-darwin\.tar\.gz$'
+        else FD_ASSET_PATTERN='x86_64-apple-darwin\.tar\.gz$'
+        fi
+    else
+        FD_ASSET_PATTERN='x86_64-unknown-linux-gnu\.tar\.gz$'
+    fi
+    DOWNLOAD_URL=$(echo "$release_info" | jq -r --arg pat "$FD_ASSET_PATTERN" '.assets[] | select(.name | test($pat)) | .browser_download_url')
 
     if [ -z "$LATEST_VERSION" ] || [ "$LATEST_VERSION" = "null" ] || [ -z "$DOWNLOAD_URL" ]; then
         echo "Error: Could not parse latest release information or find a suitable download URL."
@@ -71,15 +79,26 @@ get_current_fd_version() {
 compare_versions() {
     local current="$1"
     local latest="$2"
+    local -a cur_parts lat_parts
+    local i n a b
 
     if [ -z "$current" ] || [ -z "$latest" ]; then return 3; fi
-    if ! sort --help 2>&1 | grep -q "\-V"; then
-        echo "Warning: Your sort command does not support version sorting (-V). Assuming upgrade is needed."
-        return 1
-    fi
-    if [ "$current" = "$latest" ]; then return 0;
-    elif [[ "$(echo -e "$current\n$latest" | sort -V | tail -n 1)" == "$latest" ]]; then return 1;
-    else return 2; fi
+    if [ "$current" = "$latest" ]; then return 0; fi
+
+    # Portable dotted-version compare (BSD sort on macOS has no -V)
+    IFS=. read -r -a cur_parts <<< "$current"
+    IFS=. read -r -a lat_parts <<< "$latest"
+    n=${#cur_parts[@]}
+    if (( ${#lat_parts[@]} > n )); then n=${#lat_parts[@]}; fi
+    for ((i = 0; i < n; i++)); do
+        a=${cur_parts[i]//[!0-9]/}
+        b=${lat_parts[i]//[!0-9]/}
+        a=$((10#${a:-0}))
+        b=$((10#${b:-0}))
+        if (( a < b )); then return 1; fi
+        if (( a > b )); then return 2; fi
+    done
+    return 0
 }
 
 # --- Main Script Logic ---
@@ -92,8 +111,8 @@ if get_current_fd_version; then CURRENT_FD_INSTALLED=0; else CURRENT_FD_INSTALLE
 
 NEEDS_INSTALL=false
 if [ $CURRENT_FD_INSTALLED -eq 0 ]; then
-    compare_versions "$CURRENT_VERSION" "$LATEST_VERSION_CLEAN"
-    case $? in
+    compare_versions "$CURRENT_VERSION" "$LATEST_VERSION_CLEAN" && CMP_RC=0 || CMP_RC=$?
+    case $CMP_RC in
         0) echo "Your currently installed version ($CURRENT_VERSION) is the latest." ;;
         1) echo "An upgrade is available from $CURRENT_VERSION to $LATEST_VERSION_CLEAN."; NEEDS_INSTALL=true ;;
         2) echo "Warning: Your version ($CURRENT_VERSION) is newer than the latest release ($LATEST_VERSION_CLEAN)." ;;

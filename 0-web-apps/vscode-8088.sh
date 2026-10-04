@@ -15,6 +15,12 @@ check_docker() {
 
 # Function to install Docker
 install_docker() {
+  # macOS: Docker Engine installers and usermod do not apply; Docker Desktop is required
+  if [[ "$(uname)" == "Darwin" ]]; then
+    echo "Docker not found. Install Docker Desktop: https://www.docker.com/products/docker-desktop/" >&2
+    echo "(or: brew install --cask docker)" >&2
+    exit 1
+  fi
   # Check OS and install Docker accordingly
   if [ -f /etc/debian_version ]; then
     sudo apt update
@@ -27,6 +33,10 @@ install_docker() {
     sudo systemctl enable docker
   elif [ -f /etc/redhat-release ]; then
     sudo yum install -y docker
+    sudo systemctl start docker
+    sudo systemctl enable docker
+  elif command -v zypper &>/dev/null; then
+    sudo zypper --non-interactive install -y docker
     sudo systemctl start docker
     sudo systemctl enable docker
   fi

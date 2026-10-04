@@ -184,6 +184,9 @@ detect_environment() {
     elif command -v pacman &> /dev/null; then
         PACKAGE_MANAGER="pacman"
         success "Detected Pacman package manager (Arch-based)"
+    elif command -v zypper &> /dev/null; then
+        warn "Brave install is not automated for openSUSE. Install it from https://brave.com/linux/ instead."
+        exit 0
     else
         error "Unsupported package manager. This script supports APT, DNF, and Pacman."
         exit 1

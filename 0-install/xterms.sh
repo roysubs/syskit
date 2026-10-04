@@ -4,10 +4,11 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Define terminal applications with their descriptions
 
 pkg_install() {
-    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    if command -v brew &>/dev/null; then brew install "$@"
+    elif command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
     elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
     elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
-    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    else echo "No supported package manager found (need brew/apt/zypper/dnf)." >&2; exit 1
     fi
 }
 
@@ -48,13 +49,8 @@ echo ""
 
 # --- Installation Process ---
 
-# Check for apt and sudo
-if ! command -v apt &> /dev/null; then
-    echo "Error: 'apt' command not found. This script is intended for Debian/Ubuntu-based systems."
-    exit 1
-fi
-
-if ! command -v sudo &> /dev/null; then
+# Check for sudo
+if ! command -v brew &> /dev/null && ! command -v sudo &> /dev/null; then
     echo "Error: 'sudo' command not found. Please install sudo or run this script as root (not recommended)."
     exit 1
 fi
@@ -63,14 +59,16 @@ echo "Starting the installation process for GUI terminals..."
 echo "You will be prompted to confirm each installation."
 echo ""
 
-# Update package list first
-read -p "Would you like to run 'sudo apt update' now? (y/N): " update_choice
-if [[ "$update_choice" =~ ^[Yy]$ ]]; then
-    echo "Running sudo apt update..."
-    sudo apt update || { echo "Failed to update apt packages. Exiting."; exit 1; }
-    echo "apt update completed."
-else
-    echo "Skipping apt update."
+# Update package list first (apt only; other managers refresh inside pkg_install)
+if command -v apt &> /dev/null; then
+    read -p "Would you like to run 'sudo apt update' now? (y/N): " update_choice
+    if [[ "$update_choice" =~ ^[Yy]$ ]]; then
+        echo "Running sudo apt update..."
+        sudo apt update || { echo "Failed to update apt packages. Exiting."; exit 1; }
+        echo "apt update completed."
+    else
+        echo "Skipping apt update."
+    fi
 fi
 
 echo ""
@@ -82,7 +80,7 @@ for pkg in "${!terminals[@]}"; do
     echo "--------------------------------------------------------"
     
     # Check if already installed
-    if dpkg -s "$pkg" &> /dev/null; then
+    if command -v "$pkg" &> /dev/null; then
         echo "--> $pkg is already installed. Skipping."
         echo ""
         continue
