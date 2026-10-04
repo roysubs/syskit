@@ -94,13 +94,22 @@ fi
 # 3. Proceed with mikefarah/yq installation
 log_info "Installing mikefarah/yq..."
 YQ_ARCH=$(uname -m)
-case "${YQ_ARCH}" in
-    x86_64) YQ_BINARY="yq_linux_amd64";;
-    aarch64 | arm64) YQ_BINARY="yq_linux_arm64";; # arm64 is another name for aarch64
-    i386 | i686) YQ_BINARY="yq_linux_386";;
-    armv7l) YQ_BINARY="yq_linux_arm";;
-    *) log_error "Unsupported architecture: ${YQ_ARCH}. Cannot determine yq binary for mikefarah/yq."; exit 1;;
-esac
+if [ "$(uname -s)" = "Darwin" ]; then
+    # Release assets on macOS: yq_darwin_amd64 / yq_darwin_arm64
+    case "${YQ_ARCH}" in
+        x86_64) YQ_BINARY="yq_darwin_amd64";;
+        arm64) YQ_BINARY="yq_darwin_arm64";;
+        *) log_error "Unsupported architecture: ${YQ_ARCH}. Cannot determine yq binary for mikefarah/yq."; exit 1;;
+    esac
+else
+    case "${YQ_ARCH}" in
+        x86_64) YQ_BINARY="yq_linux_amd64";;
+        aarch64 | arm64) YQ_BINARY="yq_linux_arm64";; # arm64 is another name for aarch64
+        i386 | i686) YQ_BINARY="yq_linux_386";;
+        armv7l) YQ_BINARY="yq_linux_arm";;
+        *) log_error "Unsupported architecture: ${YQ_ARCH}. Cannot determine yq binary for mikefarah/yq."; exit 1;;
+    esac
+fi
 
 # Ensure INSTALL_DIR directory exists
 if [ ! -d "${INSTALL_DIR}" ]; then

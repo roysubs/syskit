@@ -8,6 +8,10 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 
 # Check if Docker is installed and running
 if ! command -v docker &> /dev/null; then
+    if [[ "$(uname)" == "Darwin" ]]; then
+        echo "Docker not found. Install Docker Desktop: https://www.docker.com/products/docker-desktop/ (or: brew install --cask docker)" >&2
+        exit 1
+    fi
     echo -e "${RED}❌ Docker not found. Installing...${NC}"
     if curl -fsSL https://get.docker.com | sh; then
         sudo usermod -aG docker "$USER"
@@ -84,6 +88,16 @@ fi
 SHOULD_INSTALL=true # Assume we will install by default
 
 # ──[ Helper Functions ]─────────────────────────
+dir_uid() {
+    if [[ "$(uname)" == "Darwin" ]]; then stat -f '%u' "$1"
+    else stat -c '%u' "$1"
+    fi
+}
+dir_gid() {
+    if [[ "$(uname)" == "Darwin" ]]; then stat -f '%g' "$1"
+    else stat -c '%g' "$1"
+    fi
+}
 ensure_dir() {
     local dir_path="$1"
     local target_uid="$2" # UID for ownership
@@ -105,8 +119,8 @@ ensure_dir() {
         echo -e "${GREEN}✅ Directory created.${NC}"
     else
         echo -e "${GREEN}✅ Directory already exists on host: $dir_path${NC}"
-        CURRENT_OWNER_UID=$(stat -c '%u' "$dir_path")
-        CURRENT_OWNER_GID=$(stat -c '%g' "$dir_path")
+        CURRENT_OWNER_UID=$(dir_uid "$dir_path")
+        CURRENT_OWNER_GID=$(dir_gid "$dir_path")
         # Check if top-level directory ownership is correct
         if [ "$CURRENT_OWNER_UID" != "$target_uid" ] || [ "$CURRENT_OWNER_GID" != "$target_gid" ]; then
             echo -e "${CYAN}Updating ownership of $dir_path to ${target_uid}:${target_gid}...${NC}"

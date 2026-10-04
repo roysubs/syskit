@@ -42,6 +42,13 @@ CONTAINER_COMPLETE_TORRENTS_PATH="/data/media-library/0-torrents-complete"
 
 set -e # Exit immediately if a command exits with a non-zero status.
 
+# --- Portable sed -i (GNU vs BSD/macOS) ---
+portable_sed_i() {
+    if [[ "$(uname)" == "Darwin" ]]; then sed -i '' "$@"
+    else sed -i "$@"
+    fi
+}
+
 # --- Helper Function for Config Modification ---
 update_or_add_setting() {
     local section=$1
@@ -55,10 +62,10 @@ update_or_add_setting() {
     echo "     - Ensuring '$key' is set..."
     if grep -q "^$escaped_key_for_grep=" "$CONFIG_FILE"; then
         # Found, so substitute the line
-        sed -i "s#^$escaped_key_for_grep=.*#$escaped_line_for_sed#" "$CONFIG_FILE"
+        portable_sed_i "s#^$escaped_key_for_grep=.*#$escaped_line_for_sed#" "$CONFIG_FILE"
     else
         # Not found, so add it under the correct section
-        sed -i "/^\[$section\]/a $escaped_line_for_sed" "$CONFIG_FILE"
+        portable_sed_i "/^\[$section\]/a $escaped_line_for_sed" "$CONFIG_FILE"
     fi
 }
 
@@ -119,7 +126,7 @@ update_or_add_setting "BitTorrent" "Session\\FinishedTorrentExportDirectory" "$C
 update_or_add_setting "BitTorrent" "Session\\TempPathEnabled" "true"
 
 # Cleanup old incorrect settings
-sed -i "/^DownloadsDefaultSavePath=/d" "$CONFIG_FILE"
+portable_sed_i "/^DownloadsDefaultSavePath=/d" "$CONFIG_FILE"
 
 # --- 4b. Password Fix ---
 echo -e "${YELLOW}--- Setting Fixed Password to: $NEW_PASSWORD_PLAINTEXT ---${NC}"

@@ -147,6 +147,10 @@ echo "✅ All conflict checks passed. Proceeding with system checks and setup...
 
 # Check Docker
 if ! command -v docker &> /dev/null; then
+    if [[ "$(uname)" == "Darwin" ]]; then
+        echo "Docker not found. Install Docker Desktop: https://www.docker.com/products/docker-desktop/ (or: brew install --cask docker)" >&2
+        exit 1
+    fi
     echo "Docker not found. Installing..."
     # Add error handling for curl and sh script
     if curl -fsSL https://get.docker.com | sh; then

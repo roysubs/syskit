@@ -10,6 +10,10 @@ set -e # Exit immediately if a command exits with a non-zero status.
 
 # Check if Docker is installed and running
 if ! command -v docker &> /dev/null; then
+    if [[ "$(uname)" == "Darwin" ]]; then
+        echo "Docker not found. Install Docker Desktop: https://www.docker.com/products/docker-desktop/ (or: brew install --cask docker)" >&2
+        exit 1
+    fi
     echo -e "${RED}❌ Docker not found. Installing...${NC}"
     if curl -fsSL https://get.docker.com | sh; then
         sudo usermod -aG docker "$USER"
@@ -218,6 +222,10 @@ echo "✅ No conflicting ports found."
 echo "✅ All conflict checks passed. Proceeding with system checks and setup..."
 
 if ! command -v docker &> /dev/null; then
+    if [[ "$(uname)" == "Darwin" ]]; then
+        echo "Docker not found. Install Docker Desktop: https://www.docker.com/products/docker-desktop/ (or: brew install --cask docker)" >&2
+        exit 1
+    fi
     echo "Docker not found. Installing..."
     if curl -fsSL https://get.docker.com | sh; then
         sudo usermod -aG docker "$USER"

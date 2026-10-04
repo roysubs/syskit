@@ -40,6 +40,13 @@ CONTAINER_COMPLETE_TORRENTS_PATH="/data/media-library/0-torrents-complete"
 
 set -e # Exit immediately if a command exits with a non-zero status.
 
+# --- Portable sed -i (GNU vs BSD/macOS) ---
+portable_sed_i() {
+    if [[ "$(uname)" == "Darwin" ]]; then sed -i '' "$@"
+    else sed -i "$@"
+    fi
+}
+
 # --- Helper Function ---
 update_or_add_setting() {
     local section=$1
@@ -50,9 +57,9 @@ update_or_add_setting() {
     local escaped_line_for_sed=$(echo "$full_line" | sed 's/\\/\\\\/g')
     echo "     - Ensuring '$key' is set to '$value'..."
     if grep -q "^$escaped_key_for_grep=" "$CONFIG_FILE"; then
-        sed -i "s#^$escaped_key_for_grep=.*#$escaped_line_for_sed#" "$CONFIG_FILE"
+        portable_sed_i "s#^$escaped_key_for_grep=.*#$escaped_line_for_sed#" "$CONFIG_FILE"
     else
-        sed -i "/^\[$section\]/a $escaped_line_for_sed" "$CONFIG_FILE"
+        portable_sed_i "/^\[$section\]/a $escaped_line_for_sed" "$CONFIG_FILE"
     fi
 }
 
@@ -101,7 +108,7 @@ update_or_add_setting "BitTorrent" "Session\\TorrentExportDirectory" "$CONTAINER
 update_or_add_setting "BitTorrent" "Session\\FinishedTorrentExportDirectory" "$CONTAINER_COMPLETE_TORRENTS_PATH"
 update_or_add_setting "BitTorrent" "Session\\TempPathEnabled" "true"
 echo -e "    - ${YELLOW}Cleaning up old incorrect settings...${NC}"
-sed -i "/^DownloadsDefaultSavePath=/d" "$CONFIG_FILE"
+portable_sed_i "/^DownloadsDefaultSavePath=/d" "$CONFIG_FILE"
 
 # 5. Restart Container
 echo "5. Starting container '$CONTAINER_NAME'..."

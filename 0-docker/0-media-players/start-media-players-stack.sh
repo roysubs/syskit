@@ -21,6 +21,10 @@ set -e # Exit immediately if a command exits with a non-zero status.
 
 # Check if Docker is installed and running
 if ! command -v docker &> /dev/null; then
+    if [[ "$(uname)" == "Darwin" ]]; then
+        echo "Docker not found. Install Docker Desktop: https://www.docker.com/products/docker-desktop/ (or: brew install --cask docker)" >&2
+        exit 1
+    fi
     echo -e "${RED}❌ Docker not found. Installing...${NC}"
     if curl -fsSL https://get.docker.com | sh; then
         sudo usermod -aG docker "$USER"
@@ -166,6 +170,10 @@ echo -e "${GREEN}✅ Pre-flight checks passed. Proceeding with system setup...${
 echo
 
 if ! command -v docker &> /dev/null; then
+    if [[ "$(uname)" == "Darwin" ]]; then
+        echo "Docker not found. Install Docker Desktop: https://www.docker.com/products/docker-desktop/ (or: brew install --cask docker)" >&2
+        exit 1
+    fi
     echo -e "${YELLOW}Docker not found. Attempting to install...${NC}"
     if curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh; then
         sudo usermod -aG docker "$USER"
@@ -317,7 +325,12 @@ echo "Setting ownership on config root ${CONFIG_ROOT} to $PUID:$PGID..."
 # $HOME is usually owned by user, so subdirs should be too.
 # However, if script is run as root initially, $HOME/.config might become root owned.
 # Using sudo to be safe, but it's better if $CONFIG_ROOT is user-creatable.
-if [ "$(stat -c '%U' "$(dirname "$CONFIG_ROOT")")" == "root" ] && [ ! -w "$(dirname "$CONFIG_ROOT")" ]; then
+if [[ "$(uname)" == "Darwin" ]]; then
+    CONFIG_ROOT_PARENT_OWNER=$(stat -f '%Su' "$(dirname "$CONFIG_ROOT")")
+else
+    CONFIG_ROOT_PARENT_OWNER=$(stat -c '%U' "$(dirname "$CONFIG_ROOT")")
+fi
+if [ "$CONFIG_ROOT_PARENT_OWNER" == "root" ] && [ ! -w "$(dirname "$CONFIG_ROOT")" ]; then
     echo -e "${YELLOW}Parent of $CONFIG_ROOT might require sudo for ownership change.${NC}"
     sudo chown -R "$PUID:$PGID" "$CONFIG_ROOT" || echo -e "${YELLOW}Warning: Could not chown $CONFIG_ROOT. Permissions issues might occur in containers.${NC}"
 else

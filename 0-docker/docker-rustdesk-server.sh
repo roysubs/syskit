@@ -36,8 +36,12 @@ check_dependencies() {
     echo -e "${CYAN}[1/9] Checking dependencies...${NC}"
 
     if ! command -v docker &> /dev/null; then
-        echo -e "${RED}❌ Docker not found. Please install Docker to continue.${NC}"
-        echo "You can usually install it with: curl -fsSL https://get.docker.com | sh"
+        if [[ "$(uname)" == "Darwin" ]]; then
+            echo -e "${RED}❌ Docker not found. Install Docker Desktop: https://www.docker.com/products/docker-desktop/ (or: brew install --cask docker)${NC}" >&2
+        else
+            echo -e "${RED}❌ Docker not found. Please install Docker to continue.${NC}"
+            echo "You can usually install it with: curl -fsSL https://get.docker.com | sh"
+        fi
         exit 1
     fi
 

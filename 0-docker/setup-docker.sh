@@ -55,7 +55,12 @@ if command -v docker &>/dev/null; then
 
         echo "==> Script finished. Docker Desktop is expected to manage Docker."
         exit 0
-    else # Native Linux, Docker command found
+    else # Native Linux (or macOS), Docker command found
+        if [[ "$(uname)" == "Darwin" ]]; then
+            echo "==> Running on macOS and Docker command is present (Docker Desktop)."
+            echo "==> Script finished. Existing Docker installation detected."
+            exit 0
+        fi
         echo "==> Running on native Linux and Docker command is present."
         echo "    Assuming Docker is already installed and configured."
         # You could add user-to-group management here if desired for existing native installs
@@ -84,6 +89,11 @@ if is_wsl; then
     echo "    Please visit: https://docs.docker.com/desktop/wsl/"
     echo "==> Script will not attempt to install Docker Engine directly into WSL when Docker Desktop is the preferred method."
     exit 1 # Exit with error as user expectation might be an install
+fi
+
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo "Docker not found. Install Docker Desktop: https://www.docker.com/products/docker-desktop/ (or: brew install --cask docker)" >&2
+    exit 1
 fi
 
 # --- Native Linux Installation (Docker command not found, not in WSL) ---

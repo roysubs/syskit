@@ -7,6 +7,10 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 
 # Check if Docker is installed and running
 if ! command -v docker &> /dev/null; then
+    if [[ "$(uname)" == "Darwin" ]]; then
+        echo "Docker not found. Install Docker Desktop: https://www.docker.com/products/docker-desktop/ (or: brew install --cask docker)" >&2
+        exit 1
+    fi
     echo -e "${RED}❌ Docker not found. Installing...${NC}"
     if curl -fsSL https://get.docker.com | sh; then
         sudo usermod -aG docker "$USER"
@@ -79,6 +83,11 @@ fi
 SHOULD_INSTALL=true # Assume we will install by default
 
 # ──[ Helper Functions ]─────────────────────────
+dir_owner() {
+    if [[ "$(uname)" == "Darwin" ]]; then stat -f '%u:%g' "$1"
+    else stat -c '%u:%g' "$1"
+    fi
+}
 ensure_dir() {
     local dir_path="$1"
     local target_puid="$2"
@@ -99,7 +108,7 @@ ensure_dir() {
         echo -e "${GREEN}✅ Directory created or already exists.${NC}"
     else
         echo -e "${GREEN}✅ Directory already exists on host: $dir_path${NC}"
-        CURRENT_OWNER=$(stat -c '%u:%g' "$dir_path")
+        CURRENT_OWNER=$(dir_owner "$dir_path")
         if [ "$CURRENT_OWNER" != "${target_puid}:${target_pgid}" ]; then
             echo -e "${CYAN}Updating ownership of $dir_path to ${target_puid}:${target_pgid}...${NC}"
             sudo chown -R "${target_puid}:${target_pgid}" "$dir_path"

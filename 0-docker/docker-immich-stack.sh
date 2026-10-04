@@ -131,8 +131,13 @@ validate_and_create_dir() {
             fi
         else # Directory exists
             echo -e "${GREEN}Directory '${dir_path_expanded}' already exists.${NC}"
-            current_owner_uid=$(stat -c "%u" "$dir_path_expanded" 2>/dev/null)
-            current_owner_gid=$(stat -c "%g" "$dir_path_expanded" 2>/dev/null)
+            if [[ "$(uname)" == "Darwin" ]]; then
+                current_owner_uid=$(stat -f "%u" "$dir_path_expanded" 2>/dev/null)
+                current_owner_gid=$(stat -f "%g" "$dir_path_expanded" 2>/dev/null)
+            else
+                current_owner_uid=$(stat -c "%u" "$dir_path_expanded" 2>/dev/null)
+                current_owner_gid=$(stat -c "%g" "$dir_path_expanded" 2>/dev/null)
+            fi
 
             if [ -z "$current_owner_uid" ] || [ -z "$current_owner_gid" ]; then
                  echo -e "${RED}Could not determine current ownership of '$dir_path_expanded'. Check permissions or path.${NC}"
