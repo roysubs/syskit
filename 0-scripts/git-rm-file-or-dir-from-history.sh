@@ -171,6 +171,9 @@ purge_history() {
   echo -e "${GREEN}✅ Backup complete.${NC}"
 
   # --- 🧼 Purge operation (config restored on any exit, even a failed rewrite) ---
+  # filter-repo deletes the origin/* tracking refs, so --force-with-lease cannot check
+  # the remote on its own afterwards. Record the remote tips now and use them as leases.
+  git ls-remote --heads origin > .git/remote-heads.before
   cp .git/config .git/config.backup
   trap 'if [ -f .git/config.backup ]; then mv -f .git/config.backup .git/config; fi' EXIT
 
@@ -194,8 +197,15 @@ purge_history() {
     echo "  git push --force-with-lease origin --all && git push --force-with-lease origin --tags"
     exit 0
   fi
-  git push --force-with-lease origin --all
-  git push --force-with-lease origin --tags
+  while read -r remote_sha ref; do
+    branch="${ref#refs/heads/}"
+    if git show-ref --verify --quiet "refs/heads/$branch"; then
+      git push --force-with-lease="$branch:$remote_sha" origin "refs/heads/$branch:refs/heads/$branch"
+    else
+      echo -e "${YELLOW}Skipped '$branch': not present locally after the rewrite.${NC}"
+    fi
+  done < .git/remote-heads.before
+  rm -f .git/remote-heads.before
 
   echo -e "${GREEN}✅ Done. '$target_path' has been removed from history and the remote updated.${NC}"
   echo "Backup kept at: $backup_file"
