@@ -126,6 +126,10 @@ log_info "🛠️ Performing system checks and prerequisite setup..."
 
 # Check Docker
 if ! command -v docker &> /dev/null; then
+    if [[ "$(uname)" == "Darwin" ]]; then
+        echo "Docker not found. Install Docker Desktop: https://www.docker.com/products/docker-desktop/ (or: brew install --cask docker)" >&2
+        exit 1
+    fi
     log_info "Docker not found. Attempting to install..."
     if curl -fsSL https://get.docker.com | sh; then
         sudo usermod -aG docker "$USER"

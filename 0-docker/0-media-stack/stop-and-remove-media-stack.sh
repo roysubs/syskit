@@ -16,6 +16,10 @@ DOCKER_COMPOSE_FILE="docker-compose.yaml"
 
 # Docker installation and status check (no changes)
 if ! command -v docker &> /dev/null; then
+    if [[ "$(uname)" == "Darwin" ]]; then
+        echo "Docker not found. Install Docker Desktop: https://www.docker.com/products/docker-desktop/ (or: brew install --cask docker)" >&2
+        exit 1
+    fi
     echo -e "${RED}❌ Docker not found. Installing...${NC}"
     if curl -fsSL https://get.docker.com | sh; then
         sudo usermod -aG docker "$USER"

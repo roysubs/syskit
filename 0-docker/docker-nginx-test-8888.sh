@@ -16,6 +16,10 @@ pkg_install() {
 }
 
 if ! command -v docker &> /dev/null; then
+    if [[ "$(uname)" == "Darwin" ]]; then
+        echo "Docker not found. Install Docker Desktop: https://www.docker.com/products/docker-desktop/ (or: brew install --cask docker)" >&2
+        exit 1
+    fi
     echo -e "${RED}❌ Docker not found. Installing...${NC}"
     if curl -fsSL https://get.docker.com | sh; then
         sudo usermod -aG docker "$USER"
@@ -41,6 +45,10 @@ PORT="8888"  # Changed from 8080 to 8888 to avoid conflicts
 
 echo "Checking if Docker is installed..."
 if ! command -v docker &> /dev/null; then
+    if [[ "$(uname)" == "Darwin" ]]; then
+        echo "Docker not found. Install Docker Desktop: https://www.docker.com/products/docker-desktop/ (or: brew install --cask docker)" >&2
+        exit 1
+    fi
     echo "Docker not found. Installing..."
     pkg_install docker.io
     sudo systemctl enable --now docker
@@ -48,21 +56,23 @@ else
     echo "Docker is already installed."
 fi
 
-# Check if Docker is running
-if ! sudo systemctl is-active --quiet docker; then
-    echo "Docker service is not running. Starting Docker..."
-    sudo systemctl start docker
-    sudo systemctl enable docker
-else
-    echo "Docker is running."
+# Check if Docker is running (systemd only; Docker Desktop on macOS manages its own daemon)
+if [[ "$(uname)" != "Darwin" ]]; then
+    if ! sudo systemctl is-active --quiet docker; then
+        echo "Docker service is not running. Starting Docker..."
+        sudo systemctl start docker
+        sudo systemctl enable docker
+    else
+        echo "Docker is running."
+    fi
 fi
 
-# Check Docker permissions
-if ! docker info &> /dev/null; then
+# Check Docker permissions (Linux group/socket model - Docker Desktop on macOS doesn't use this)
+if [[ "$(uname)" != "Darwin" ]] && ! docker info &> /dev/null; then
     echo "ERROR: Docker permission denied. Attempting to fix..."
     echo "Adding current user to Docker group..."
     sudo usermod -aG docker $USER
-    
+
     # Attempt to apply group changes immediately
     echo "Applying Docker group changes. You may need to log out and log back in for full changes."
     newgrp docker
@@ -70,6 +80,9 @@ if ! docker info &> /dev/null; then
         echo "ERROR: Docker permissions still not applied. Please log out and log back in."
         exit 1
     fi
+elif [[ "$(uname)" == "Darwin" ]] && ! docker info &> /dev/null; then
+    echo "ERROR: Docker permission denied. On macOS this usually means Docker Desktop isn't running - please start it and re-run." >&2
+    exit 1
 fi
 
 echo "Creating a Docker network ($NETWORK_NAME) if not exists..."

@@ -11,11 +11,16 @@ echo "1. Stopping container..."
 docker compose stop "$CONTAINER_NAME"
 
 echo "2. Wiping old password settings from config..."
+if [[ "$(uname)" == "Darwin" ]]; then
+    SED_I_ARGS=(-i '')
+else
+    SED_I_ARGS=(-i)
+fi
 if [ ! -w "$CONFIG_FILE" ]; then
     echo "⚠️  No write permission on $CONFIG_FILE — trying with sudo"
-    sudo sed -i '/^WebUI\\Password/d' "$CONFIG_FILE"
+    sudo sed "${SED_I_ARGS[@]}" '/^WebUI\\Password/d' "$CONFIG_FILE"
 else
-    sed -i '/^WebUI\\Password/d' "$CONFIG_FILE"
+    sed "${SED_I_ARGS[@]}" '/^WebUI\\Password/d' "$CONFIG_FILE"
 fi
 
 # Verify it actually got removed
