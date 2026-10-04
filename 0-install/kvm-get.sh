@@ -67,6 +67,7 @@ else
     ech_success "CPU virtualization support is enabled."
 fi
 
+if command -v apt &>/dev/null; then # kvm-ok (cpu-checker) is Debian-only; the /proc/cpuinfo check above covers openSUSE
 if ! kvm-ok > /dev/null 2>&1; then
     ech_info "kvm-ok utility not found, installing cpu-checker..."
     ech_cmd apt update
@@ -80,6 +81,7 @@ else
         ech_warn "KVM acceleration can NOT be used. Please check 'kvm-ok' output for details."
         exit 1
     fi
+fi
 fi
 ech_success "KVM acceleration can be used."
 
@@ -96,6 +98,11 @@ ech_info "Installing KVM and related packages..."
 
 PACKAGES_TO_INSTALL="qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virtinst virt-manager"
 
+if command -v zypper &>/dev/null; then
+    # openSUSE: package names differ from Debian, so install the official KVM patterns instead
+    ech_cmd zypper --non-interactive refresh
+    ech_cmd zypper --non-interactive install -y -t pattern kvm_server kvm_tools
+else
 for pkg in $PACKAGES_TO_INSTALL; do
     if ! dpkg -s "$pkg" >/dev/null 2>&1; then
         ech_cmd apt update # Run update once before installing
@@ -111,6 +118,7 @@ for pkg in $PACKAGES_TO_INSTALL; do
         ech_info "$pkg is already installed."
     fi
 done
+fi
 ech_success "KVM packages installed."
 
 # --- User and Group Management ---

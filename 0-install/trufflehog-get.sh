@@ -7,7 +7,15 @@ set -e
 # Use a more specific temp directory name for clarity and robustness
 TMP_DIR="$(mktemp -d install-trufflehog-XXXXXX)"
 INSTALL_DIR="$HOME/.local/bin"
-ARCH="linux_amd64" # Assuming 64-bit Linux. Use $(uname -m) for more general arch detection if needed.
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  # Release assets: trufflehog_<ver>_darwin_amd64.tar.gz / trufflehog_<ver>_darwin_arm64.tar.gz
+  case "$(uname -m)" in
+    arm64) ARCH="darwin_arm64" ;;
+    *) ARCH="darwin_amd64" ;;
+  esac
+else
+  ARCH="linux_amd64" # Assuming 64-bit Linux. Use $(uname -m) for more general arch detection if needed.
+fi
 
 # --- Cleanup Function ---
 # This function will be called automatically when the script exits

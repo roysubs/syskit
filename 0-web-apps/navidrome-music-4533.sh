@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 # Author: Roy Wiseman 2025-01
+# openSUSE: this script installs a Debian .deb package, not automated for zypper.
+if command -v zypper &>/dev/null; then
+    echo "Navidrome: not automated for openSUSE. Install it from https://www.navidrome.org/ instead."
+    exit 0
+fi
 
 CURRENT_USER=${SUDO_USER:-$(whoami)}
 
@@ -27,19 +32,33 @@ sudo mkdir -p "$MUSIC_DIR" "$DATA_DIR"
 sudo chown -R "$CURRENT_USER:$CURRENT_USER" "$MUSIC_DIR" "$DATA_DIR"
 sudo chmod 777 "$MUSIC_DIR" "$DATA_DIR"
 
-sudo sed -i "s|^MusicFolder = .*|MusicFolder = '$MUSIC_DIR'|" "$CONFIG_FILE"
-sudo sed -i "s|^DataFolder = .*|DataFolder = '$DATA_DIR'|" "$CONFIG_FILE"
+if [[ "$(uname)" == "Darwin" ]]; then
+    sudo sed -i '' "s|^MusicFolder = .*|MusicFolder = '$MUSIC_DIR'|" "$CONFIG_FILE"
+    sudo sed -i '' "s|^DataFolder = .*|DataFolder = '$DATA_DIR'|" "$CONFIG_FILE"
+else
+    sudo sed -i "s|^MusicFolder = .*|MusicFolder = '$MUSIC_DIR'|" "$CONFIG_FILE"
+    sudo sed -i "s|^DataFolder = .*|DataFolder = '$DATA_DIR'|" "$CONFIG_FILE"
+fi
 
 # Start the service
-sudo systemctl restart navidrome
-sleep 2  # Give it a moment to start
+if command -v systemctl &>/dev/null; then
+    sudo systemctl restart navidrome
+    sleep 2  # Give it a moment to start
 
-# Show service status
-echo "\nNavidrome Service Status:"
-sudo systemctl status navidrome --no-pager
+    # Show service status
+    echo "\nNavidrome Service Status:"
+    sudo systemctl status navidrome --no-pager
+else
+    echo "systemctl not found (not supported on this platform) — start/manage navidrome manually."
+fi
 
 # Display connection info
-IP=$(hostname -I | awk '{print $1}')
+if [[ "$(uname)" == "Darwin" ]]; then
+    IFACE=$(route -n get 1.1.1.1 2>/dev/null | awk '/interface: /{print $2}')
+    IP=$(ipconfig getifaddr "$IFACE" 2>/dev/null)
+else
+    IP=$(hostname -I | awk '{print $1}')
+fi
 PORT=4533
 
 echo "Navidrome is running!"

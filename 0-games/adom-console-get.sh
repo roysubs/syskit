@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 # Author: Roy Wiseman 2025-05
+# openSUSE: this script installs a Debian binary and apt libncurses5, not automated for zypper.
+if command -v zypper &>/dev/null; then
+    echo "ADOM: not automated for openSUSE. Install it from https://www.adom.de/ instead."
+    exit 0
+fi
 
 # Define the download URL
 DOWNLOAD_URL="https://www.adom.de/home/download/current/adom_linux_debian_64_3.3.3.tar.gz"

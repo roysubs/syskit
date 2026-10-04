@@ -177,6 +177,10 @@ else
   elif [ ! -x "$MD_CAT_BIN" ]; then # mdcat found by command -v but not our target, or not executable
     echo "mdcat found by 'command -v' but either not at $MD_CAT_BIN or not executable there."
   fi
+  if [ "$(uname -s)" = "Darwin" ]; then
+    echo "mdcat has no macOS release binary upstream. Install it with: brew install mdcat" >&2
+    exit 1
+  fi
   install_mdcat # This will attempt to install to /usr/local/bin
 
   # Post-install check

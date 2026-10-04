@@ -13,13 +13,15 @@ pkg_install() {
 set -e
 
 # Only update if it's been more than 2 days since the last update (to avoid constant updates)
-if [ -e /var/cache/apt/pkgcache.bin ]; then
-    if [ $(find /var/cache/apt/pkgcache.bin -mtime +2 -print) ]; then
+if command -v apt &>/dev/null; then
+    if [ -e /var/cache/apt/pkgcache.bin ]; then
+        if [ $(find /var/cache/apt/pkgcache.bin -mtime +2 -print) ]; then
+            sudo apt update && sudo apt upgrade -y
+        fi
+    else
+        echo "Cache file not found, running update anyway..."
         sudo apt update && sudo apt upgrade -y
     fi
-else
-    echo "Cache file not found, running update anyway..."
-    sudo apt update && sudo apt upgrade -y
 fi
 
 if ! command -v phear &> /dev/null; then

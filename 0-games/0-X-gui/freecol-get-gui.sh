@@ -5,5 +5,10 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 echo "A strategy game inspired by Sid Meier's Colonization."
 echo "Works well on WSL in Windows (with WSLg)"
 
-sudo apt install freecol
+pkg_install() {
+    if command -v zypper &>/dev/null; then sudo zypper install -y "$@"
+    else sudo apt install "$@"
+    fi
+}
+pkg_install freecol
 

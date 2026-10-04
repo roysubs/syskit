@@ -3,7 +3,11 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-02
 
 # Install the Term::Animation
-sudo apt install libcurses-perl
+if command -v zypper &>/dev/null; then
+    echo "libcurses-perl: not automated for openSUSE (Perl Curses package name not verified). Install the Perl Curses module with zypper manually."
+else
+    sudo apt install libcurses-perl
+fi
 
 #!/bin/bash
 

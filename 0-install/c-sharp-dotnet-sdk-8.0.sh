@@ -2,6 +2,12 @@
 if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 # Author: Roy Wiseman 2025-01
 
+# openSUSE: this script uses Microsoft's Ubuntu .deb repo, which has no openSUSE equivalent here.
+if command -v zypper &>/dev/null; then
+  echo ".NET SDK install is not automated for openSUSE. Install it from https://learn.microsoft.com/dotnet/core/install/linux"
+  exit 0
+fi
+
 # Ensure the script is run as root
 if [ "$EUID" -ne 0 ]; then
   echo "Please run as root."

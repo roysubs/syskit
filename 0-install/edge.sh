@@ -92,6 +92,9 @@ detect_environment() {
     elif command -v dnf &> /dev/null; then
         PACKAGE_MANAGER="dnf"
         success "Detected DNF package manager (Fedora/RHEL-based)."
+    elif command -v zypper &> /dev/null; then
+        PACKAGE_MANAGER="zypper"
+        warn "Detected zypper (openSUSE). Microsoft's Edge repository does not support openSUSE; the Edge install will be skipped."
     else
         error "Unsupported package manager. This script supports 'apt' and 'dnf'."
         exit 1
@@ -175,6 +178,11 @@ uninstall_edge() {
 
 install_edge() {
     info "Preparing to install Microsoft Edge..."
+
+    if [[ "$PACKAGE_MANAGER" == "zypper" ]]; then
+        warn "Not automated for openSUSE. Install Microsoft Edge manually from https://www.microsoft.com/edge (skipping install)."
+        return 0
+    fi
 
     # Setup repository based on package manager
     case "$PACKAGE_MANAGER" in

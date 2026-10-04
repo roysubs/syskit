@@ -5,8 +5,14 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Clear any old files
 rm -f gitleaks*.tar.gz gitleaks
 
-# Download latest release info and get the correct link for Linux x86_64
-DOWNLOAD_URL=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | grep -o "https://.*linux_x64.tar.gz" || grep -o "https://.*linux_amd64.tar.gz")
+# Download latest release info and get the correct link for Linux x86_64 or macOS
+if [ "$(uname -s)" = "Darwin" ]; then
+    if [ "$(uname -m)" = "arm64" ]; then GL_ARCH="darwin_arm64"; else GL_ARCH="darwin_x64"; fi
+    DOWNLOAD_URL=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | grep -o "https://.*${GL_ARCH}.tar.gz")
+else
+    GL_JSON=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest)
+    DOWNLOAD_URL=$(printf '%s\n' "$GL_JSON" | grep -o "https://.*linux_x64.tar.gz" || printf '%s\n' "$GL_JSON" | grep -o "https://.*linux_amd64.tar.gz")
+fi
 
 # Check if a valid URL was found
 if [ -z "$DOWNLOAD_URL" ]; then

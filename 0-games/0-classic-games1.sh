@@ -144,8 +144,6 @@ install_apt_packages() {
         echo "No packages specified for installation."
         return 1
     fi
-    echo "Attempting to update package lists..."
-    sudo apt-get update
     echo "Attempting to install packages: $*"
     pkg_install "$@"
 }

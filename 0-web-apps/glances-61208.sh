@@ -5,7 +5,8 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Variables
 
 pkg_install() {
-    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    if [[ "$(uname)" == "Darwin" ]]; then brew install "$@"
+    elif command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
     elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
     elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
     else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
@@ -17,6 +18,17 @@ PORT=61208      # You can change this port number as needed
 # GROUP=glances # Group for running Glances service
 # USER=boss     # No need to set this, use current user to run the service
 GROUP=users     # Group for running Glances service, use basic 'users'
+
+# macOS: no useradd and no systemd. Install with Homebrew and print how to run it.
+if [[ "$(uname)" == "Darwin" ]]; then
+    if ! command -v brew &>/dev/null; then echo "Homebrew is required. Install it from https://brew.sh first." >&2; exit 1; fi
+    pkg_install glances
+    echo "Glances installed. Run it in a terminal with:"
+    echo "  glances -w --port $PORT"
+    echo "Then open http://localhost:$PORT in a browser."
+    echo "It is not registered as a service on macOS; keep that terminal open (or use tmux)."
+    exit 0
+fi
 
 # Install pipx if it's not already installed
 if ! command -v pipx &> /dev/null; then

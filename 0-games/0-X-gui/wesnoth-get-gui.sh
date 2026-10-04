@@ -5,4 +5,9 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 echo "A turn-based strategy game featuring fantasy battles and campaigns."
 echo "Works well on WSL in Windows (with WSLg)"
 
-sudo apt install wesnoth
+pkg_install() {
+    if command -v zypper &>/dev/null; then sudo zypper install -y "$@"
+    else sudo apt install "$@"
+    fi
+}
+pkg_install wesnoth

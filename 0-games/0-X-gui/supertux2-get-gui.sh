@@ -6,6 +6,9 @@ echo "A classic 2D platformer inspired by Super Mario, featuring Tux the penguin
 echo "Confusingly, the apt package is supertux, but the binary is supertux2"
 echo "Works well with WSL in Windows (with WSLg)"
 
-sudo apt install supertux
-sudo ln -s /usr/games/supertux2 /usr/games/supertux
-sudo ln -s /usr/games/supertux2 /usr/games/supertux2
+if command -v zypper &>/dev/null; then sudo zypper install -y supertux2
+else
+    sudo apt install supertux
+    sudo ln -s /usr/games/supertux2 /usr/games/supertux
+    sudo ln -s /usr/games/supertux2 /usr/games/supertux2
+fi

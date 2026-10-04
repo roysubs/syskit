@@ -18,6 +18,11 @@ pkg_install() {
     fi
 }
 
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo "OneDrive client is Linux-only here - use the official macOS OneDrive app"
+    exit 0
+fi
+
 if [[ -z "$1" ]]; then
     echo "Usage: $0 your-email@example.com"
     echo "Please provide the Microsoft account email you intend to use."
@@ -28,6 +33,14 @@ EMAIL="$1"
 # Create a temporary directory for the source code that cleans up on exit
 TEMP_DIR=$(mktemp -d)
 trap 'rm -rf -- "$TEMP_DIR"' EXIT
+
+# openSUSE: the Debian build-deps (libphobos2-ldc-dev etc.) have no verified zypper
+# equivalent, so the source build is not automated here.
+if command -v zypper &>/dev/null && ! command -v apt &>/dev/null; then
+    echo "OneDrive source build is not automated on openSUSE (no verified zypper names for its D compiler/phobos build deps)."
+    echo "Install a OneDrive client from your distro or OBS repos, or build it manually: https://github.com/abraunegg/onedrive"
+    exit 1
+fi
 
 # --- Cleanup & Dependency Installation ---
 echo "Preparing to build the latest OneDrive client from source..."

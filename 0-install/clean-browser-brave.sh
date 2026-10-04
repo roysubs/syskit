@@ -148,6 +148,7 @@ detect_environment() {
     success "Running for user: ${C_WHITE}$CURRENT_USER${C_RESET}"
 
     if command -v apt-get &>/dev/null; then PACKAGE_MANAGER="apt";
+    elif command -v zypper &>/dev/null; then warn "Brave is not automated for openSUSE (the install uses Brave's apt repository). Install it from https://brave.com/linux/ instead. Skipping."; exit 0
     else error "Unsupported package manager. This script currently requires APT (Debian/Ubuntu/Mint)."; exit 1; fi
     success "Detected APT package manager."
 

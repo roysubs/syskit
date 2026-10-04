@@ -15,17 +15,24 @@ BIN_PATH="$GAME_DIR/asciiportal"
 
 echo
 echo "--- Step 1: Installing build dependencies ---"
-sudo apt update
-sudo apt install -y \
-  build-essential \
-  g++ \
-  libsdl1.2-dev \
-  libsdl-mixer1.2-dev \
-  git \
-  cmake \
-  unzip \
-  libyaml-cpp-dev \
-  wget
+if command -v apt &>/dev/null; then
+  sudo apt update
+  sudo apt install -y \
+    build-essential \
+    g++ \
+    libsdl1.2-dev \
+    libsdl-mixer1.2-dev \
+    git \
+    cmake \
+    unzip \
+    libyaml-cpp-dev \
+    wget
+elif command -v zypper &>/dev/null; then
+  echo "ASCIIpOrtal build dependencies (SDL 1.2, yaml-cpp) are not mapped to openSUSE package names by this script; see https://github.com/cymonsgames/ASCIIpOrtal for build instructions." >&2
+  exit 0
+else
+  echo "No supported package manager found (need apt or zypper)." >&2; exit 1
+fi
 
 echo
 echo "--- Step 2: Cloning ASCIIpOrtal source code ---"

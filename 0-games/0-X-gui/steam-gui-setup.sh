@@ -13,7 +13,6 @@ pkg_install() {
 }
 
 echo "Updating package lists and installing dependencies..."
-sudo apt update
 pkg_install lib32gcc1 lib32stdc++6 wget
 
 # Create a directory for SteamCMD

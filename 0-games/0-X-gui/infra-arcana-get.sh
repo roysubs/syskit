@@ -46,8 +46,10 @@ install_dependencies() {
     
     if command -v apt-get &> /dev/null; then
         echo "Debian/Ubuntu detected"
-        sudo apt-get update
         pkg_install $DEBIAN_DEPS
+    elif command -v zypper &> /dev/null; then
+        echo "openSUSE detected"
+        pkg_install $FEDORA_DEPS
     elif command -v dnf &> /dev/null; then
         echo "Fedora detected"
         sudo dnf install -y $FEDORA_DEPS

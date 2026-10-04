@@ -5,11 +5,33 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Ensure script is run as sudo
 
 pkg_install() {
-    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    if command -v brew &>/dev/null; then brew install "$@"
+    elif command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
     elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
     elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
-    else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
+    else echo "No supported package manager found (need brew/apt/zypper/dnf)." >&2; exit 1
     fi
+}
+
+if [[ "$(uname)" == "Darwin" ]]; then
+  echo "Desktop switching doesn't apply on macOS - its desktop is built in and can't be swapped."
+  exit 0
+fi
+
+# Debian tasksel names map to openSUSE zypper patterns. A desktop with no known
+# pattern is skipped on zypper; every other package manager goes through pkg_install.
+install_desktop() {
+  local debian_name="$1" suse_pattern="$2"
+  shift 2
+  if command -v zypper &>/dev/null && ! command -v apt &>/dev/null; then
+    if [[ -n "$suse_pattern" ]]; then
+      sudo zypper --non-interactive refresh && sudo zypper --non-interactive install -y -t pattern "$suse_pattern"
+    else
+      echo "Skipping $debian_name: no known openSUSE pattern. Install it manually." >&2
+    fi
+  else
+    pkg_install "$debian_name" "$@"
+  fi
 }
 
 if [[ $EUID -ne 0 ]]; then
@@ -112,43 +134,43 @@ SESSION_CMD=""
 # Map desktop environments to their session commands and installation commands
 case $DESKTOP_ENV in
   GNOME)
-    pkg_install task-gnome-desktop dbus-x11
+    install_desktop task-gnome-desktop gnome dbus-x11
     SESSION_CMD="/usr/bin/gnome-session"
     ;;
   XFCE)
-    pkg_install task-xfce-desktop dbus-x11
+    install_desktop task-xfce-desktop xfce dbus-x11
     SESSION_CMD="/usr/bin/startxfce4"
     ;;
   LXQt)
-    pkg_install task-lxqt-desktop dbus-x11
+    install_desktop task-lxqt-desktop lxqt dbus-x11
     SESSION_CMD="/usr/bin/startlxqt"
     ;;
   LXDE)
-    pkg_install task-lxde-desktop dbus-x11
+    install_desktop task-lxde-desktop "" dbus-x11
     SESSION_CMD="/usr/bin/startlxde"
     ;;
   MATE)
-    pkg_install task-mate-desktop dbus-x11
+    install_desktop task-mate-desktop "" dbus-x11
     SESSION_CMD="/usr/bin/mate-session"
     ;;
   Budgie)
-    pkg_install budgie-desktop dbus-x11
+    install_desktop budgie-desktop "" dbus-x11
     SESSION_CMD="/usr/bin/budgie-session"
     ;;
   KDE)
-    pkg_install task-kde-desktop dbus-x11
+    install_desktop task-kde-desktop "" dbus-x11
     SESSION_CMD="/usr/bin/startplasma-x11"
     ;;
   Cinnamon)
-    pkg_install task-cinnamon-desktop dbus-x11
+    install_desktop task-cinnamon-desktop "" dbus-x11
     SESSION_CMD="/usr/bin/cinnamon-session"
     ;;
   Pantheon)
-    pkg_install pantheon
+    install_desktop pantheon ""
     SESSION_CMD="/usr/bin/pantheon-session"
     ;;
   Deepin)
-    pkg_install dde
+    install_desktop dde ""
     SESSION_CMD="/usr/bin/startdde"
     ;;
   Openbox)
@@ -168,7 +190,7 @@ case $DESKTOP_ENV in
     SESSION_CMD="/usr/bin/enlightenment_start"
     ;;
   Sugar)
-    pkg_install sucrose
+    install_desktop sucrose ""
     SESSION_CMD="/usr/bin/sugar"
     ;;
   *)

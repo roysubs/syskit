@@ -2,6 +2,12 @@
 if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 # Author: Roy Wiseman 2025-04
 
+# Linux-hardware-specific (lsblk, free, lscpu, sensors, GNU nc -l -p): stop early on macOS
+if [[ "$(uname)" == "Darwin" ]]; then
+  echo "my-system-info-8081 is Linux-hardware-specific; use 0-scripts/sys-info-mac.sh for a macOS report"
+  exit 0
+fi
+
 # Serve a web page that displays various basic information
 # If 8081 is in use, 'sudo lsof -i :8081' and kill that process then rerun this
 # To make it run independently and in the background:
@@ -42,12 +48,18 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 
 
 # Only update if at least 2 days have passed since the last update
-if [ $(find /var/cache/apt/pkgcache.bin -mtime +2 -print) ]; then sudo apt update; fi
+if command -v apt &>/dev/null && [ $(find /var/cache/apt/pkgcache.bin -mtime +2 -print) ]; then sudo apt update; fi
 # Install tools if not already installed
-install-if-missing() { if ! dpkg-query -l "$1" >/dev/null; then sudo apt install -y $1; fi; }
+install-if-missing() {
+    if command -v zypper &>/dev/null; then
+        if ! rpm -q "$1" >/dev/null 2>&1; then sudo zypper --non-interactive install -y "$1"; fi
+    elif ! dpkg-query -l "$1" >/dev/null; then sudo apt install -y $1; fi
+}
 install-if-missing python3
 install-if-missing curl
-install-if-missing neofetch
+if command -v zypper &>/dev/null; then echo "neofetch: not automated for openSUSE (package name not verified); install it manually if wanted."
+else install-if-missing neofetch
+fi
 install-if-missing inxi
 install-if-missing duf
 install-if-missing jq

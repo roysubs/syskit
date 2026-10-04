@@ -5,7 +5,8 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Exit on errors
 
 pkg_install() {
-    if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    if [[ "$(uname)" == "Darwin" ]]; then brew install "$@"
+    elif command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
     elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
     elif command -v dnf &>/dev/null; then sudo dnf install -y "$@"
     else echo "No supported package manager found (need apt/zypper/dnf)." >&2; exit 1
@@ -23,6 +24,27 @@ error() {
   exit 1
 }
 
+# macOS: Homebrew formula + brew services (no systemd; Homebrew must NOT run as root).
+# The Linux install path below is unchanged.
+if [[ "$(uname)" == "Darwin" ]]; then
+  if [[ $EUID -eq 0 ]]; then error "On macOS run this as your normal user, not with sudo (Homebrew refuses to run as root)."; fi
+  if ! command -v brew &>/dev/null; then error "Homebrew is required. Install it from https://brew.sh first."; fi
+  info "Installing Ollama with Homebrew..."
+  pkg_install ollama
+  info "Starting the Ollama service with brew services..."
+  brew services start ollama
+  MODEL="llama3:8b"
+  info "Downloading the default model ($MODEL)..."
+  if ollama pull "$MODEL"; then
+    info "Model $MODEL downloaded successfully."
+  else
+    error "Failed to download model $MODEL."
+  fi
+  info "Installation complete. To use Ollama, run:"
+  info "  ollama run $MODEL"
+  exit 0
+fi
+
 # Ensure script is run as root
 if [[ $EUID -ne 0 ]]; then
   error "This script must be run as root. Use sudo."
@@ -30,7 +52,9 @@ fi
 
 # Update and upgrade system packages
 info "Updating system packages..."
-apt update && apt upgrade -y
+if command -v apt &>/dev/null; then apt update && apt upgrade -y
+elif command -v zypper &>/dev/null; then zypper --non-interactive refresh && zypper --non-interactive update -y
+fi
 
 # Install required dependencies
 info "Installing required dependencies..."

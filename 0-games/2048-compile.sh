@@ -30,6 +30,9 @@ check_and_install_dependency() {
         if command -v apt &> /dev/null; then
             # Debian/Ubuntu based
             pkg_install "$package_name"
+        elif command -v zypper &> /dev/null; then
+            # openSUSE based
+            pkg_install "$package_name"
         elif command -v yum &> /dev/null; then
             # RHEL/CentOS based
             sudo yum install -y "$package_name"
@@ -43,7 +46,7 @@ check_and_install_dependency() {
             # macOS using Homebrew
             brew install "$package_name"
         else
-            echo "Could not detect a supported package manager (apt, yum, dnf, pacman, brew)."
+            echo "Could not detect a supported package manager (apt, zypper, yum, dnf, pacman, brew)."
             echo "Please install '$package_name' manually and run the script again."
             exit 1
         fi
