@@ -57,9 +57,9 @@ elif command -v zypper &>/dev/null; then
         libjpeg8-devel \
         libX11-devel \
         libXrandr-devel \
-        libSDL2-devel \
-        libSDL2_image-devel \
-        libSDL2_mixer-devel \
+        sdl2-compat-devel \
+        SDL2_image-devel \
+        SDL2_mixer-devel \
         git \
         cmake
 else

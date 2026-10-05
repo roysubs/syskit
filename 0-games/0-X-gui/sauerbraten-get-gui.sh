@@ -6,7 +6,11 @@ echo "Open-source FPS with a strong multiplayer community and a built-in level e
 echo "Works well on WSL in Windows (with WSLg)"
 
 pkg_install() {
-    if command -v zypper &>/dev/null; then sudo zypper install -y "$@"
+    if command -v zypper &>/dev/null; then
+        echo "sauerbraten is not in openSUSE's default repositories. It is in the OBS 'games' project:"
+        echo "  https://software.opensuse.org/package/sauerbraten"
+        echo "Add that repository, then run: sudo zypper install sauerbraten"
+        return 0
     else sudo apt install "$@"
     fi
 }

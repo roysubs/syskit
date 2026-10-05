@@ -42,14 +42,15 @@ install_dependencies() {
     # Package lists for different distros
     DEBIAN_DEPS="libsdl2-2.0-0 libsdl2-image-2.0-0 libsdl2-ttf-2.0-0 libsdl2-mixer-2.0-0 wget unzip"
     FEDORA_DEPS="SDL2 SDL2_image SDL2_ttf SDL2_mixer wget unzip"
+    OPENSUSE_DEPS="libSDL2-2_0-0 libSDL2_image-2_0-0 libSDL2_ttf-2_0-0 libSDL2_mixer-2_0-0 wget unzip"
     ARCH_DEPS="sdl2 sdl2_image sdl2_ttf sdl2_mixer wget unzip"
-    
+
     if command -v apt-get &> /dev/null; then
         echo "Debian/Ubuntu detected"
         pkg_install $DEBIAN_DEPS
     elif command -v zypper &> /dev/null; then
         echo "openSUSE detected"
-        pkg_install $FEDORA_DEPS
+        pkg_install $OPENSUSE_DEPS
     elif command -v dnf &> /dev/null; then
         echo "Fedora detected"
         sudo dnf install -y $FEDORA_DEPS

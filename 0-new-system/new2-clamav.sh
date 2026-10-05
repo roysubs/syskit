@@ -20,22 +20,26 @@ print_step() {
 # Step 1: Install ClamAV
 print_step "Step 1: Installing ClamAV and chkrootkit..."
 if ! command -v clamscan &>/dev/null; then
-    echo "Installing ClamAV and necessary services..."
-    pkg_install clamav clamav-daemon
-    pkg_install chkrootkit
-sudo chkrootkit
+    echo "Installing ClamAV..."
+    if command -v zypper &>/dev/null; then
+        pkg_install clamav
+    else
+        pkg_install clamav clamav-daemon
+    fi
 else
     echo "ClamAV is already installed."
 fi
-if ! command -v chrootkit &>/dev/null; then
-    pkg_install chkrootkit
-else
+if command -v chkrootkit &>/dev/null; then
     echo "chkrootkit is already installed."
+elif command -v zypper &>/dev/null; then
+    echo "chkrootkit is not packaged for openSUSE, so the rootkit scan is skipped (see https://chkrootkit.org)."
+else
+    pkg_install chkrootkit
 fi
 
-# Step 2: Stop freshclam service to avoid lock issues
+# Step 2: Run chkrootkit (only where it is installed)
 print_step "Step 2: Run chkrootkit..."
-sudo chkrootkit
+if command -v chkrootkit &>/dev/null; then sudo chkrootkit; fi
 
 # Step 3: Stop freshclam service to avoid locks then update the virus database
 print_step "Step 3: Stop freshclam service to avoid locks then update the virus database"

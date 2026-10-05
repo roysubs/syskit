@@ -27,7 +27,7 @@ echo 'source ~/.powerlevel10k/powerlevel10k.zsh-theme' >> ~/.zshrc
 # Install necessary fonts (Nerd Fonts)
 echo "Installing necessary fonts (Nerd Fonts)..."
 if command -v zypper &>/dev/null && ! command -v apt &>/dev/null; then
-    echo "Skipping fonts-font-awesome and fonts-powerline: Debian package names with no verified openSUSE equivalent. Install a Font Awesome and a Powerline font manually."
+    pkg_install fontawesome-fonts powerline-fonts
 else
     pkg_install fonts-font-awesome fonts-powerline
 fi
