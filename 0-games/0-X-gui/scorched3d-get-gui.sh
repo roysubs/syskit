@@ -6,7 +6,11 @@ echo "A 3D artillery game with destructible terrain and multiplayer support."
 echo "Works well on WSL in Windows (with WSLg)"
 
 pkg_install() {
-    if command -v zypper &>/dev/null; then sudo zypper install -y "$@"
+    if command -v zypper &>/dev/null; then
+        echo "scorched3d is not in openSUSE's default repositories. It is in the OBS 'games' project:"
+        echo "  https://software.opensuse.org/package/scorched3d"
+        echo "Add that repository, then run: sudo zypper install scorched3d"
+        return 0
     else sudo apt install "$@"
     fi
 }

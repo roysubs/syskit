@@ -64,7 +64,7 @@ install_dependency() {
     local package_name="$1"
     local command_name="$2"
     local zypper_pkg="$package_name"
-    case "$package_name" in lm-sensors) zypper_pkg="sensors" ;; esac
+    case "$package_name" in lm-sensors) zypper_pkg="sensors" ;; iperf3) zypper_pkg="iperf" ;; esac
 
     if ! is_command_available "$command_name"; then
         local SUDO_CMD=""
