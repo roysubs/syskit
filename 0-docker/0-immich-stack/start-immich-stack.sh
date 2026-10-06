@@ -532,10 +532,10 @@ echo -e "${BOLD}${YELLOW}${STACK_DIR}${NC}"
 echo
 echo -e "${BOLD}${CYAN}To start your Immich stack:${NC}"
 echo -e "1. Navigate to the directory: ${GREEN}cd ${STACK_DIR}${NC}"
-echo -e "2. Run Docker Compose:      ${GREEN}docker-compose up -d${NC}"
+echo -e "2. Run Docker Compose:      ${GREEN}docker compose up -d${NC}"
 echo
 echo -e "${YELLOW}It might take a few minutes for all services to start up, especially on the first run as images are downloaded.${NC}"
-echo -e "You can monitor the logs using: ${GREEN}docker-compose logs -f${NC}"
+echo -e "You can monitor the logs using: ${GREEN}docker compose logs -f${NC}"
 echo
 echo -e "${BOLD}${CYAN}Once started, you should be able to access Immich at:${NC}"
 if [ "$SETUP_REVERSE_PROXY" == "Y" ] && [ -n "$REVERSE_PROXY_DOMAIN" ]; then
@@ -613,15 +613,15 @@ echo -e "     - Back up the generated ${YELLOW}${STACK_DIR}/.env${NC} file (cont
 echo -e "     - Consider tools like Duplicati, BorgBackup, or rsync scripts for automated backups."
 echo -e "   - ${CYAN}Updating Immich:${NC} Periodically, new versions are released."
 echo -e "     1. Read the release notes for any breaking changes!"
-echo -e "     2. `cd ${STACK_DIR}`"
-echo -e "     3. `docker-compose pull` (pulls the latest images specified by IMMICH_VERSION in your .env)"
-echo -e "     4. `docker-compose up -d` (recreates containers with the new images)"
+echo -e "     2. cd ${STACK_DIR}"
+echo -e "     3. docker compose pull (pulls the latest images specified by IMMICH_VERSION in your .env)"
+echo -e "     4. docker compose up -d (recreates containers with the new images)"
 echo -e "   - ${CYAN}Community Support:${NC} Join the Immich Discord or visit their GitHub for help and discussions: https://immich.app/docs/community"
 echo
 
 header "Troubleshooting & Next Steps"
 echo -e "If Immich doesn't start:"
-echo -e "  - Check logs: ${GREEN}docker-compose logs -f immich-server immich-microservices immich-database${NC} (in the ${STACK_DIR} directory)"
+echo -e "  - Check logs: ${GREEN}docker compose logs -f immich-server immich-microservices immich-database${NC} (in the ${STACK_DIR} directory)"
 echo -e "  - Ensure ports are not conflicting with other services on your host."
 echo -e "  - Verify directory permissions for your mounted volumes."
 echo

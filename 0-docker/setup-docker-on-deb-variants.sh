@@ -3,6 +3,16 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Author: Roy Wiseman 2025-05
 set -euo pipefail
 
+# This script is for Debian-family Linux (Debian, Ubuntu, Linux Mint) only.
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo "Docker Desktop for Mac: https://www.docker.com/products/docker-desktop/ (or: brew install --cask docker). This script is Debian-family Linux only." >&2
+    exit 1
+fi
+if ! command -v apt &>/dev/null; then
+    echo "This script needs apt (Debian, Ubuntu, Linux Mint). On openSUSE use: sudo zypper install -y docker docker-compose" >&2
+    exit 1
+fi
+
 # === Initial Checks and Detection ===
 
 # Detect architecture

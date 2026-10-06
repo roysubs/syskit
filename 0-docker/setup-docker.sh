@@ -92,7 +92,7 @@ if is_wsl; then
 fi
 
 if [[ "$(uname)" == "Darwin" ]]; then
-    echo "Docker not found. Install Docker Desktop: https://www.docker.com/products/docker-desktop/ (or: brew install --cask docker)" >&2
+    echo "Docker not found. Run ./setup-docker-desktop-on-macos.sh, or install Docker Desktop: https://www.docker.com/products/docker-desktop/ (or: brew install --cask docker)" >&2
     exit 1
 fi
 
@@ -127,16 +127,23 @@ else
 fi
 
 
-echo "==> Downloading and running Docker's official installation script (get.docker.com)..."
-# Download the script
-curl -fsSL https://get.docker.com -o get-docker.sh
+if command -v zypper &>/dev/null; then
+    # get.docker.com has no openSUSE branch, so use the distribution's own packages
+    echo "==> openSUSE detected. Installing Docker from the openSUSE repositories..."
+    sudo zypper --non-interactive refresh
+    sudo zypper install -y docker docker-compose
+else
+    echo "==> Downloading and running Docker's official installation script (get.docker.com)..."
+    # Download the script
+    curl -fsSL https://get.docker.com -o get-docker.sh
 
-# Run the script
-# Note: The get.docker.com script typically handles adding the repo, GPG key, and installing packages.
-sudo sh get-docker.sh
+    # Run the script
+    # Note: The get.docker.com script typically handles adding the repo, GPG key, and installing packages.
+    sudo sh get-docker.sh
 
-# Clean up the script
-rm get-docker.sh
+    # Clean up the script
+    rm get-docker.sh
+fi
 
 echo "==> Docker Engine installation attempted."
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: brew install bash" >&2; return 1 2>/dev/null || exit 1; fi
 # Author: Roy Wiseman 2025-05
+# Services with network_mode: host (see the compose file) only see the Linux VM's network
+# under Docker Desktop for Mac. Run this on Linux if those services must be reachable.
 
 RED='\e[0;31m'
 YELLOW='\e[1;33m'
@@ -26,13 +28,30 @@ if ! command -v docker &> /dev/null; then
         exit 1
     fi
     echo -e "${RED}❌ Docker not found. Installing...${NC}"
-    if curl -fsSL https://get.docker.com | sh; then
+    # get.docker.com has no openSUSE branch, so use the distribution's own packages there
+    INSTALL_DOCKER_OK=false
+    if command -v zypper &>/dev/null; then
+        sudo zypper --non-interactive refresh && sudo zypper install -y docker docker-compose && INSTALL_DOCKER_OK=true
+    else
+        curl -fsSL https://get.docker.com | sh && INSTALL_DOCKER_OK=true
+    fi
+    if [[ "$INSTALL_DOCKER_OK" == true ]]; then
         sudo usermod -aG docker "$USER"
         echo -e "${GREEN}Docker installed successfully. Please log out and back in to apply group changes or run 'newgrp docker'.${NC}"
         exit 1
     else
         echo -e "${RED}❌ Failed to install Docker.${NC}"
         exit 1
+    fi
+fi
+
+# yq (mikefarah) is needed to read docker-compose.yaml below
+if ! command -v yq &>/dev/null || ! yq --version 2>&1 | grep -qF "mikefarah/yq"; then
+    echo -e "${YELLOW}yq (mikefarah) not found. Installing...${NC}"
+    if [[ "$(uname)" == "Darwin" ]]; then
+        brew install yq
+    else
+        bash "$(dirname "${BASH_SOURCE[0]}")/../setup-yq-for-yaml.sh"
     fi
 fi
 
