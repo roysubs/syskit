@@ -253,6 +253,20 @@ alias ll='ls -alh'
 alias ll.='ls -ald .[!.]* ..?*'
 alias l='ls -CF'
 
+# clip: copy stdin to the clipboard (echo hi | clip). Uses whichever tool is installed.
+clip() {
+    if command -v pbcopy >/dev/null 2>&1; then pbcopy
+    elif [[ -n "$WAYLAND_DISPLAY" ]] && command -v wl-copy >/dev/null 2>&1; then wl-copy
+    elif command -v xclip >/dev/null 2>&1; then xclip -selection clipboard
+    elif command -v xsel >/dev/null 2>&1; then xsel --clipboard --input
+    else echo "clip: no clipboard tool found (install xclip or wl-clipboard)" >&2; return 1
+    fi
+}
+# open: macOS has it built in. On Linux, use xdg-open for the same behaviour.
+if [[ "$(uname)" != "Darwin" ]] && command -v xdg-open >/dev/null 2>&1; then
+    open() { xdg-open "$@" >/dev/null 2>&1; }
+fi
+
 alias ifconfig='sudo ifconfig'
 alias ipconfig='sudo ifconfig'
 alias venvh='source $HOME/syskit/0-scripts/venv-helper.sh'
