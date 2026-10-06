@@ -6,6 +6,10 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Creates a complete, private, self-hosted remote desktop relay.
 # IDEMPOTENT: Safe to run multiple times!
 # https://rustdesk.com/docs/en/self-host/
+#
+# Linux only in practice: the compose file uses network_mode: "host". On Docker Desktop
+# for Mac, host networking attaches to the Linux VM, not the Mac, so the relay ports
+# are not reachable from the network.
 # ────────────────────────────────────────────────────────────────
 
 set -e # Exit on error

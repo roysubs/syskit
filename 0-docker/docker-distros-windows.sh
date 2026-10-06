@@ -9,6 +9,11 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # ---[ Prerequisites Check ]----------------------
 # Check if Docker is installed and running
 
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo "dockurr/windows needs KVM (/dev/kvm), which Docker Desktop for Mac does not provide. Run this on Linux." >&2
+    exit 1
+fi
+
 pkg_install() {
     if command -v apt &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y "$@"
     elif command -v zypper &>/dev/null; then sudo zypper --non-interactive refresh && sudo zypper install -y "$@"
@@ -19,7 +24,13 @@ pkg_install() {
 
 if ! command -v docker &> /dev/null; then
     echo -e "${RED}❌ Docker not found. Installing...${NC}"
-    if curl -fsSL https://get.docker.com | sh; then
+    INSTALL_DOCKER_OK=false
+    if command -v zypper &>/dev/null; then
+        pkg_install docker docker-compose && INSTALL_DOCKER_OK=true
+    else
+        curl -fsSL https://get.docker.com | sh && INSTALL_DOCKER_OK=true
+    fi
+    if [[ "$INSTALL_DOCKER_OK" == true ]]; then
         sudo usermod -aG docker "$USER"
         echo -e "${GREEN}Docker installed successfully. Please log out and back in to apply group changes or run 'newgrp docker'.${NC}"
         exit 1

@@ -77,7 +77,7 @@ on both steps), zypper runs 'refresh' first, dnf installs directly (auto-refresh
 GROUP 2 — Genuinely apt-specific, left as apt/Debian-only by design (32 files)
 Repo/PPA/GPG-key setup, raw .deb downloads, dpkg -i — not worth unifying across distros.
 ======================================================================
-0-docker/0-monitoring-stack/setup-docker-deb-variants.sh  ::  writes/edits sources.list(.d)
+0-docker/setup-docker-on-deb-variants.sh  ::  writes/edits sources.list(.d)
 0-docker/setup-nvidia-container-toolkit.sh  ::  writes/edits sources.list(.d)
 0-help/x-glow-template.sh  ::  writes/edits sources.list(.d)
 0-install/anydesk-get.sh  ::  writes/edits sources.list(.d)
