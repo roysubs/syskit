@@ -3,8 +3,7 @@
 # Wrapper script to invoke the add-paths, zshrc, and vimrc update scripts for Zsh users (macOS/Linux)
 
 # Prevent the script from running if not sourced
-# Zsh way to check if sourced: [[ -n $ZSH_EVAL_CONTEXT && $ZSH_EVAL_CONTEXT == 'toplevel' ]] is false if sourced?
-# Actually simpler: if [[ $0 == $ZSH_ARGZERO ]]; then executed; else sourced; fi
+# Zsh: $0 equals $ZSH_ARGZERO only when the file is run as a script
 if [[ $0 == $ZSH_ARGZERO ]]; then
     echo "
 This script must be sourced.
@@ -22,35 +21,44 @@ fi
 
 SCRIPT_DIR=${0:a:h} # Get absolute path of script directory in Zsh
 
+# Steps that fail are recorded here and reported at the end
+FAILED=()
+
 # Ensure /usr/local/bin exists (common issue on clean macOS)
 if [[ ! -d "/usr/local/bin" ]]; then
     echo "Directory /usr/local/bin does not exist. Creating it (requires sudo)..."
     sudo mkdir -p "/usr/local/bin"
 fi
 
-# 1. Vim RC (macOS Optimized)
-SCRIPT_PATH="$SCRIPT_DIR/0-new-system/new1-vimrc-macos.sh"
-if [[ -x "$SCRIPT_PATH" ]]; then
-    "$SCRIPT_PATH"
+# 1. Vim RC: the macOS version on macOS, the general version everywhere else
+if [[ "$(uname)" == "Darwin" ]]; then
+    VIMRC_SCRIPT="$SCRIPT_DIR/0-new-system/new1-vimrc-macos.sh"
 else
-    # Fallback to original if macos specific one missing (unlikely since we just made it)
-    "$SCRIPT_DIR/0-new-system/new1-vimrc.sh"
+    VIMRC_SCRIPT="$SCRIPT_DIR/0-new-system/new1-vimrc.sh"
+fi
+if [[ -x "$VIMRC_SCRIPT" ]]; then
+    "$VIMRC_SCRIPT" || FAILED+=("vimrc")
+else
+    echo "Error: Script $VIMRC_SCRIPT not found or not executable."
+    FAILED+=("vimrc")
 fi
 
-# 2. Update H Scripts (Compatible now that dir exists)
+# 2. Update H Scripts
 SCRIPT_PATH="$SCRIPT_DIR/0-new-system/new1-update-h-scripts.sh"
 if [[ -x "$SCRIPT_PATH" ]]; then
-    "$SCRIPT_PATH"
+    "$SCRIPT_PATH" || FAILED+=("h-scripts")
 else
     echo "Error: Script $SCRIPT_PATH not found or not executable."
+    FAILED+=("h-scripts")
 fi
 
 # 3. Zsh RC (The new zsh script)
 SCRIPT_PATH="$SCRIPT_DIR/0-new-system/new1-zshrc.sh"
 if [[ -x "$SCRIPT_PATH" ]]; then
-    "$SCRIPT_PATH" --clean
+    "$SCRIPT_PATH" --clean || FAILED+=("zshrc")
 else
     echo "Error: Script $SCRIPT_PATH not found or not executable."
+    FAILED+=("zshrc")
 fi
 
 # 4. Add Paths (Integrated logic)
@@ -59,8 +67,8 @@ add_to_path() {
   local DIR="$1"
   # Resolve absolute path
   # Zsh modifiers :a :h etc are great.
-  local ABS_DIR="${DIR:a}" 
-   
+  local ABS_DIR="${DIR:a}"
+
   # Add to current session
   if [[ ":$PATH:" != *":$ABS_DIR:"* ]]; then
       echo "Adding $ABS_DIR to PATH for the current session..."
@@ -90,4 +98,8 @@ add_to_path "$SCRIPT_DIR"
 add_to_path "$SCRIPT_DIR/0-scripts"
 add_to_path "$SCRIPT_DIR/0-help"
 
+if (( ${#FAILED[@]} )); then
+    echo -e "\n\033[1;31mSetup finished with errors in: ${FAILED[*]}\033[0m" >&2
+    return 1
+fi
 echo -e "\n\033[1;32mSuccess!\033[0m Syskit Zsh setup complete."
