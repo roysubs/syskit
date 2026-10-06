@@ -4,7 +4,7 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # Reports whether the modules, shell profile, PATH and help commands are in place.
 # Exit 0 if there are no FAIL lines, 1 otherwise.
 
-SYSKIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SYSKIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NEW_SYSTEM="$SYSKIT_DIR/0-new-system"
 FAILS=0
 WARNS=0
