@@ -163,6 +163,7 @@ Scripts for setting up the user's environment, shell customizations, and essenti
 * `new1-inputrc-key-bindings.sh`: Applies all of its readline key bindings in `~/.inputrc` in one go. Not called by the setup scripts; opt in by running it directly.
 * `new1-inputrc-tab-completion.sh`: Applies all of its tab completion settings in `~/.inputrc` in one go, including case-insensitive completion. Not called by the setup scripts; opt in by running it directly.
 * `new1-inputrc-picker.sh`: Interactive, idempotent picker for the same readline options, one at a time, with an explanation and the current on/off state for each. Affects bash only; zsh has its own line editor and ignores `~/.inputrc`.
+* `new1-zsh-keybindings-picker.sh`: The zsh counterpart to the inputrc picker, same style, writing to `~/.zshrc` via `bindkey`/`zle` instead. Its blocks sit above the `# syskit definitions` marker so they survive `new1-zshrc.sh --clean`. Not called by the setup scripts; opt in by running it directly.
 * `new1-update-h-scripts.sh`: Updates a specific set of scripts, possibly helper scripts or scripts from another source referred to as "h-scripts". *(Clarify what "h-scripts" are for better understanding)*.
 * `new1-vimrc.sh`: Sets up a custom `.vimrc` for Vim (and potentially Neovim) with preferred settings and plugins in a non-disruptive manner.
 
