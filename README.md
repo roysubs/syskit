@@ -160,8 +160,9 @@ Scripts for setting up the user's environment, shell customizations, and essenti
 
 * `new1-add-paths.sh`: Adds custom directories to the system's or user's `PATH` environment variable for easier command execution. *(Consider renaming to be more specific if it adds particular paths, e.g., `new1-add-custom-scripts-to-path.sh`)*.
 * `new1-bashrc.sh`: Configures the `.bashrc` file with custom aliases, functions, and settings for the Bash shell in a non-disruptive way.
-* `new1-inputrc-key-bindings.sh`: Customizes readline key bindings in `/etc/inputrc` or `~/.inputrc` for enhanced command-line editing.
-* `new1-inputrc-tab-completion.sh`: Enhances bash tab completion settings via `inputrc` for more efficient command input.
+* `new1-inputrc-key-bindings.sh`: Applies all of its readline key bindings in `~/.inputrc` in one go. Not called by the setup scripts; opt in by running it directly.
+* `new1-inputrc-tab-completion.sh`: Applies all of its tab completion settings in `~/.inputrc` in one go, including case-insensitive completion. Not called by the setup scripts; opt in by running it directly.
+* `new1-inputrc-picker.sh`: Interactive, idempotent picker for the same readline options, one at a time, with an explanation and the current on/off state for each. Affects bash only; zsh has its own line editor and ignores `~/.inputrc`.
 * `new1-update-h-scripts.sh`: Updates a specific set of scripts, possibly helper scripts or scripts from another source referred to as "h-scripts". *(Clarify what "h-scripts" are for better understanding)*.
 * `new1-vimrc.sh`: Sets up a custom `.vimrc` for Vim (and potentially Neovim) with preferred settings and plugins in a non-disruptive manner.
 

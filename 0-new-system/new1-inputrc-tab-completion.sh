@@ -10,6 +10,10 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # This only modifies the user's current configuration.
 # Very tricky to get this right, due to different codes from keyboards and XOFF issue with
 # some terminal emulators (so invoking 'stty -ixon' might affect tmux etc).
+#
+# This applies every setting below in one go, including completion-ignore-case, which
+# some people dislike. For a per-option enable/disable picker with an explanation of
+# each one, use new1-inputrc-picker.sh instead.
 
 echo "Starting ~/.inputrc configuration update..."
 

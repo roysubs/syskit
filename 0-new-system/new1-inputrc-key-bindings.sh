@@ -10,6 +10,9 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 # This only modifies the user's current configuration.
 # Very tricky to get this right, due to different codes from keyboards and XOFF issue with
 # some terminal emulators (so invoking 'stty -ixon' might affect tmux etc).
+#
+# This applies every binding below in one go. For a per-option enable/disable picker
+# with an explanation of each one, use new1-inputrc-picker.sh instead.
 
 echo "Starting ~/.inputrc configuration update..."
 
@@ -67,8 +70,8 @@ read -r -d '' INPUTRC_BLOCK << 'EOF'
 
 # Alt-r: Incremental search backward through history (Alternative binding)
 # Provides an alternative keybinding for reverse history search.
-### "\er": backward-i-searcr
-"\M-r": backward-i-searcr
+### "\er": backward-i-search
+"\M-r": backward-i-search
 
 # Alt-s: Incremental search forward through history (Alternative binding)
 # Provides an alternative keybinding for forward history search.
