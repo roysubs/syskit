@@ -33,9 +33,9 @@ fi
 zshrc_block=$(cat <<'EOF_ZSHRC_CONTENT'
 # syskit definitions
 ####################
-# Note: Put manually added .zshrc definitions *above* this section
-# 'new1-zshrc.sh --clean' will delete everything from the '# syskit definitions'
-# to the end of the file
+# Note: Put manually added .zshrc definitions *above* this section.
+# 'new1-zshrc.sh --clean' removes only the block between this line and the
+# '# end syskit definitions' line below; anything after that end line is left alone.
 
 # Path definitions
 if [[ ":$PATH:" != *":$HOME/syskit:"* ]]; then export PATH="$HOME/syskit:$PATH"; fi
@@ -362,7 +362,7 @@ EOF
     esac
 }
 alias cs='c s'
-
+# end syskit definitions
 EOF_ZSHRC_CONTENT
 )
 
@@ -374,13 +374,25 @@ if [[ -z "$first_non_empty_line" ]]; then
     exit 1
 fi
 
-# Clean logic
+# Clean logic: the block is bounded by the begin marker and this literal end
+# marker, so --clean only ever removes its own block, never anything written
+# after it (that's where OverKeys, or anything else, might live).
+END_MARKER_LINE="# end syskit definitions"
 if [[ "$CLEAN_MODE" == true ]]; then
     if grep -Fxq "$first_non_empty_line" "$ZSHRC_FILE"; then
-        echo "CLEAN_MODE: Removing old block..."
-        escaped_marker=$(printf '%s\n' "$first_non_empty_line" | sed 's/[.[\*^$]/\\&/g')
-        sed -i '' "/^${escaped_marker}$/,\$d" "$ZSHRC_FILE"
-        echo "Removed."
+        if grep -Fxq "$END_MARKER_LINE" "$ZSHRC_FILE"; then
+            echo "CLEAN_MODE: Removing the block between '$first_non_empty_line' and '$END_MARKER_LINE'."
+            tmp_clean=$(mktemp)
+            awk -v b="$first_non_empty_line" -v e="$END_MARKER_LINE" '
+                $0 == b { skip = 1; next }
+                skip == 1 { if ($0 == e) skip = 0; next }
+                { print }
+            ' "$ZSHRC_FILE" > "$tmp_clean" && mv "$tmp_clean" "$ZSHRC_FILE"
+            echo "Removed."
+        else
+            echo "CLEAN_MODE: Found '$first_non_empty_line' but no '$END_MARKER_LINE' (an older, unbounded block)."
+            echo "CLEAN_MODE: Skipping cleanup so nothing after it is deleted by mistake. Missing entries will still be added below."
+        fi
     else
         echo "CLEAN_MODE: Marker not found, nothing to clean."
     fi

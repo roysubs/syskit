@@ -57,9 +57,9 @@ fi
 bashrc_block=$(cat <<'EOF_BASHRC_CONTENT'
 # syskit definitions
 ####################
-# Note: Put manually added .bashrc definitionas *above* this section, as
-# 'new1-bashrc.sh --clean' will delete everything from the '# syskit definitions'
-# to the end of the file
+# Note: Put manually added .bashrc definitions *above* this section.
+# 'new1-bashrc.sh --clean' removes only the block between this line and the
+# '# end syskit definitions' line below; anything after that end line is left alone.
 if ! [[ ":$PATH:" == *":$HOME/syskit:"* ]]; then export PATH="$HOME/syskit:$PATH"; fi
 if ! [[ ":$PATH:" == *":$HOME/syskit/0-scripts:"* ]]; then export PATH="$HOME/syskit/0-scripts:$PATH"; fi
 # Prompt before overwrite (-i interactive) for rm,cp,mv is very important to avoid disasters
@@ -365,7 +365,7 @@ EOF
     esac
 }
 alias cs='c s'
-
+# end syskit definitions
 EOF_BASHRC_CONTENT
 )
 
@@ -378,15 +378,25 @@ if [[ -z "$first_non_empty_line" ]]; then
     exit 1 # Exit if the block is empty, as something is wrong.
 fi
 
-# Check if this line exists in .bashrc
-# Only attempt cleanup if the marker is found and CLEAN_MODE is true
+# Only attempt cleanup if the begin marker is found and CLEAN_MODE is true.
+# The block is bounded by the begin marker and this literal end marker, so
+# --clean only ever removes its own block, never anything written after it.
+END_MARKER_LINE="# end syskit definitions"
 if [[ "$CLEAN_MODE" == true ]]; then
     if grep -Fxq "$first_non_empty_line" "$BASHRC_FILE"; then
-        echo "CLEAN_MODE: Performing cleanup. Deleting block from '$first_non_empty_line' to end of $BASHRC_FILE."
-        # Escape the marker line for sed address
-        escaped_marker=$(printf '%s\n' "$first_non_empty_line" | sed 's/[.[\*^$]/\\&/g')
-        sed -i "/^${escaped_marker}$/,\$d" "$BASHRC_FILE"
-        echo "Removed block from $BASHRC_FILE."
+        if grep -Fxq "$END_MARKER_LINE" "$BASHRC_FILE"; then
+            echo "CLEAN_MODE: Removing the block between '$first_non_empty_line' and '$END_MARKER_LINE'."
+            tmp_clean=$(mktemp)
+            awk -v b="$first_non_empty_line" -v e="$END_MARKER_LINE" '
+                $0 == b { skip = 1; next }
+                skip == 1 { if ($0 == e) skip = 0; next }
+                { print }
+            ' "$BASHRC_FILE" > "$tmp_clean" && mv "$tmp_clean" "$BASHRC_FILE"
+            echo "Removed block from $BASHRC_FILE."
+        else
+            echo "CLEAN_MODE: Found '$first_non_empty_line' but no '$END_MARKER_LINE' (an older, unbounded block)."
+            echo "CLEAN_MODE: Skipping cleanup so nothing after it is deleted by mistake. Missing entries will still be added below."
+        fi
     else
         echo "CLEAN_MODE: Marker line '$first_non_empty_line' not found in $BASHRC_FILE. No cleanup performed."
     fi
