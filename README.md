@@ -111,7 +111,9 @@ Optional Add-ons
     - Generic Wireguard setup with work with any VPN vendor  
 
 ✅ Backup, Sync, and Sharing integration  
-    - rsync, rclone, and borgbackup scripts available (wip)  
+    - `0-scripts/borg-home-backup.sh`: deduplicated, incremental backups of `$HOME` with Borg, auto-installs a daily backup + weekly prune cron job  
+    - `0-scripts/backup-rclone-sync.sh`: offsite sync of any folder to any `rclone` remote (cloud storage, another host, etc). Copies by default (never deletes at the destination); `--mirror` opts into a destructive sync, with its own confirmation  
+    - `0-scripts/z-backup-quick.sh`: quick zip-based backup of a folder  
     - Syncthing as local or container install  
     - Filebrowser for web UI access to `media-stack`  
 
@@ -198,6 +200,21 @@ Scripts for user-specific personalizations.
 * `new4-bashrc_personal.sh`: Configures personal `.bashrc` additions. An optional script to manage user specific aliases, functions, or settings unique to a user's preference.
 
 ---
+
+## Games (`0-games/`)
+
+Console and GUI game installers/launchers: roguelikes (ADOM, Brogue, Cataclysm: DDA, Dwarf Fortress, Angband, Sil-Q), classic terminal games (BSD games, telnet Star Wars, asciiquarium), and Steam helpers. Most games are reached through the menu-driven Python entry points (`games-console-by-menu-*.py`, `games-gui-by-menu-*.py`, `roguelikes-by-menu.py`, `steam-games-*.py`) rather than run individually. See `0-games/1-bsd-games.txt`, `1-emulators.md` and `1-steam-db-how-to.txt` for background.
+
+## Web Apps (`0-web-apps/`)
+
+Single-purpose launchers for browser-based tools: `cockpit-9090.sh`, `glances-61208.sh`, `webmin-10000.sh`, `my-system-info-8081.sh`, `vscode-8088.sh` (code-server), `navidrome-music-4533.sh`, and qBittorrent's web UI (`qbittorrent-nox.sh`). Each script installs and starts its tool, printing the URL to reach it on.
+
+## Network and Security (`0-scripts/`)
+
+* `check-firewall.sh`: reports the status of whichever firewall tool (ufw, firewalld, iptables, nftables, csf, ipset) is active, with a `-t`/`--tips` cheatsheet of common commands for each.
+* `firewall-baseline.sh`: applies a deny-by-default baseline (ufw or firewalld) with your SSH port(s) and any ports you list explicitly allowed first. Requires typed confirmation before changing anything, and supports `--dry-run`. macOS gets a lighter touch: it just offers to turn on the built-in Application Firewall. **Only run this over a connection you can afford to lose**, ideally with console/physical access as a fallback.
+* `net-diag.sh`: path tracing (`mtr`, falling back to `traceroute`) and an `iperf3` client/server pair for testing bandwidth between two of your own hosts. Complements `sys-bench.sh`, which only tests loopback bandwidth and internet speed.
+* `shellcheck-audit.sh`: runs `shellcheck` across a directory tree (default: this repo) and summarises the worst-offending files. Complements `syntax-check-script.sh`, which only catches syntax errors and bad characters, not the broader class of real bugs `shellcheck` catches.
 
 ## Documentation & Guides
 
