@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
-# test-vm.sh — stock Linux test machines for netscrew, as KVM virtual machines on this host, each
+# kvm-test-vm.sh — stock Linux test machines for netscrew, as KVM virtual machines on this host, each
 # with its own address on the LAN (so the Mac, mina and Windows PCs see it like any other
 # machine: mDNS, n access <host>, xrdp, Samba…). Official cloud images, nothing pre-configured
 # for n — finding what's missing is n's job.
 #
-#   ./test-vm.sh [--distro D] [--desktop[=gnome|xfce]] [--password PW]
+#   ./kvm-test-vm.sh [--distro D] [--desktop[=gnome|xfce]] [--password PW]
 #                                                        create it, or bring it back up; every
 #                                                        step checks first, so a re-run only
 #                                                        does what's missing
-#   ./test-vm.sh [--distro D] --status                   state and address
-#   ./test-vm.sh [--distro D] --console [lines]          its boot log (or a screenshot)
-#   ./test-vm.sh [--distro D] --destroy                  delete the VM and its disk
-#   ./test-vm.sh [--distro D] --fresh                    a VM like a fresh desktop install, to test
+#   ./kvm-test-vm.sh [--distro D] --status               state and address
+#   ./kvm-test-vm.sh [--distro D] --console [lines]      its boot log (or a screenshot)
+#   ./kvm-test-vm.sh [--distro D] --destroy              delete the VM and its disk
+#   ./kvm-test-vm.sh [--distro D] --fresh                a VM like a fresh desktop install, to test
 #                                                        n add: no ssh server, ssh blocked, no keys
 #                                                        (named D-fresh; password logins allowed)
-#   ./test-vm.sh [--distro D] --fresh --type-add         "type" n add's one line in it — run as root
+#   ./kvm-test-vm.sh [--distro D] --fresh --type-add     "type" n add's one line in it — run as root
 #                                                        through the guest agent, no ssh needed
-#   ./test-vm.sh --list                                  the test VMs here
-#   ./test-vm.sh --bridge                                put this host on a bridge (br0), so it can
+#   ./kvm-test-vm.sh --list                              the test VMs here
+#   ./kvm-test-vm.sh --bridge                            put this host on a bridge (br0), so it can
 #                                                        reach its own VMs too (once; undoes itself
 #                                                        if the network doesn't come back)
-#   ./test-vm.sh --unbridge                              undo that (or a cable given to the VMs)
+#   ./kvm-test-vm.sh --unbridge                          undo that (or a cable given to the VMs)
 #
 #   D: rocky9 (default) · fedora · debian12 · debian13 · ubuntu24 · opensuse
 #
