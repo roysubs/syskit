@@ -6,6 +6,7 @@ if ((BASH_VERSINFO[0] < 4)); then echo "This script needs bash 4+. On macOS: bre
 #   - v6.1: Fixed typo 2>/null to 2>/dev/null
 #   - v6.2: Fixed syntax error in 'find' command (missing space)
 #   - v7.0: Separated -t (show all types) from -x (filter by extension) for PowerShell symmetry
+#   - v7.1: macOS/BSD find has no -printf (GNU-only); fall back to 'stat -f' there
 
 # --- Configuration ---
 set -o pipefail  # Crucial: allows us to catch 'find' errors after the pipeline
@@ -170,11 +171,17 @@ if [[ -n "$specific_ext" ]]; then
     cmd+=("-name" "*.$specific_ext")
 fi
 
-# Output size|path|filename if listing, otherwise original
-if [[ $list_files -eq 1 ]]; then
-    cmd+=("-type" "f" "-printf" "%s|%p|%f\n")
+# Output size|path for every file; awk derives the filename from the path itself,
+# so both branches below feed it identically.
+# GNU find has -printf; BSD find (macOS) doesn't, so fall back to a batched 'stat'.
+# 'stat' itself can be either flavor independently of 'find' (e.g. Homebrew coreutils'
+# gnubin on PATH gives GNU stat on a Mac with BSD find), so check stat separately.
+if find --version >/dev/null 2>&1; then
+    cmd+=("-type" "f" "-printf" "%s|%p\n")
+elif stat --version >/dev/null 2>&1; then
+    cmd+=("-type" "f" "-exec" "stat" "-c" "%s|%n" "{}" "+")
 else
-    cmd+=("-type" "f" "-printf" "%s|%f\n")
+    cmd+=("-type" "f" "-exec" "stat" "-f" "%z|%N" "{}" "+")
 fi
 
 
@@ -214,12 +221,14 @@ fi
 
     {
         bytes = $1
+        filepath = $2
 
-        # Handle different printf formats
+        # Filename is whatever follows the last "/" in the path (works whether
+        # find gave us a bare name or a full path, GNU -printf or BSD stat alike)
+        n_parts = split(filepath, parts, "/")
+        filename = parts[n_parts]
+
         if (list_files) {
-            filepath = $2
-            filename = $3
-
             # --- Make path relative ---
             relative_path = filepath
             # Check if filepath starts with search_path
@@ -232,8 +241,6 @@ fi
 
             file_paths[total_files + 1] = relative_path
             file_sizes[total_files + 1] = bytes
-        } else {
-            filename = $2
         }
 
         n = split(filename, a, ".")
