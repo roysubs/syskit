@@ -287,6 +287,23 @@ format_time() {
     fi
 }
 
+# Resolve the requested hash algorithm to an actual command. md5sum/sha256sum are GNU-only
+# names; macOS has no md5sum at all, and its native 'shasum -a 256' already produces the
+# exact same output format, so only md5 needs real translation ('md5 -q' has no filename
+# field, but that's fine: only the first word of hash_output is ever used, below).
+if [[ "$hash_algo" == "md5sum" ]] && ! command -v md5sum >/dev/null 2>&1; then
+    command -v md5 >/dev/null 2>&1 || { echo "Error: neither md5sum nor md5 found." >&2; exit 1; }
+    hash_algo="md5 -q"
+elif [[ "$hash_algo" == "sha256sum" ]] && ! command -v sha256sum >/dev/null 2>&1; then
+    command -v shasum >/dev/null 2>&1 || { echo "Error: neither sha256sum nor shasum found." >&2; exit 1; }
+    hash_algo="shasum -a 256"
+fi
+
+# 'stat -c' is GNU-only; BSD stat (macOS) uses '-f FORMAT' instead, with its own different
+# format codes. Detected once, not per file.
+STAT_IS_GNU=false
+stat --version >/dev/null 2>&1 && STAT_IS_GNU=true
+
 # Stage 2: Hash files with matching sizes
 if [[ "$quiet_mode" != true ]]; then
     echo >&2
@@ -304,8 +321,13 @@ while IFS= read -r filepath; do
         if [[ $? -eq 0 ]]; then
             hash=$(echo "$hash_output" | awk '{print $1}')
             # Get file size and modification time
-            size=$(stat -c '%s' "$filepath" 2>/dev/null)
-            mtime=$(stat -c '%Y' "$filepath" 2>/dev/null)
+            if [[ "$STAT_IS_GNU" == true ]]; then
+                size=$(stat -c '%s' "$filepath" 2>/dev/null)
+                mtime=$(stat -c '%Y' "$filepath" 2>/dev/null)
+            else
+                size=$(stat -f '%z' "$filepath" 2>/dev/null)
+                mtime=$(stat -f '%m' "$filepath" 2>/dev/null)
+            fi
             
             # Store: hash -> size|mtime|filepath
             if [[ -n "${hash_to_files[$hash]}" ]]; then

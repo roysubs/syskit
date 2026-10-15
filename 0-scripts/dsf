@@ -162,7 +162,16 @@ trap 'rm -f "$TMP_FILE_LISTING" "$SORTED_AND_TRIMMED_OUTPUT" 2>/dev/null' EXIT #
 if ! $CMD_PREFIX find "${find_args[@]}" | while IFS= read -r -d '' file_path; do
     size_cmd_output=""
     if $DISK_USAGE; then
-        size_cmd_output=$($CMD_PREFIX du -B1 "$file_path" 2>/dev/null | awk '{print $1}')
+        # 'du -B1' is GNU-only; BSD du silently ignores it rather than erroring, so this
+        # used to just show the wrong number on macOS instead of failing. stat's %b (blocks
+        # allocated, in fixed 512-byte units) is identical on GNU and BSD stat, so compute
+        # disk usage from that instead of fighting du's inconsistent flags.
+        if [[ "$STAT_IS_GNU" == true ]]; then
+            blocks=$($CMD_PREFIX stat -c "%b" "$file_path" 2>/dev/null)
+        else
+            blocks=$($CMD_PREFIX stat -f "%b" "$file_path" 2>/dev/null)
+        fi
+        [[ "$blocks" =~ ^[0-9]+$ ]] && size_cmd_output=$((blocks * 512))
     elif [[ "$STAT_IS_GNU" == true ]]; then
         size_cmd_output=$($CMD_PREFIX stat -c "%s" "$file_path" 2>/dev/null)
     else
