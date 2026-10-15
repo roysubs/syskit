@@ -205,8 +205,17 @@ if [[ -n "$filter_pattern" ]]; then
     filter_args="-name \"$filter_pattern\""
 fi
 
-# Find all files with their sizes
-find_cmd="$use_sudo find \"$dir\" -xdev -type f $filter_args -size +${min_size}${exclude_args} -printf '%s %p\n'"
+# Find all files with their sizes. GNU find has -printf; BSD find (macOS) doesn't, at all,
+# so fall back to a batched stat. stat can be a different flavor than find on the same host
+# (e.g. Homebrew coreutils' gnubin gives GNU stat even with BSD find still native), so check
+# it separately rather than assuming.
+if find --version >/dev/null 2>&1; then
+    find_cmd="$use_sudo find \"$dir\" -xdev -type f $filter_args -size +${min_size}${exclude_args} -printf '%s %p\n'"
+elif stat --version >/dev/null 2>&1; then
+    find_cmd="$use_sudo find \"$dir\" -xdev -type f $filter_args -size +${min_size}${exclude_args} -exec stat -c '%s %n' {} +"
+else
+    find_cmd="$use_sudo find \"$dir\" -xdev -type f $filter_args -size +${min_size}${exclude_args} -exec stat -f '%z %N' {} +"
+fi
 eval "$find_cmd" 2>/dev/null > "$temp_all_files"
 find_exit_status=$?
 

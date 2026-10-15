@@ -253,45 +253,41 @@ fi
 # Start timer (GNU date for %N nanoseconds)
 start_time=$(date +%s.%N)
 
-# Find will output Unix timestamp (seconds since epoch, with fractional part) and path
-# %T@ provides a sortable timestamp. %p is the path.
-find_output_format="%T@ %p\\n"
-
-# Prepare the find command
-find_cmd="$use_sudo find \"$dir\" -xdev $type_flag $pattern_conditions$exclude_args -printf '$find_output_format'"
-
-# AWK script to format the timestamp using gawk's built-in 'strftime' function
-awk_formatter_script='
-{
-    timestamp_full = $1;  # First field is the timestamp (e.g., 1609459200.123456)
-
-    # Reconstruct the filepath from the 2nd field to the end
-    filepath = "";
-    for (i = 2; i <= NF; i++) {
-        filepath = filepath (i == 2 ? "" : OFS) $i;
-    }
-
-    # Use gawk strftime for formatting. It needs an integer timestamp.
-    int_timestamp = int(timestamp_full);
-
-    formatted_date = strftime("%Y-%m-%d %H:%M:%S", int_timestamp);
-
-    print formatted_date " " filepath;
-}
-'
-
-# Build full display command for summary (simplified for readability)
-full_cmd="$use_sudo find \"$dir\" -xdev $type_flag $pattern_conditions_display$exclude_display -printf '%T@ %p\\n' | sort -rnk1,1 | gawk '{awk_formatter_script}'"
+# Prepare the find command. GNU find formats the date itself via -printf's %T sub-codes
+# (fast, no extra processes). BSD find (macOS) has no -printf at all, so fall back to a
+# batched stat: BSD stat can format the date inline too (-t), but GNU stat can't, so get
+# its raw epoch instead and convert that after sorting. find and stat can be different
+# flavors on the same host (e.g. Homebrew coreutils' gnubin gives GNU stat even with BSD
+# find still native) — never assume one from the other, check each separately.
+NEEDS_EPOCH_FORMAT=false
+if find --version >/dev/null 2>&1; then
+    find_output_format="%TY-%Tm-%Td %TH:%TM:%TS %p\\n"
+    find_cmd="$use_sudo find \"$dir\" -xdev $type_flag $pattern_conditions$exclude_args -printf '$find_output_format'"
+    full_cmd="$use_sudo find \"$dir\" -xdev $type_flag $pattern_conditions_display$exclude_display -printf '$find_output_format' | sort -r"
+elif stat --version >/dev/null 2>&1; then
+    NEEDS_EPOCH_FORMAT=true
+    find_cmd="$use_sudo find \"$dir\" -xdev $type_flag $pattern_conditions$exclude_args -exec stat -c '%Y %n' {} +"
+    full_cmd="$use_sudo find \"$dir\" -xdev $type_flag $pattern_conditions_display$exclude_display -exec stat -c '%Y %n' {} + | sort -rn"
+else
+    find_cmd="$use_sudo find \"$dir\" -xdev $type_flag $pattern_conditions$exclude_args -exec stat -f '%Sm %N' -t '%Y-%m-%d %H:%M:%S' {} +"
+    full_cmd="$use_sudo find \"$dir\" -xdev $type_flag $pattern_conditions_display$exclude_display -exec stat -f '%Sm %N' -t '%Y-%m-%d %H:%M:%S' {} + | sort -r"
+fi
 
 # Execute the command pipeline
 set -o pipefail # Exit immediately if a command in the pipeline fails
 pipeline_output=""
 pipeline_exit_status=0
 
-# Execute the full pipeline
-pipeline_output=$(eval "$find_cmd" | \
-    sort -rnk1,1 | \
-    gawk "$awk_formatter_script")
+# Execute the full pipeline. The YYYY-MM-DD date prefix sorts correctly as plain text,
+# except in the GNU-stat fallback, which has a raw epoch prefix and needs a numeric sort.
+if [[ "$NEEDS_EPOCH_FORMAT" == true ]]; then
+    pipeline_output=$(eval "$find_cmd" | sort -rn | \
+        while IFS=' ' read -r epoch rest; do
+            printf '%s %s\n' "$(date -d "@$epoch" '+%Y-%m-%d %H:%M:%S')" "$rest"
+        done)
+else
+    pipeline_output=$(eval "$find_cmd" | sort -r)
+fi
 pipeline_exit_status=$?
 
 set +o pipefail # Reset pipefail option

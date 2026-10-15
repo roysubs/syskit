@@ -149,6 +149,11 @@ with open(out_file, "w") as f:
         sort -o "$out_file" "$out_file" 2>/dev/null || true
     elif find "$TARGET_DIR" -maxdepth 1 -type f -printf '' &>/dev/null; then
         find "$TARGET_DIR" -type f -printf '%T@ %s %p\n' 2>/dev/null | sort > "$out_file"
+    elif stat --version &>/dev/null; then
+        # GNU stat (e.g. via Homebrew coreutils' gnubin) even though find stayed BSD above
+        find "$TARGET_DIR" -type f -exec stat -c '%Y %s %n' {} + 2>/dev/null | sort > "$out_file"
+    elif find "$TARGET_DIR" -maxdepth 1 -type f -exec stat -f '%m %z %N' {} + &>/dev/null; then
+        find "$TARGET_DIR" -type f -exec stat -f '%m %z %N' {} + 2>/dev/null | sort > "$out_file"
     else
         find "$TARGET_DIR" -type f 2>/dev/null | sort > "$out_file"
     fi

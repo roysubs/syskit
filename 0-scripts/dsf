@@ -151,6 +151,11 @@ find_args=("$USER_DIR_INPUT" -maxdepth 1 -type f)
 $IGNORE_HIDDEN && find_args+=('!' -name '.*')
 find_args+=(-print0)
 
+# 'stat --printf=' is GNU-only syntax; BSD stat (macOS) uses '-f FORMAT' instead, with its
+# own different format codes (%z, not %s). Detected once, not per file.
+STAT_IS_GNU=false
+stat --version >/dev/null 2>&1 && STAT_IS_GNU=true
+
 TMP_FILE_LISTING=$(mktemp)
 trap 'rm -f "$TMP_FILE_LISTING" "$SORTED_AND_TRIMMED_OUTPUT" 2>/dev/null' EXIT # Add SORTED_AND_TRIMMED_OUTPUT here
 
@@ -158,8 +163,10 @@ if ! $CMD_PREFIX find "${find_args[@]}" | while IFS= read -r -d '' file_path; do
     size_cmd_output=""
     if $DISK_USAGE; then
         size_cmd_output=$($CMD_PREFIX du -B1 "$file_path" 2>/dev/null | awk '{print $1}')
+    elif [[ "$STAT_IS_GNU" == true ]]; then
+        size_cmd_output=$($CMD_PREFIX stat -c "%s" "$file_path" 2>/dev/null)
     else
-        size_cmd_output=$($CMD_PREFIX stat --printf="%s" "$file_path" 2>/dev/null)
+        size_cmd_output=$($CMD_PREFIX stat -f "%z" "$file_path" 2>/dev/null)
     fi
     if [[ "$size_cmd_output" =~ ^[0-9]+$ ]]; then
         printf "%s\t%s\n" "$size_cmd_output" "$file_path"
