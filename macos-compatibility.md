@@ -33,7 +33,8 @@ Linux systems use **GNU Coreutils**, while macOS uses **BSD Utilities**. They sh
 *   **`sed`**: On Linux, `sed -i` works directly. On Mac, it requires an extension (e.g., `sed -i ''`).
 *   **`grep`**: GNU grep has powerful recursive and perl-regex features that BSD grep lacks.
 *   **`echo`**: `echo -e` behavior can vary wildly between versions, leading to broken formatting in menus.
-*   **`find`**: The arguments for time, depth, and execution differ slightly.
+*   **`find -printf`**: GNU-only, and not just different syntax — BSD find has no equivalent flag at all. A script using it doesn't behave differently on a Mac, it fails outright, and worse, `find`'s own non-zero exit can get misread by `set -o pipefail`/error-handling code as a different problem (we once blamed a permissions error that was actually just this).
+*   **`stat`**: the *same flag letter* means something different depending on the flavor. BSD `stat -f FORMAT` is a custom per-file format string. GNU `stat -f` instead shows *filesystem* info (not file info) — its format flag is `-c` (or `--printf`). This is a worse trap than most BSD/GNU differences, because it doesn't error: it silently prints the wrong kind of output.
 
 ### C. Zsh as the Default Shell
 Since macOS Catalina, **Zsh** is the default interactive shell. 
@@ -110,6 +111,17 @@ If you want your scripts to be truly cross-platform without forcing the user to 
     # Instead of echo -e "\033[32mSuccess\033[0m"
     printf "\033[32m%%s\033[0m\n" "Success"
     ```
+7.  **Detect `find` and `stat` separately — never assume one tells you the other**: a Mac following the "Pro Linux" setup above can easily end up with GNU `stat` (from `coreutils`' `gnubin`) while `find` stays BSD, if `findutils` isn't on the same PATH. `find --version` and `stat --version` only succeed for the GNU versions; use them independently:
+    ```bash
+    # GNU find has -printf; BSD find doesn't, at all
+    if find --version >/dev/null 2>&1; then
+        find "$dir" -type f -printf '%s|%p\n'
+    elif stat --version >/dev/null 2>&1; then
+        find "$dir" -type f -exec stat -c '%s|%n' {} +   # GNU stat
+    else
+        find "$dir" -type f -exec stat -f '%z|%N' {} +   # BSD stat
+    fi
+    ```
 
 ---
 
@@ -122,3 +134,5 @@ If you want your scripts to be truly cross-platform without forcing the user to 
 | **Globbing** | Forgiving | Strict (Zsh) | `unsetopt NOMATCH` (Zsh) |
 | **xargs** | `--no-run-if-empty`| Not supported | Remove flag or use GNU xargs |
 | **echo** | `-e` usually works | `-e` usually fails | Use `printf` instead |
+| **`find -printf`** | Works | No equivalent at all | Detect with `find --version`; fall back to `stat -exec` |
+| **`stat -f`** | Shows filesystem info (`-c` is the format flag) | Custom per-file format string | Detect `stat` *separately* from `find`: `stat --version` |
