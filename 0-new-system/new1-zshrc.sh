@@ -249,9 +249,14 @@ alias u5='u1;u1;u1;u1;u1'; alias cd......='u5'
 # Tools
 alias cx='chmod +x'
 cxx() { chmod +x "$1" && "./$1"; }
-alias ls='ls -G' # -G for color in macOS/BSD ls, --color=auto for GNU. Zsh usually detects.
-# Better to check system type? MacOS 'ls' is BSD. 'ls -G'. Linux 'ls' is GNU.
-if ls --color >/dev/null 2>&1; then alias ls='ls --color=auto'; else alias ls='ls -G'; fi
+# -G is BSD ls's color flag (macOS); GNU ls (Linux) uses --color=auto and treats -G as
+# something unrelated entirely (suppress the group column in a long listing) — so this
+# can't be a single unconditional alias, it needs an explicit OS check.
+if [[ "$(uname)" == "Darwin" ]]; then
+    alias ls='ls -G'
+else
+    alias ls='ls --color=auto'
+fi
 
 alias ls.='ls -d .[!.]* ..?*'
 alias ll='ls -alh'
