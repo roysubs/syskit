@@ -43,9 +43,13 @@ if [[ ":$PATH:" != *":$HOME/syskit/0-scripts:"* ]]; then export PATH="$HOME/sysk
 # Admin tools (ifconfig, ip, iw, ethtool, ...) live in sbin, which isn't on a normal user's
 # PATH on Debian/Ubuntu (only sudo's secure_path has it) - add it so reading network/system
 # state works without sudo. A no-op on macOS, which already has these on PATH.
-for d in /usr/local/sbin /usr/sbin /sbin; do
-    if [[ -d "$d" ]] && [[ ":$PATH:" != *":$d:"* ]]; then export PATH="$PATH:$d"; fi
-done
+# One line each, not a loop: this file's own --clean/add logic processes non-function
+# content line by line, not as a block, so a multi-line for/do/done here can get split -
+# one line recognised as already present and skipped, the rest added around the gap,
+# leaving a silently empty loop body. A single self-contained line can't be split.
+if [[ -d /usr/local/sbin ]] && [[ ":$PATH:" != *":/usr/local/sbin:"* ]]; then export PATH="$PATH:/usr/local/sbin"; fi
+if [[ -d /usr/sbin ]] && [[ ":$PATH:" != *":/usr/sbin:"* ]]; then export PATH="$PATH:/usr/sbin"; fi
+if [[ -d /sbin ]] && [[ ":$PATH:" != *":/sbin:"* ]]; then export PATH="$PATH:/sbin"; fi
 
 # Safety aliases
 alias rm='rm -i'
