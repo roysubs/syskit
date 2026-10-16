@@ -281,6 +281,23 @@ clip() {
 if [[ "$(uname)" != "Darwin" ]] && command -v xdg-open >/dev/null 2>&1; then
     open() { xdg-open "$@" >/dev/null 2>&1; }
 fi
+# flushdns: clear the local DNS cache. A troubleshooting command (stale lookups after a
+# DNS change, /etc/hosts edit, or network switch), not something to run routinely.
+flushdns() {
+    if [[ "$(uname)" == "Darwin" ]]; then
+        sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder
+    elif command -v resolvectl >/dev/null 2>&1; then
+        sudo resolvectl flush-caches
+    elif command -v systemd-resolve >/dev/null 2>&1; then
+        sudo systemd-resolve --flush-caches
+    elif command -v nscd >/dev/null 2>&1; then
+        sudo systemctl restart nscd
+    else
+        echo "flushdns: no known DNS cache service found (resolvectl/systemd-resolve/nscd)" >&2
+        return 1
+    fi
+    echo "DNS cache flushed."
+}
 
 alias venvh='source $HOME/syskit/0-scripts/venv-helper.sh'
 
