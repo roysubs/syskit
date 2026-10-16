@@ -40,6 +40,11 @@ zshrc_block=$(cat <<'EOF_ZSHRC_CONTENT'
 # Path definitions
 if [[ ":$PATH:" != *":$HOME/syskit:"* ]]; then export PATH="$HOME/syskit:$PATH"; fi
 if [[ ":$PATH:" != *":$HOME/syskit/0-scripts:"* ]]; then export PATH="$HOME/syskit/0-scripts:$PATH"; fi
+# Admin tools (ifconfig, ip, iw, ethtool, ...) live in /usr/sbin and /sbin, which aren't on a
+# normal user's PATH on Debian/Ubuntu (only sudo's secure_path has them) - add them so reading
+# network/system state works without sudo. A no-op on macOS, which already has both on PATH.
+if [[ ":$PATH:" != *":/usr/sbin:"* ]]; then export PATH="$PATH:/usr/sbin"; fi
+if [[ ":$PATH:" != *":/sbin:"* ]]; then export PATH="$PATH:/sbin"; fi
 
 # Safety aliases
 alias rm='rm -i'
@@ -267,8 +272,6 @@ if [[ "$(uname)" != "Darwin" ]] && command -v xdg-open >/dev/null 2>&1; then
     open() { xdg-open "$@" >/dev/null 2>&1; }
 fi
 
-alias ifconfig='sudo ifconfig'
-alias ipconfig='sudo ifconfig'
 alias venvh='source $HOME/syskit/0-scripts/venv-helper.sh'
 
 # Tmux
