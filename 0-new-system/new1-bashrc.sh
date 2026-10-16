@@ -304,6 +304,8 @@ if ! dpkg -s bluez-tools &> /dev/null && command -v batcat &> /dev/null && ! com
 # 'mdcat paginate' / 'mdcat less'
 command -v ml >/dev/null || alias ml='mdcat -p'
 command -v mp >/dev/null || alias mp='mdcat -p'
+# ql: Quick Look preview from the terminal (macOS only; qlmanage doesn't exist elsewhere)
+command -v qlmanage >/dev/null 2>&1 && alias ql='qlmanage -p 2>/dev/null'
 
 # The below will load ~/.bashrc_personal if it is present. This is more for personal jump
 # locations and personal functions and aliases that don't fit as more generic. A sample set

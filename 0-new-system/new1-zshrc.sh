@@ -317,6 +317,9 @@ if [[ -f $HOME/syskit/0-scripts/g ]]; then alias gacp='g acp'; fi
 # Batcat compatibility
 if ! dpkg -s bluez-tools >/dev/null 2>&1 && (( $+commands[batcat] )) && ! (( $+commands[bat] )); then alias bat='batcat'; fi
 
+# ql: Quick Look preview from the terminal (macOS only; qlmanage doesn't exist elsewhere)
+command -v qlmanage >/dev/null 2>&1 && alias ql='qlmanage -p 2>/dev/null'
+
 # Personal overwrite
 if [[ -f ~/.zshrc_personal ]]; then . ~/.zshrc_personal; fi
 
